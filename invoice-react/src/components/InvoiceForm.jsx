@@ -450,11 +450,14 @@ export default function InvoiceForm({
         setIsGenerating(true)
         setEmailStatus(t.alertGenerating)
         try {
-            // Check if Google OAuth is connected FIRST
-            const googleStatusRes = await fetch('/auth/google/status')
-            const googleStatus = await googleStatusRes.json()
+            // Check for local tokens
+            const tokensStr = localStorage.getItem('google_tokens')
+            let tokens = null
+            if (tokensStr) {
+                try { tokens = JSON.parse(tokensStr) } catch (e) { }
+            }
 
-            if (!googleStatus.connected) {
+            if (!tokens) {
                 setIsGenerating(false)
                 setEmailStatus('')
                 return alert(
@@ -478,7 +481,8 @@ export default function InvoiceForm({
                     text: `Hello,\n\nPlease find attached the invoice ${currentData.invoiceNumber}.\n\nThank you!`,
                     pdfBase64,
                     filename: `${currentData.invoiceNumber}.pdf`,
-                    useGoogle: true  // Always require Google
+                    useGoogle: true,
+                    tokens: tokens // Send tokens to API
                 })
             })
             if (response.ok) {

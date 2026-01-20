@@ -5,30 +5,49 @@ export default function Header({ onNewInvoice, lang, setLang, t, currentView, on
 
     useEffect(() => {
         checkGoogleStatus()
+
+        // Listen for storage changes (e.g. login/logout in other tab or component)
+        const handleStorageChange = () => checkGoogleStatus()
+        window.addEventListener('storage', handleStorageChange)
+        // Also listen for custom event we might dispatch
+        window.addEventListener('google_login_update', handleStorageChange)
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange)
+            window.removeEventListener('google_login_update', handleStorageChange)
+        }
     }, [])
 
-    const checkGoogleStatus = async () => {
-        try {
-            const res = await fetch('/auth/google/status')
-            const data = await res.json()
-            setIsGoogleConnected(data.connected)
-        } catch (e) {
-            console.error('Failed to check google status', e)
-        }
+    const checkGoogleStatus = () => {
+        const tokens = localStorage.getItem('google_tokens')
+        setIsGoogleConnected(!!tokens)
     }
 
     const handleGoogleLogin = async () => {
+        if (isGoogleConnected) {
+            // If connected, clicking might mean "Show settings" or "Logout". 
+            // For now, let's just go to Settings to manage account
+            onViewChange('settings')
+            return
+        }
+
         try {
             const res = await fetch('/auth/google/url')
             const data = await res.json()
             if (data.url) {
-                const popup = window.open(data.url, 'Google Auth', 'width=600,height=700')
-                const timer = setInterval(async () => {
-                    if (popup.closed) {
-                        clearInterval(timer)
+                window.open(data.url, 'Google Auth', 'width=600,height=700')
+
+                const handleMessage = (event) => {
+                    if (event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
+                        const { tokens } = event.data
+                        localStorage.setItem('google_tokens', JSON.stringify(tokens))
                         checkGoogleStatus()
+                        window.removeEventListener('message', handleMessage)
+                        // Dispath event for other components
+                        window.dispatchEvent(new Event('google_login_update'))
                     }
-                }, 1000)
+                }
+                window.addEventListener('message', handleMessage)
             }
         } catch (e) {
             alert('Failed to start auth flow')

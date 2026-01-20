@@ -322,20 +322,23 @@ export default function Settings({
                                     const res = await fetch('/auth/google/url');
                                     const data = await res.json();
                                     if (data.url) {
-                                        const popup = window.open(data.url, 'Google Auth', 'width=600,height=700');
-                                        const timer = setInterval(async () => {
-                                            if (popup.closed) {
-                                                clearInterval(timer);
-                                                const statusRes = await fetch('/auth/google/status');
-                                                const statusData = await statusRes.json();
-                                                if (statusData.connected) {
-                                                    const newConfig = { ...smtpConfig, useGoogle: true };
-                                                    setSmtpConfig(newConfig);
-                                                    localStorage.setItem('smtpConfig', JSON.stringify(newConfig));
-                                                    alert(lang === 'cs' ? 'Úspěšně připojeno!' : 'Successfully connected!');
-                                                }
+                                        window.open(data.url, 'Google Auth', 'width=600,height=700');
+
+                                        // Listen for success message from popup
+                                        const handleMessage = (event) => {
+                                            if (event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
+                                                const { tokens, email } = event.data;
+                                                localStorage.setItem('google_tokens', JSON.stringify(tokens));
+
+                                                const newConfig = { ...smtpConfig, useGoogle: true, fromEmail: email };
+                                                setSmtpConfig(newConfig);
+                                                localStorage.setItem('smtpConfig', JSON.stringify(newConfig));
+
+                                                alert(lang === 'cs' ? 'Úspěšně připojeno!' : 'Successfully connected!');
+                                                window.removeEventListener('message', handleMessage);
                                             }
-                                        }, 1000);
+                                        };
+                                        window.addEventListener('message', handleMessage);
                                     }
                                 } catch (e) {
                                     alert('Failed to start auth flow');
@@ -351,8 +354,8 @@ export default function Settings({
                             <button
                                 type="button"
                                 className="danger"
-                                onClick={async () => {
-                                    await fetch('/auth/google/disconnect', { method: 'POST' });
+                                onClick={() => {
+                                    localStorage.removeItem('google_tokens');
                                     const newConfig = { ...smtpConfig, useGoogle: false };
                                     setSmtpConfig(newConfig);
                                     localStorage.setItem('smtpConfig', JSON.stringify(newConfig));
