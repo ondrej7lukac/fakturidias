@@ -1,0 +1,34 @@
+# === USER DATA - NEVER COMMIT THIS! ===
+# This folder contains your invoices and items database
+data/
+google_tokens.json
+
+# === NODE MODULES ===
+# These are installed via npm install, don't commit them
+node_modules/
+invoice-react/node_modules/
+
+# === BUILD OUTPUT ===
+# Generated files, can be rebuilt
+invoice-react/dist/
+*.log
+
+# === IDE FILES ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === OS FILES ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === DEBUG FILES ===
+.cursor/
+*.webp
+
+# === Environment Variables (if you add any later) ===
+.env
+.env.local

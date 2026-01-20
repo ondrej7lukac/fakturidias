@@ -1,0 +1,240 @@
+﻿{
+    "pocetCelkem":  1,
+    "ekonomickeSubjekty":  [
+                               {
+                                   "ico":  "14080214",
+                                   "obchodniJmeno":  "BeBerry Coffee s.r.o.",
+                                   "sidlo":  {
+                                                 "kodStatu":  "CZ",
+                                                 "nazevStatu":  "Česká republika",
+                                                 "kodKraje":  19,
+                                                 "nazevKraje":  "Hlavní město Praha",
+                                                 "kodOkresu":  3100,
+                                                 "kodObce":  554782,
+                                                 "nazevObce":  "Praha",
+                                                 "kodSpravnihoObvodu":  108,
+                                                 "nazevSpravnihoObvodu":  "Praha 10",
+                                                 "kodMestskehoObvodu":  108,
+                                                 "nazevMestskehoObvodu":  "Praha 10",
+                                                 "kodMestskeCastiObvodu":  500224,
+                                                 "kodUlice":  464058,
+                                                 "nazevMestskeCastiObvodu":  "Praha 10",
+                                                 "nazevUlice":  "Korunní",
+                                                 "cisloDomovni":  2569,
+                                                 "kodCastiObce":  490229,
+                                                 "cisloOrientacni":  108,
+                                                 "nazevCastiObce":  "Vinohrady",
+                                                 "kodAdresnihoMista":  28281047,
+                                                 "psc":  10100,
+                                                 "textovaAdresa":  "Korunní 2569/108, Vinohrady, 10100 Praha 10",
+                                                 "standardizaceAdresy":  true,
+                                                 "typCisloDomovni":  1
+                                             },
+                                   "pravniForma":  "112",
+                                   "pravniFormaRos":  "112",
+                                   "financniUrad":  "010",
+                                   "datumVzniku":  "2021-12-21",
+                                   "datumAktualizace":  "2025-10-30",
+                                   "dic":  "CZ14080214",
+                                   "icoId":  "14080214",
+                                   "adresaDorucovaci":  {
+                                                            "radekAdresy1":  "Korunní 2569/108",
+                                                            "radekAdresy2":  "Vinohrady",
+                                                            "radekAdresy3":  "10100 Praha 10"
+                                                        },
+                                   "czNace2008":  [
+                                                      "00",
+                                                      "6820",
+                                                      "821"
+                                                  ],
+                                   "seznamRegistraci":  {
+                                                            "stavZdrojeRos":  "AKTIVNI",
+                                                            "stavZdrojeVr":  "AKTIVNI",
+                                                            "stavZdrojeRes":  "AKTIVNI",
+                                                            "stavZdrojeRzp":  "AKTIVNI",
+                                                            "stavZdrojeNrpzs":  "NEEXISTUJICI",
+                                                            "stavZdrojeRpsh":  "NEEXISTUJICI",
+                                                            "stavZdrojeRcns":  "NEEXISTUJICI",
+                                                            "stavZdrojeSzr":  "NEEXISTUJICI",
+                                                            "stavZdrojeDph":  "AKTIVNI",
+                                                            "stavZdrojeSkDph":  "NEEXISTUJICI",
+                                                            "stavZdrojeSd":  "NEEXISTUJICI",
+                                                            "stavZdrojeIr":  "NEEXISTUJICI",
+                                                            "stavZdrojeCeu":  "NEEXISTUJICI",
+                                                            "stavZdrojeRs":  "NEEXISTUJICI",
+                                                            "stavZdrojeRed":  "NEEXISTUJICI",
+                                                            "stavZdrojeMonitor":  "NEEXISTUJICI"
+                                                        },
+                                   "primarniZdroj":  "ros",
+                                   "dalsiUdaje":  [
+                                                      {
+                                                          "obchodniJmeno":  [
+                                                                                {
+                                                                                    "obchodniJmeno":  "BeBerry Coffee s.r.o.",
+                                                                                    "primarniZaznam":  true
+                                                                                }
+                                                                            ],
+                                                          "sidlo":  [
+                                                                        {
+                                                                            "sidlo":  {
+                                                                                          "kodStatu":  "CZ",
+                                                                                          "nazevStatu":  "Česká republika",
+                                                                                          "kodKraje":  19,
+                                                                                          "nazevKraje":  "Hlavní město Praha",
+                                                                                          "kodObce":  554782,
+                                                                                          "nazevObce":  "Praha",
+                                                                                          "kodSpravnihoObvodu":  108,
+                                                                                          "nazevSpravnihoObvodu":  "Praha 10",
+                                                                                          "kodMestskehoObvodu":  108,
+                                                                                          "nazevMestskehoObvodu":  "Praha 10",
+                                                                                          "kodMestskeCastiObvodu":  500224,
+                                                                                          "kodUlice":  464058,
+                                                                                          "nazevMestskeCastiObvodu":  "Praha 10",
+                                                                                          "nazevUlice":  "Korunní",
+                                                                                          "cisloDomovni":  2569,
+                                                                                          "kodCastiObce":  490229,
+                                                                                          "cisloOrientacni":  108,
+                                                                                          "nazevCastiObce":  "Vinohrady",
+                                                                                          "kodAdresnihoMista":  28281047,
+                                                                                          "psc":  10100,
+                                                                                          "textovaAdresa":  "Korunní 2569/108, Vinohrady, 10100 Praha 10",
+                                                                                          "standardizaceAdresy":  true,
+                                                                                          "typCisloDomovni":  1
+                                                                                      },
+                                                                            "primarniZaznam":  true
+                                                                        }
+                                                                    ],
+                                                          "pravniForma":  "112",
+                                                          "pravniFormaRos":  "112",
+                                                          "datovyZdroj":  "res"
+                                                      },
+                                                      {
+                                                          "obchodniJmeno":  [
+                                                                                {
+                                                                                    "obchodniJmeno":  "BeBerry Coffee s.r.o.",
+                                                                                    "primarniZaznam":  true
+                                                                                }
+                                                                            ],
+                                                          "sidlo":  [
+                                                                        {
+                                                                            "sidlo":  {
+                                                                                          "kodStatu":  "CZ",
+                                                                                          "nazevStatu":  "Česká republika",
+                                                                                          "kodKraje":  19,
+                                                                                          "nazevKraje":  "Hlavní město Praha",
+                                                                                          "kodOkresu":  3100,
+                                                                                          "kodObce":  554782,
+                                                                                          "nazevObce":  "Praha",
+                                                                                          "kodSpravnihoObvodu":  108,
+                                                                                          "nazevSpravnihoObvodu":  "Praha 10",
+                                                                                          "kodMestskehoObvodu":  108,
+                                                                                          "nazevMestskehoObvodu":  "Praha 10",
+                                                                                          "kodMestskeCastiObvodu":  500224,
+                                                                                          "kodUlice":  464058,
+                                                                                          "nazevMestskeCastiObvodu":  "Praha 10",
+                                                                                          "nazevUlice":  "Korunní",
+                                                                                          "cisloDomovni":  2569,
+                                                                                          "kodCastiObce":  490229,
+                                                                                          "cisloOrientacni":  108,
+                                                                                          "nazevCastiObce":  "Vinohrady",
+                                                                                          "kodAdresnihoMista":  28281047,
+                                                                                          "psc":  10100,
+                                                                                          "textovaAdresa":  "Korunní 2569/108, Vinohrady, 10100 Praha 10",
+                                                                                          "standardizaceAdresy":  true,
+                                                                                          "typCisloDomovni":  1
+                                                                                      },
+                                                                            "primarniZaznam":  true
+                                                                        }
+                                                                    ],
+                                                          "pravniFormaRos":  "112",
+                                                          "datovyZdroj":  "ros"
+                                                      },
+                                                      {
+                                                          "obchodniJmeno":  [
+                                                                                {
+                                                                                    "obchodniJmeno":  "BeBerry Coffee s.r.o.",
+                                                                                    "primarniZaznam":  true
+                                                                                }
+                                                                            ],
+                                                          "sidlo":  [
+                                                                        {
+                                                                            "sidlo":  {
+                                                                                          "kodStatu":  "CZ",
+                                                                                          "nazevStatu":  "Česká republika",
+                                                                                          "kodKraje":  19,
+                                                                                          "nazevKraje":  "Hlavní město Praha",
+                                                                                          "kodObce":  554782,
+                                                                                          "nazevObce":  "Praha",
+                                                                                          "kodSpravnihoObvodu":  108,
+                                                                                          "nazevSpravnihoObvodu":  "Praha 10",
+                                                                                          "kodMestskehoObvodu":  108,
+                                                                                          "nazevMestskehoObvodu":  "Praha 10",
+                                                                                          "kodMestskeCastiObvodu":  500224,
+                                                                                          "kodUlice":  464058,
+                                                                                          "nazevMestskeCastiObvodu":  "Praha 10",
+                                                                                          "nazevUlice":  "Korunní",
+                                                                                          "cisloDomovni":  2569,
+                                                                                          "kodCastiObce":  490229,
+                                                                                          "cisloOrientacni":  108,
+                                                                                          "nazevCastiObce":  "Vinohrady",
+                                                                                          "kodAdresnihoMista":  28281047,
+                                                                                          "psc":  10100,
+                                                                                          "textovaAdresa":  "Korunní 2569/108, Vinohrady, 10100 Praha 10",
+                                                                                          "standardizaceAdresy":  true,
+                                                                                          "typCisloDomovni":  1
+                                                                                      },
+                                                                            "primarniZaznam":  true
+                                                                        }
+                                                                    ],
+                                                          "pravniForma":  "112",
+                                                          "datovyZdroj":  "rzp"
+                                                      },
+                                                      {
+                                                          "obchodniJmeno":  [
+                                                                                {
+                                                                                    "obchodniJmeno":  "BeBerry Coffee s.r.o.",
+                                                                                    "primarniZaznam":  true
+                                                                                }
+                                                                            ],
+                                                          "sidlo":  [
+                                                                        {
+                                                                            "sidlo":  {
+                                                                                          "kodStatu":  "CZ",
+                                                                                          "nazevStatu":  "Česká republika",
+                                                                                          "kodKraje":  19,
+                                                                                          "nazevKraje":  "Hlavní město Praha",
+                                                                                          "kodOkresu":  3100,
+                                                                                          "kodObce":  554782,
+                                                                                          "nazevObce":  "Praha",
+                                                                                          "kodMestskehoObvodu":  108,
+                                                                                          "nazevMestskehoObvodu":  "Praha 10",
+                                                                                          "kodMestskeCastiObvodu":  500224,
+                                                                                          "kodUlice":  464058,
+                                                                                          "nazevMestskeCastiObvodu":  "Praha 10",
+                                                                                          "nazevUlice":  "Korunní",
+                                                                                          "cisloDomovni":  2569,
+                                                                                          "kodCastiObce":  490229,
+                                                                                          "cisloOrientacni":  108,
+                                                                                          "nazevCastiObce":  "Vinohrady",
+                                                                                          "kodAdresnihoMista":  28281047,
+                                                                                          "psc":  10100,
+                                                                                          "textovaAdresa":  "Korunní 2569/108, Vinohrady, 10100 Praha 10",
+                                                                                          "standardizaceAdresy":  true,
+                                                                                          "typCisloDomovni":  1
+                                                                                      },
+                                                                            "primarniZaznam":  true
+                                                                        }
+                                                                    ],
+                                                          "pravniForma":  "112",
+                                                          "spisovaZnacka":  "C 359146/MSPH",
+                                                          "datovyZdroj":  "vr"
+                                                      }
+                                                  ],
+                                   "czNace":  [
+                                                  "00",
+                                                  "6820",
+                                                  "821"
+                                              ]
+                               }
+                           ]
+}
