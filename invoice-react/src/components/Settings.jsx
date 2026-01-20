@@ -336,6 +336,8 @@ export default function Settings({
 
                                                 alert(lang === 'cs' ? 'Úspěšně připojeno!' : 'Successfully connected!');
                                                 window.removeEventListener('message', handleMessage);
+                                                // Dispatch global event
+                                                window.dispatchEvent(new Event('google_login_update'))
                                             }
                                         };
                                         window.addEventListener('message', handleMessage);
@@ -359,6 +361,8 @@ export default function Settings({
                                     const newConfig = { ...smtpConfig, useGoogle: false };
                                     setSmtpConfig(newConfig);
                                     localStorage.setItem('smtpConfig', JSON.stringify(newConfig));
+                                    // Dispatch global event
+                                    window.dispatchEvent(new Event('google_login_update'))
                                 }}
                             >
                                 {lang === 'cs' ? 'Odpojit' : 'Disconnect'}

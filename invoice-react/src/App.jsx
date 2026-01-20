@@ -41,6 +41,28 @@ function App() {
             console.error('Failed to load invoices:', err)
             setIsLoading(false)
         })
+
+        // Listen for Google Login to auto-fill email
+        const handleGoogleLogin = () => {
+            const tokensStr = localStorage.getItem('google_tokens')
+            if (tokensStr) {
+                // Try to get email from localStorage (Settings.jsx saves it there now in smtpConfig)
+                const smtpConfig = localStorage.getItem('smtpConfig')
+                if (smtpConfig) {
+                    const { fromEmail } = JSON.parse(smtpConfig)
+                    if (fromEmail) {
+                        setDefaultSupplier(prev => {
+                            if (!prev || !prev.email) {
+                                return { ...prev, email: fromEmail }
+                            }
+                            return prev
+                        })
+                    }
+                }
+            }
+        }
+        window.addEventListener('google_login_update', handleGoogleLogin)
+        return () => window.removeEventListener('google_login_update', handleGoogleLogin)
     }, [])
 
     // Save local settings to localStorage (not server)

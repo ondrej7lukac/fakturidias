@@ -39,8 +39,17 @@ export default function Header({ onNewInvoice, lang, setLang, t, currentView, on
 
                 const handleMessage = (event) => {
                     if (event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
-                        const { tokens } = event.data
+                        const { tokens, email } = event.data
                         localStorage.setItem('google_tokens', JSON.stringify(tokens))
+
+                        // Save email to smtpConfig (used by Settings and App)
+                        const currentSmtp = JSON.parse(localStorage.getItem('smtpConfig') || '{}')
+                        localStorage.setItem('smtpConfig', JSON.stringify({
+                            ...currentSmtp,
+                            useGoogle: true,
+                            fromEmail: email
+                        }))
+
                         checkGoogleStatus()
                         window.removeEventListener('message', handleMessage)
                         // Dispath event for other components
