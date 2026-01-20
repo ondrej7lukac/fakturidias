@@ -1,6 +1,5 @@
-# === USER DATA - NEVER COMMIT THIS! ===
-# This folder contains your invoices and items database
-data/
+# === SENSITIVE TOKENS - NEVER COMMIT THIS! ===
+# OAuth tokens are sensitive and personal
 google_tokens.json
 
 # === NODE MODULES ===
@@ -32,3 +31,7 @@ desktop.ini
 # === Environment Variables (if you add any later) ===
 .env
 .env.local
+
+# NOTE: data/ folder IS committed for testing purposes
+# This contains test invoices and items database
+# For production, you'd want to use a real database
