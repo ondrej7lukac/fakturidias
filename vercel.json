@@ -17,11 +17,5 @@
             "source": "/((?!api/.*|auth/.*).*)",
             "destination": "/invoice-react/dist/index.html"
         }
-    ],
-    "functions": {
-        "api/index.js": {
-            "memory": 1024,
-            "maxDuration": 10
-        }
-    }
+    ]
 }
