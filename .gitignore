@@ -1,37 +1,38 @@
-# === SENSITIVE TOKENS - NEVER COMMIT THIS! ===
-# OAuth tokens are sensitive and personal
-google_tokens.json
-
-# === NODE MODULES ===
-# These are installed via npm install, don't commit them
+# Dependencies
 node_modules/
 invoice-react/node_modules/
 
-# === BUILD OUTPUT ===
-# Generated files, can be rebuilt
-invoice-react/dist/
-*.log
+# Environment variables
+.env
+.env.local
+.env.*.local
 
-# === IDE FILES ===
+# Sensitive files
+google_tokens.json
+*.pem
+*.key
+
+# Build output
+dist/
+invoice-react/dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+.cursor/
+debug.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# === OS FILES ===
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# === DEBUG FILES ===
-.cursor/
-*.webp
-
-# === Environment Variables (if you add any later) ===
-.env
-.env.local
-
-# NOTE: data/ folder IS committed for testing purposes
-# This contains test invoices and items database
-# For production, you'd want to use a real database
+# Data storage
+data/

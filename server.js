@@ -170,9 +170,13 @@ function readJsonBody(req, callback) {
 }
 
 // #region Google OAuth Setup
-const GOOGLE_CLIENT_ID = "1028031822016-6jqktqscqmksr0qjnp65ctcehq6etjrr.apps.googleusercontent.com";
-const GOOGLE_CLIENT_SECRET = "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";
+// Load environment variables
+require('dotenv').config();
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_REDIRECT_URI = "http://localhost:5500/auth/google/callback";
+
 
 const SCOPES = [
   'https://mail.google.com/',

@@ -1,14 +1,32 @@
-const http = require("http");
 const https = require("https");
 const zlib = require("zlib");
 const { URL } = require("url");
+
+// Environment variables will be set in Vercel dashboard
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+
+// Vercel serverless functions are stateless, so we use environment detection
+const GOOGLE_REDIRECT_URI = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}/auth/google/callback`
+    : "https://ondrej7lukac-fakturidias.vercel.app/auth/google/callback";
+
+const SCOPES = [
+    'https://mail.google.com/',
+    'https://www.googleapis.com/auth/userinfo.email'
+];
+
+// In-memory token storage (resets per invocation on Vercel)
+// For production, use a database or Vercel KV
+let oAuth2Client = null;
+let google = null;
 
 // #region Helper Functions
 function sendJson(res, status, payload) {
     res.statusCode = status;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     res.end(JSON.stringify(payload));
 }
@@ -16,7 +34,7 @@ function sendJson(res, status, payload) {
 function sendCors(res) {
     res.statusCode = 204;
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     res.end();
 }
@@ -89,12 +107,41 @@ async function proxyJsonWithFallback(optionsList, body, res) {
     }
     sendJson(res, 502, { error: "ARES request failed", details: lastError?.error });
 }
+
+function readJsonBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = "";
+        req.on("data", chunk => { body += chunk; });
+        req.on("end", () => {
+            try {
+                const parsed = JSON.parse(body || "{}");
+                resolve(parsed);
+            } catch (error) {
+                reject(new Error("Invalid JSON body"));
+            }
+        });
+    });
+}
 // #endregion
+
+// Initialize Google OAuth if credentials are available
+try {
+    if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
+        google = require('googleapis').google;
+        oAuth2Client = new google.auth.OAuth2(
+            GOOGLE_CLIENT_ID,
+            GOOGLE_CLIENT_SECRET,
+            GOOGLE_REDIRECT_URI
+        );
+    }
+} catch (e) {
+    console.warn("[Vercel] googleapis not installed or failed to load");
+}
 
 module.exports = async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const requestPath = decodeURIComponent(url.pathname || "/");
-    console.log(`[API] Request: ${req.method} ${requestPath}`);
+    console.log(`[API] ${req.method} ${requestPath}`);
 
     // Handle CORS preflight for all routes
     if (req.method === "OPTIONS") {
@@ -103,53 +150,44 @@ module.exports = async (req, res) => {
 
     // --- ARES Search Route ---
     if (requestPath.endsWith("/api/ares/search") && req.method === "POST") {
-        let body = "";
-        req.on("data", chunk => { body += chunk; });
-
-        return new Promise((resolve) => {
-            req.on("end", async () => {
-                try {
-                    const parsedBody = JSON.parse(body || "{}");
-                    const payload = JSON.stringify({
-                        obchodniJmeno: String(parsedBody.obchodniJmeno || "").trim(),
-                        ico: parsedBody.ico ? String(parsedBody.ico).trim() : undefined,
-                        pocet: parsedBody.pocet || 8,
-                        strana: parsedBody.strana || 1
-                    });
-
-                    await proxyJsonWithFallback([
-                        {
-                            hostname: "ares.gov.cz",
-                            path: "/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/vyhledat",
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "Content-Length": Buffer.byteLength(payload),
-                                "Accept": "application/json",
-                                "Accept-Encoding": "gzip, deflate",
-                                "User-Agent": "InvoiceMaker/1.0"
-                            }
-                        },
-                        {
-                            hostname: "ares.gov.cz",
-                            path: "/ekonomicke-subjekty/rest/ekonomicke-subjekty/vyhledat",
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "Content-Length": Buffer.byteLength(payload),
-                                "Accept": "application/json",
-                                "Accept-Encoding": "gzip, deflate",
-                                "User-Agent": "InvoiceMaker/1.0"
-                            }
-                        }
-                    ], payload, res);
-                    resolve();
-                } catch (e) {
-                    sendJson(res, 400, { error: "Invalid JSON body" });
-                    resolve();
-                }
+        try {
+            const parsedBody = await readJsonBody(req);
+            const payload = JSON.stringify({
+                obchodniJmeno: String(parsedBody.obchodniJmeno || "").trim(),
+                ico: parsedBody.ico ? String(parsedBody.ico).trim() : undefined,
+                pocet: parsedBody.pocet || 8,
+                strana: parsedBody.strana || 1
             });
-        });
+
+            return await proxyJsonWithFallback([
+                {
+                    hostname: "ares.gov.cz",
+                    path: "/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/vyhledat",
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Content-Length": Buffer.byteLength(payload),
+                        "Accept": "application/json",
+                        "Accept-Encoding": "gzip, deflate",
+                        "User-Agent": "InvoiceMaker/1.0"
+                    }
+                },
+                {
+                    hostname: "ares.gov.cz",
+                    path: "/ekonomicke-subjekty/rest/ekonomicke-subjekty/vyhledat",
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Content-Length": Buffer.byteLength(payload),
+                        "Accept": "application/json",
+                        "Accept-Encoding": "gzip, deflate",
+                        "User-Agent": "InvoiceMaker/1.0"
+                    }
+                }
+            ], payload, res);
+        } catch (e) {
+            return sendJson(res, 400, { error: "Invalid JSON body" });
+        }
     }
 
     // --- ARES IČO Lookup Route ---
@@ -183,24 +221,129 @@ module.exports = async (req, res) => {
         ], null, res);
     }
 
-    // --- Auth & Email (Mock/Placeholder for Serverless) ---
-    // Note: Full persistent file storage (invoices.json, google_tokens.json) 
-    // DOES NOT work on Vercel Serverless automatically. 
-    // You would need a database (Supabase, Firebase, MongoDB) for true persistence.
-    // For now, we return valid but empty/mock responses to prevent crashes.
+    // --- Google OAuth Routes ---
+    if (requestPath === "/auth/google/url" && req.method === "GET") {
+        if (!oAuth2Client) {
+            return sendJson(res, 500, {
+                error: "OAuth not configured",
+                message: "Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel environment variables"
+            });
+        }
 
-    if (requestPath.includes("/auth/google")) {
-        return sendJson(res, 501, { error: "Google OAuth not supported on static Vercel deployment yet. Requires Database." });
+        const authUrl = oAuth2Client.generateAuthUrl({
+            access_type: 'offline',
+            scope: SCOPES,
+            prompt: 'consent'
+        });
+        return sendJson(res, 200, { url: authUrl });
     }
 
-    if (requestPath.includes("/api/invoices") || requestPath.includes("/api/items")) {
-        // Return empty lists for now so the frontend doesn't break
-        if (req.method === "GET") return sendJson(res, 200, { invoices: [], items: [] });
-        return sendJson(res, 200, { success: true }); // Pretend we saved it
+    if (requestPath === "/auth/google/callback") {
+        if (!oAuth2Client) {
+            res.setHeader("Content-Type", "text/html");
+            return res.end(`
+                <html>
+                <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+                    <h1 style="color: red;">OAuth Not Configured</h1>
+                    <p>Please configure Google OAuth credentials in Vercel.</p>
+                </body>
+                </html>
+            `);
+        }
+
+        const code = url.searchParams.get('code');
+        if (code) {
+            try {
+                const { tokens } = await oAuth2Client.getToken(code);
+                oAuth2Client.setCredentials(tokens);
+
+                // Extract email from ID token
+                let userEmail = null;
+                if (tokens.id_token) {
+                    try {
+                        const ticket = await oAuth2Client.verifyIdToken({
+                            idToken: tokens.id_token,
+                            audience: GOOGLE_CLIENT_ID
+                        });
+                        userEmail = ticket.getPayload().email;
+                    } catch (e) {
+                        console.warn('[OAuth] Could not decode ID token:', e.message);
+                    }
+                }
+
+                // NOTE: On Vercel, we can't persist tokens to file system
+                // You should save them to a database or Vercel KV
+                // For now, display them to the user to copy
+
+                res.setHeader("Content-Type", "text/html");
+                res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+                return res.end(`
+                    <html>
+                    <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+                        <h1 style="color: orange;">⚠️ Important: Token Storage Required</h1>
+                        <p>Google OAuth is connected, but Vercel serverless functions are stateless.</p>
+                        <p><strong>Your email:</strong> ${userEmail || 'Not available'}</p>
+                        <p style="color: red;">To persist tokens, you need to set up a database (MongoDB, Vercel KV, etc.)</p>
+                        <p>For now, OAuth will work for this session only.</p>
+                        <button onclick="window.close()">Close Window</button>
+                        <script>
+                            setTimeout(() => window.close(), 5000);
+                        </script>
+                    </body>
+                    </html>
+                `);
+            } catch (error) {
+                res.setHeader("Content-Type", "text/html");
+                return res.end(`
+                    <html>
+                    <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+                        <h1 style="color: red;">Authentication Failed</h1>
+                        <p>${error.message}</p>
+                    </body>
+                    </html>
+                `);
+            }
+        }
     }
 
-    if (requestPath.includes("/api/email/send")) {
-        return sendJson(res, 501, { error: "Email sending not configured for Vercel." });
+    if (requestPath === "/auth/google/status" && req.method === "GET") {
+        // On Vercel, we can't check persistent status without a database
+        return sendJson(res, 200, {
+            connected: false,
+            message: "Vercel deployment requires database for persistent OAuth tokens"
+        });
+    }
+
+    if (requestPath === "/auth/google/disconnect" && req.method === "POST") {
+        if (oAuth2Client) {
+            oAuth2Client.setCredentials({});
+        }
+        return sendJson(res, 200, { success: true });
+    }
+
+    // --- Email Sending ---
+    if (requestPath === "/api/email/send" && req.method === "POST") {
+        return sendJson(res, 501, {
+            error: "Email not configured for Vercel",
+            message: "Gmail OAuth requires persistent token storage (database). Set up MongoDB or Vercel KV."
+        });
+    }
+
+    // --- Data Routes (Placeholder) ---
+    // NOTE: Vercel serverless functions have no file system persistence
+    // Use MongoDB, Vercel KV, or another database
+    if (requestPath.includes("/api/invoices")) {
+        return sendJson(res, 501, {
+            error: "Database not configured",
+            message: "Set up MongoDB by adding MONGODB_URI to Vercel environment variables"
+        });
+    }
+
+    if (requestPath.includes("/api/items")) {
+        return sendJson(res, 501, {
+            error: "Database not configured",
+            message: "Set up MongoDB by adding MONGODB_URI to Vercel environment variables"
+        });
     }
 
     // 404 for anything else
