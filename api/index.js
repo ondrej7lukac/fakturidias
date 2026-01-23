@@ -17,22 +17,26 @@ const SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email'
 ];
 
-let oAuth2Client = null;
-let google = null;
+// function-scoped variables instead of global
+const getOAuthClient = () => {
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return null;
 
-// Initialize Google OAuth
-try {
-    if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
-        google = require('googleapis').google;
-        oAuth2Client = new google.auth.OAuth2(
+    // Hardcoded production URL
+    const redirectUri = "https://fakturidias.vercel.app/auth/google/callback";
+    console.log("[OAuth] Using Redirect URI:", redirectUri);
+
+    try {
+        const { google } = require('googleapis');
+        return new google.auth.OAuth2(
             GOOGLE_CLIENT_ID,
             GOOGLE_CLIENT_SECRET,
-            GOOGLE_REDIRECT_URI
+            redirectUri
         );
+    } catch (e) {
+        console.error("Failed to load googleapis:", e);
+        return null;
     }
-} catch (e) {
-    console.warn("[Vercel] googleapis not installed or failed to load");
-}
+};
 
 // MongoDB Schemas
 const tokenSchema = new mongoose.Schema({
@@ -212,6 +216,7 @@ module.exports = async (req, res) => {
 
     // --- OAuth URL ---
     if (requestPath.includes("/auth/google/url")) {
+        const oAuth2Client = getOAuthClient();
         if (!oAuth2Client) return sendJson(res, 500, { error: "OAuth not configured" });
         const authUrl = oAuth2Client.generateAuthUrl({ access_type: 'offline', scope: SCOPES, prompt: 'consent' });
         return sendJson(res, 200, { url: authUrl });
@@ -219,6 +224,7 @@ module.exports = async (req, res) => {
 
     // --- OAuth Callback ---
     if (requestPath.includes("/auth/google/callback")) {
+        const oAuth2Client = getOAuthClient();
         const code = url.searchParams.get('code');
         if (code && oAuth2Client) {
             try {
