@@ -358,7 +358,11 @@ export default function Settings({
                                 className="danger"
                                 onClick={() => {
                                     localStorage.removeItem('google_tokens');
-                                    const newConfig = { ...smtpConfig, useGoogle: false };
+                                    const newConfig = {
+                                        useGoogle: false,
+                                        fromName: '',
+                                        fromEmail: ''
+                                    };
                                     setSmtpConfig(newConfig);
                                     localStorage.setItem('smtpConfig', JSON.stringify(newConfig));
                                     // Dispatch global event
