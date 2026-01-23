@@ -399,6 +399,49 @@ export default function InvoiceForm({
         setItemSuggestions([])
     }
 
+    const handleDeleteRow = (index) => {
+        if (window.confirm(lang === 'cs' ? 'Smazat položku?' : 'Delete item?')) {
+            const newItems = [...items]
+            newItems.splice(index, 1)
+            setItems(newItems)
+            handleBlurSave()
+        }
+    }
+
+    const handleItemTotalChange = (e) => {
+        const newTotal = Number(e.target.value)
+        // Calculate Unit Price from Total:
+        // Total = (Price - Discount) * Qty * (1 + TaxMultiplier)
+        // Price - Discount = Total / (Qty * TaxMultiplier)
+        // Price = (Total / (Qty * TaxMultiplier)) + Discount
+
+        const qty = itemInput.qty || 1
+        const taxRate = Number(itemInput.taxRate) || 0
+        const discount = Number(itemInput.discount) || 0
+
+        const taxMultiplier = 1 + (taxRate / 100)
+
+        if (qty > 0 && taxMultiplier > 0) {
+            const price = (newTotal / (qty * taxMultiplier)) + discount
+            setItemInput(prev => ({
+                ...prev,
+                price: Number(price.toFixed(2))
+            }))
+        }
+    }
+
+    // Helper to show current total in the input
+    const currentItemTotal = () => {
+        const qty = itemInput.qty || 0
+        const price = itemInput.price || 0
+        const discount = itemInput.discount || 0
+        const taxRate = Number(itemInput.taxRate) || 0
+
+        const sub = (price - discount) * qty
+        const total = sub * (1 + taxRate / 100)
+        return total > 0 ? total.toFixed(2) : ''
+    }
+
     const handleAddCategory = () => {
         const normalized = categoryInput.trim()
         if (normalized) {
@@ -744,7 +787,7 @@ export default function InvoiceForm({
 
                     <h3>{t.items}</h3>
                     <div style={{ position: 'relative' }}>
-                        <div className="grid" style={{ gridTemplateColumns: '2fr 1fr 1.5fr 1fr 1fr', gap: '10px', alignItems: 'end' }}>
+                        <div className="grid" style={{ gridTemplateColumns: '2fr 0.7fr 1fr 0.8fr 1fr 1fr', gap: '10px', alignItems: 'end' }}>
                             <div style={{ position: 'relative' }}>
                                 <label>{t.item}</label>
                                 <input
@@ -831,6 +874,18 @@ export default function InvoiceForm({
                                     placeholder="0.00"
                                 />
                             </div>
+                            <div>
+                                <label>{t.total}</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={currentItemTotal()}
+                                    onChange={handleItemTotalChange}
+                                    onFocus={(e) => e.target.select()}
+                                    placeholder="0.00"
+                                    style={{ fontWeight: 'bold' }}
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -839,7 +894,7 @@ export default function InvoiceForm({
                         <button type="button" onClick={handleClearItems} className="secondary">{t.clearItems}</button>
                     </div>
 
-                    <ItemsTable items={items} lang={lang} t={t} />
+                    <ItemsTable items={items} lang={lang} t={t} onDelete={handleDeleteRow} />
 
                     <h3>{t.payment}</h3>
                     <div className="grid two">
