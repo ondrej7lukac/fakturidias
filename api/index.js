@@ -283,19 +283,19 @@ module.exports = async (req, res) => {
 
     // --- Invoices ---
     if (requestPath.includes("/api/invoices")) {
-        // Ensure user is determined (mock 'default' for now)
-        const userId = "default";
+        const userId = req.headers['x-user-id'] || "default";
 
         if (req.method === "GET") {
             const invoiceId = requestPath.split('/').pop();
             // detailed fetch
             if (invoiceId && invoiceId !== 'invoices') {
                 const inv = await Invoice.findOne({ id: invoiceId });
+                // Optional: Ensure user owns it
                 if (!inv) return sendJson(res, 404, { error: "Invoice not found" });
                 return sendJson(res, 200, inv.data);
             }
             // list fetch
-            const invoices = await Invoice.find({}).sort({ createdAt: -1 });
+            const invoices = await Invoice.find({ userId }).sort({ createdAt: -1 });
             return sendJson(res, 200, { invoices: invoices.map(i => i.data || i) });
         }
         if (req.method === "POST") {
@@ -303,25 +303,32 @@ module.exports = async (req, res) => {
             const { invoice } = body;
             await Invoice.findOneAndUpdate(
                 { id: invoice.id },
-                { id: invoice.id, data: invoice, userId: "default" },
+                { id: invoice.id, data: invoice, userId },
                 { upsert: true, new: true }
             );
+            return sendJson(res, 200, { success: true });
+        }
+        if (req.method === "DELETE") {
+            const invoiceId = requestPath.split('/').pop();
+            await Invoice.deleteOne({ id: invoiceId, userId });
             return sendJson(res, 200, { success: true });
         }
     }
 
     // --- Items ---
     if (requestPath.includes("/api/items")) {
+        const userId = req.headers['x-user-id'] || "default";
+
         if (req.method === "GET") {
-            const items = await Item.find({});
+            const items = await Item.find({ userId });
             return sendJson(res, 200, { items });
         }
         if (req.method === "POST") {
             const body = await readJsonBody(req);
             const item = body.item || body;
             await Item.findOneAndUpdate(
-                { name: item.name },
-                { ...item, userId: "default" },
+                { name: item.name, userId },
+                { ...item, userId },
                 { upsert: true, new: true }
             );
             return sendJson(res, 200, { success: true });

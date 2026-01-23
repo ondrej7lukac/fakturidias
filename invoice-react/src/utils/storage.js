@@ -1,7 +1,21 @@
+// Helper to get current user ID
+export function getUserId() {
+    try {
+        const config = localStorage.getItem('smtpConfig');
+        if (config) {
+            const { fromEmail } = JSON.parse(config);
+            return fromEmail || 'default';
+        }
+    } catch (e) { }
+    return 'default';
+}
+
 // Server-based storage functions
 export async function loadData() {
     try {
-        const response = await fetch('/api/invoices')
+        const response = await fetch('/api/invoices', {
+            headers: { 'x-user-id': getUserId() }
+        })
         if (!response.ok) {
             if (response.status === 401) {
                 console.warn('Not authenticated - returning empty data')
@@ -21,7 +35,10 @@ export async function saveInvoice(invoice) {
     try {
         const response = await fetch('/api/invoices', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'x-user-id': getUserId()
+            },
             body: JSON.stringify({ invoice })
         })
         if (!response.ok) {
@@ -38,7 +55,8 @@ export async function saveInvoice(invoice) {
 export async function deleteInvoice(invoiceId) {
     try {
         const response = await fetch(`/api/invoices/${invoiceId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 'x-user-id': getUserId() }
         })
         if (!response.ok) {
             throw new Error('Failed to delete invoice')

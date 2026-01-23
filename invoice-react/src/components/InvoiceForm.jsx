@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { formatInvoiceNumber, addDays, formatDate, money } from '../utils/storage'
+import { formatInvoiceNumber, addDays, formatDate, money, getUserId } from '../utils/storage'
 import AresSearch from './AresSearch'
 import ItemsTable from './ItemsTable'
 import InvoicePreview from './InvoicePreview'
@@ -202,7 +202,9 @@ export default function InvoiceForm({
     useEffect(() => {
         const loadSavedItems = async () => {
             try {
-                const response = await fetch('/api/items')
+                const response = await fetch('/api/items', {
+                    headers: { 'x-user-id': getUserId() }
+                })
                 if (response.ok) {
                     const data = await response.json()
                     setSavedItems(data.items || [])
@@ -343,7 +345,10 @@ export default function InvoiceForm({
         try {
             await fetch('/api/items', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': getUserId()
+                },
                 body: JSON.stringify({
                     item: {
                         name: newItem.name,
@@ -353,7 +358,9 @@ export default function InvoiceForm({
                 })
             })
             // Reload items database
-            const response = await fetch('/api/items')
+            const response = await fetch('/api/items', {
+                headers: { 'x-user-id': getUserId() }
+            })
             if (response.ok) {
                 const data = await response.json()
                 setSavedItems(data.items || [])
