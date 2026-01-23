@@ -275,6 +275,11 @@ module.exports = async (req, res) => {
         return sendJson(res, 200, { connected: true, email: "User" });
     }
 
+    // Global CORS Preflight
+    if (req.method === "OPTIONS") {
+        return sendJson(res, 200, {});
+    }
+
     // --- Invoices ---
     if (requestPath.includes("/api/invoices")) {
         // Ensure user is determined (mock 'default' for now)
@@ -308,22 +313,22 @@ module.exports = async (req, res) => {
     if (requestPath.includes("/api/items")) {
         if (req.method === "GET") {
             const items = await Item.find({});
-            return sendJson(res, 200, items);
+            return sendJson(res, 200, { items });
         }
         if (req.method === "POST") {
-            const item = await readJsonBody(req);
-            // Deduplicate by name for simplicity or use specific ID
+            const body = await readJsonBody(req);
+            const item = body.item || body;
             await Item.findOneAndUpdate(
                 { name: item.name },
                 { ...item, userId: "default" },
-                { upsert: true }
+                { upsert: true, new: true }
             );
             return sendJson(res, 200, { success: true });
         }
     }
 
     // --- Email Sending ---
-    if (requestPath === "/api/email/send" && req.method === "POST") {
+    if (requestPath.includes("/api/email/send") && req.method === "POST") {
         try {
             const nodemailer = require('nodemailer');
             const body = await readJsonBody(req);
