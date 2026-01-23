@@ -1,6 +1,6 @@
 {
     "version": 2,
-    "outputDirectory": "invoice-react/dist",
+    "outputDirectory": "dist",
     "rewrites": [
         {
             "source": "/api/:path*",
@@ -12,11 +12,11 @@
         },
         {
             "source": "/assets/:path*",
-            "destination": "/invoice-react/dist/assets/:path*"
+            "destination": "/dist/assets/:path*"
         },
         {
             "source": "/((?!api/.*|auth/.*).*)",
-            "destination": "/invoice-react/dist/index.html"
+            "destination": "/dist/index.html"
         }
     ]
 }
