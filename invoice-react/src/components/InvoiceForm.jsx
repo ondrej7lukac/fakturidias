@@ -791,11 +791,24 @@ export default function InvoiceForm({
                             </div>
                             <div>
                                 <label>{t.qty}</label>
-                                <input type="number" min="1" value={itemInput.qty} onChange={(e) => setItemInput(p => ({ ...p, qty: Number(e.target.value) }))} />
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={itemInput.qty}
+                                    onChange={(e) => setItemInput(p => ({ ...p, qty: Number(e.target.value) }))}
+                                    onFocus={(e) => e.target.select()}
+                                />
                             </div>
                             <div>
                                 <label>{t.unitPrice}</label>
-                                <input type="number" min="0" step="0.01" value={itemInput.price} onChange={(e) => setItemInput(p => ({ ...p, price: Number(e.target.value) }))} />
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={itemInput.price}
+                                    onChange={(e) => setItemInput(p => ({ ...p, price: Number(e.target.value) }))}
+                                    onFocus={(e) => e.target.select()}
+                                />
                             </div>
                             <div>
                                 <label>{lang === 'cs' ? 'DPH %' : 'Tax %'}</label>
@@ -814,6 +827,7 @@ export default function InvoiceForm({
                                     step="0.01"
                                     value={itemInput.discount}
                                     onChange={(e) => setItemInput(p => ({ ...p, discount: Number(e.target.value) }))}
+                                    onFocus={(e) => e.target.select()}
                                     placeholder="0.00"
                                 />
                             </div>
