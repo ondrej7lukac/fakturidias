@@ -1,6 +1,5 @@
 {
     "version": 2,
-    "outputDirectory": "dist",
     "rewrites": [
         {
             "source": "/api/:path*",
@@ -12,11 +11,11 @@
         },
         {
             "source": "/assets/:path*",
-            "destination": "/dist/assets/:path*"
+            "destination": "/assets/:path*"
         },
         {
-            "source": "/((?!api/.*|auth/.*).*)",
-            "destination": "/dist/index.html"
+            "source": "/((?!api/.*|auth/.*|assets/.*).*)",
+            "destination": "/index.html"
         }
     ]
 }
