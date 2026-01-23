@@ -63,6 +63,13 @@ const itemSchema = new mongoose.Schema({
 });
 const Item = mongoose.models.Item || mongoose.model('Item', itemSchema);
 
+const settingsSchema = new mongoose.Schema({
+    userId: String,
+    data: Object,
+    updatedAt: { type: Date, default: Date.now }
+});
+const Settings = mongoose.models.Settings || mongoose.model('Settings', settingsSchema);
+
 // Connect to Database
 let cachedDb = null;
 async function connectToDatabase() {
@@ -89,7 +96,7 @@ function sendJson(res, status, payload) {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-user-id");
     res.end(JSON.stringify(payload));
 }
 
@@ -97,7 +104,7 @@ function sendCors(res) {
     res.statusCode = 204;
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-user-id");
     res.end();
 }
 
@@ -332,6 +339,28 @@ module.exports = async (req, res) => {
                 { upsert: true, new: true }
             );
             return sendJson(res, 200, { success: true });
+        }
+    }
+
+    // --- Settings ---
+    if (requestPath.includes("/api/settings")) {
+        // Try to get userId from header (should be passed from frontend if possible)
+        // Or if using default header logic.
+        const userId = req.headers['x-user-id'] || "default";
+
+        if (req.method === "GET") {
+            const settings = await Settings.findOne({ userId });
+            return sendJson(res, 200, { settings: settings ? settings.data : {} });
+        }
+        if (req.method === "POST") {
+            const body = await readJsonBody(req);
+            const { settings } = body;
+            await Settings.findOneAndUpdate(
+                { userId },
+                { userId, data: settings, updatedAt: new Date() },
+                { upsert: true, new: true }
+            );
+            return sendJson(res, 200, { success: true, settings });
         }
     }
 
