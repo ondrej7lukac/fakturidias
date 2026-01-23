@@ -58,7 +58,7 @@ export default function InvoiceForm({
     })
 
     const [items, setItems] = useState([])
-    const [itemInput, setItemInput] = useState({ name: '', qty: 1, price: 0, taxRate: '21', discount: 0 })
+    const [itemInput, setItemInput] = useState({ name: '', qty: 1, price: '', taxRate: '21', discount: 0 })
     const [categoryInput, setCategoryInput] = useState('')
     const [isGenerating, setIsGenerating] = useState(false)
     const [emailStatus, setEmailStatus] = useState('')
@@ -329,6 +329,7 @@ export default function InvoiceForm({
         const total = subtotal + taxAmount
 
         const newItem = {
+            id: crypto.randomUUID(),
             name: itemInput.name.trim(),
             qty,
             price: basePrice,
@@ -369,7 +370,7 @@ export default function InvoiceForm({
             console.error('[Items] Failed to save item:', e)
         }
 
-        setItemInput({ name: '', qty: 1, price: 0, taxRate: '21', discount: 0 })
+        setItemInput({ name: '', qty: 1, price: '', taxRate: '21', discount: 0 })
         setItemSuggestions([])
     }
 
@@ -849,8 +850,9 @@ export default function InvoiceForm({
                                     min="0"
                                     step="0.01"
                                     value={itemInput.price}
-                                    onChange={(e) => setItemInput(p => ({ ...p, price: Number(e.target.value) }))}
+                                    onChange={(e) => setItemInput(p => ({ ...p, price: e.target.value }))}
                                     onFocus={(e) => e.target.select()}
+                                    placeholder={lang === 'cs' ? 'bez daně' : 'excl. tax'}
                                 />
                             </div>
                             <div>
@@ -864,15 +866,11 @@ export default function InvoiceForm({
                             </div>
                             <div>
                                 <label>{lang === 'cs' ? 'Sleva' : 'Discount'}</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={itemInput.discount}
-                                    onChange={(e) => setItemInput(p => ({ ...p, discount: Number(e.target.value) }))}
-                                    onFocus={(e) => e.target.select()}
-                                    placeholder="0.00"
-                                />
+                                <select value={itemInput.discount} onChange={(e) => setItemInput(p => ({ ...p, discount: Number(e.target.value) }))}>
+                                    {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(val => (
+                                        <option key={val} value={val}>{val === 0 ? '-' : `-${val}%`}</option>
+                                    ))}
+                                </select>
                             </div>
                             <div>
                                 <label>{t.total}</label>
@@ -882,7 +880,7 @@ export default function InvoiceForm({
                                     value={currentItemTotal()}
                                     onChange={handleItemTotalChange}
                                     onFocus={(e) => e.target.select()}
-                                    placeholder="0.00"
+                                    placeholder={formData.currency}
                                     style={{ fontWeight: 'bold' }}
                                 />
                             </div>

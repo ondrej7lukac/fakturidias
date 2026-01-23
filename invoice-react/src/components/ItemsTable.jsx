@@ -38,7 +38,7 @@ export default function ItemsTable({ items, lang, t, onDelete }) {
             </thead>
             <tbody>
                 {items.map((item, index) => (
-                    <tr key={index}>
+                    <tr key={item.id || index}>
                         <td>{item.name}</td>
                         <td>{item.qty}</td>
                         <td>{money(item.price)}</td>
