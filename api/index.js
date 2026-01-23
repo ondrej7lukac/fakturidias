@@ -243,7 +243,16 @@ module.exports = async (req, res) => {
                 );
 
                 res.setHeader("Content-Type", "text/html");
-                return res.end(`<script>window.close();</script>`);
+                return res.end(`
+                    <script>
+                        window.opener.postMessage({
+                            type: 'GOOGLE_LOGIN_SUCCESS',
+                            tokens: ${JSON.stringify(tokens)},
+                            email: "${userId}"
+                        }, '*');
+                        window.close();
+                    </script>
+                `);
             } catch (error) {
                 return sendJson(res, 500, { error: error.message });
             }
