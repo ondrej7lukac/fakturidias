@@ -123,7 +123,8 @@ export default function AresSearch({
 
     const applyAresEntity = (entity) => {
         const name = entity.obchodniJmeno || entity.nazev || ''
-        const address = formatAresAddress(entity.sidlo)
+        // Prioritize full address string if available, otherwise parse structured address
+        const address = entity.adresa || entity.textovaAdresa || formatAresAddress(entity.sidlo)
         const city = entity.sidlo?.nazevObce || entity.sidlo?.obec || ''
         const ico = entity.ico || ''
         const vat = entity.dic || ''
