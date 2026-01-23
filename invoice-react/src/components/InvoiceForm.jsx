@@ -457,6 +457,13 @@ export default function InvoiceForm({
                 try { tokens = JSON.parse(tokensStr) } catch (e) { }
             }
 
+            // Get sender email from config
+            const smtpConfig = localStorage.getItem('smtpConfig')
+            let fromEmail = ''
+            if (smtpConfig) {
+                try { fromEmail = JSON.parse(smtpConfig).fromEmail } catch (e) { }
+            }
+
             if (!tokens) {
                 setIsGenerating(false)
                 setEmailStatus('')
@@ -478,11 +485,17 @@ export default function InvoiceForm({
                 body: JSON.stringify({
                     to: currentData.client.email,
                     subject: `${t.invoice} ${currentData.invoiceNumber}`,
-                    text: `Hello,\n\nPlease find attached the invoice ${currentData.invoiceNumber}.\n\nThank you!`,
-                    pdfBase64,
-                    filename: `${currentData.invoiceNumber}.pdf`,
-                    useGoogle: true,
-                    tokens: tokens // Send tokens to API
+                    html: `<p>Hello,</p><p>Please find attached the invoice ${currentData.invoiceNumber}.</p><p>Thank you!</p>`,
+                    attachments: [
+                        {
+                            filename: `${currentData.invoiceNumber}.pdf`,
+                            path: pdfBase64
+                        }
+                    ],
+                    auth: {
+                        user: fromEmail,
+                        tokens: tokens
+                    }
                 })
             })
             if (response.ok) {
