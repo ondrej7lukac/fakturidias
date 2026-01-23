@@ -9,8 +9,8 @@ export default function ItemsTable({ items, lang, t, onDelete }) {
                         <th>{t.item}</th>
                         <th>{t.qty}</th>
                         <th>{t.price}</th>
-                        <th>{lang === 'cs' ? 'Sleva' : 'Discount'}</th>
                         <th>{lang === 'cs' ? 'DPH %' : 'Tax %'}</th>
+                        <th>{lang === 'cs' ? 'Sleva' : 'Discount'}</th>
                         <th>{t.total}</th>
                     </tr>
                 </thead>
@@ -30,8 +30,8 @@ export default function ItemsTable({ items, lang, t, onDelete }) {
                     <th>{t.item}</th>
                     <th>{t.qty}</th>
                     <th>{t.price}</th>
-                    <th>{lang === 'cs' ? 'Sleva' : 'Discount'}</th>
                     <th>{lang === 'cs' ? 'DPH %' : 'Tax %'}</th>
+                    <th>{lang === 'cs' ? 'Sleva' : 'Discount'}</th>
                     <th>{t.total}</th>
                     <th></th>
                 </tr>
@@ -42,8 +42,8 @@ export default function ItemsTable({ items, lang, t, onDelete }) {
                         <td>{item.name}</td>
                         <td>{item.qty}</td>
                         <td>{money(item.price)}</td>
-                        <td>{item.discount ? `${money(item.discount)}` : '-'}</td>
                         <td>{item.taxRate || 0}%</td>
+                        <td>{item.discount ? `${money(item.discount)}` : '-'}</td>
                         <td>{money(item.total)}</td>
                         <td style={{ width: '40px', textAlign: 'center' }}>
                             <button

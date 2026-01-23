@@ -28,8 +28,8 @@ export default function InvoiceForm({
         taxableSupplyDate: '', // DUZP - Datum uskutečnění zdanitelného plnění
         status: 'draft',
         category: '',
-        clientName: 'Test Client',
-        clientEmail: 'billing@client.com',
+        clientName: '',
+        clientEmail: '',
         clientArea: 'Prague',
         clientIco: '',
         clientVat: '',
@@ -58,6 +58,13 @@ export default function InvoiceForm({
     })
 
     const [items, setItems] = useState([])
+    // Ref to access latest state in setTimeout
+    const stateRef = useRef({ formData, items })
+
+    useEffect(() => {
+        stateRef.current = { formData, items }
+    }, [formData, items])
+
     const [itemInput, setItemInput] = useState({ name: '', qty: 1, price: '', taxRate: '21', discount: 0 })
     const [categoryInput, setCategoryInput] = useState('')
     const [isGenerating, setIsGenerating] = useState(false)
@@ -118,9 +125,9 @@ export default function InvoiceForm({
                 taxableSupplyDate: '',
                 status: 'draft',
                 category: '',
-                clientName: 'Test Client',
-                clientEmail: 'ondrej7lukac@gmail.com',
-                clientArea: 'Prague',
+                clientName: '',
+                clientEmail: '',
+                clientArea: '',
                 clientIco: '',
                 clientVat: '',
                 clientAddress: '',
@@ -189,8 +196,10 @@ export default function InvoiceForm({
         }
 
         // Set new timer - save after 1 second of inactivity
+        // Use stateRef to get the LATEST data when the timer fires
         const timer = setTimeout(() => {
-            const invoiceData = getCurrentInvoiceData()
+            const currentData = stateRef.current
+            const invoiceData = getCurrentInvoiceData(currentData.formData, currentData.items)
             onSave(invoiceData)
             console.log('[Auto-Save] Invoice saved:', invoiceData.invoiceNumber)
         }, 1000)
@@ -217,46 +226,46 @@ export default function InvoiceForm({
     }, [])
 
 
-    const getCurrentInvoiceData = () => {
+    const getCurrentInvoiceData = (currentFormData = formData, currentItems = items) => {
         return {
             id: invoice?.id || crypto.randomUUID(),
-            invoiceNumber: formData.invoiceNumber.trim(),
-            issueDate: formData.issueDate,
-            dueDate: formData.dueDate,
-            taxableSupplyDate: formData.taxableSupplyDate || formData.issueDate, // DUZP
-            status: formData.status,
-            category: formData.category,
+            invoiceNumber: currentFormData.invoiceNumber.trim(),
+            issueDate: currentFormData.issueDate,
+            dueDate: currentFormData.dueDate,
+            taxableSupplyDate: currentFormData.taxableSupplyDate || currentFormData.issueDate, // DUZP
+            status: currentFormData.status,
+            category: currentFormData.category,
             client: {
-                name: formData.clientName.trim(),
-                email: formData.clientEmail.trim(),
-                area: formData.clientArea.trim(),
-                ico: formData.clientIco.trim(),
-                vat: formData.clientVat.trim(),
-                address: formData.clientAddress.trim()
+                name: currentFormData.clientName.trim(),
+                email: currentFormData.clientEmail.trim(),
+                area: currentFormData.clientArea.trim(),
+                ico: currentFormData.clientIco.trim(),
+                vat: currentFormData.clientVat.trim(),
+                address: currentFormData.clientAddress.trim()
             },
-            items,
-            currency: formData.currency,
-            amount: items.reduce((sum, item) => sum + item.total, 0),
+            items: currentItems,
+            currency: currentFormData.currency,
+            amount: currentItems.reduce((sum, item) => sum + item.total, 0),
             payment: {
-                iban: formData.iban.trim(),
-                bic: formData.bic.trim(),
-                note: formData.paymentNote.trim()
+                iban: currentFormData.iban.trim(),
+                bic: currentFormData.bic.trim(),
+                note: currentFormData.paymentNote.trim()
             },
             supplier: {
-                name: formData.supplierName.trim(),
-                ico: formData.supplierIco.trim(),
-                vat: formData.supplierVat.trim(),
-                address: formData.supplierAddress.trim(),
-                registry: formData.supplierRegistry.trim(),
-                phone: formData.supplierPhone.trim(),
-                email: formData.supplierEmail.trim(),
-                website: formData.supplierWebsite.trim()
+                name: currentFormData.supplierName.trim(),
+                ico: currentFormData.supplierIco.trim(),
+                vat: currentFormData.supplierVat.trim(),
+                address: currentFormData.supplierAddress.trim(),
+                registry: currentFormData.supplierRegistry.trim(),
+                phone: currentFormData.supplierPhone.trim(),
+                email: currentFormData.supplierEmail.trim(),
+                website: currentFormData.supplierWebsite.trim()
             },
             // VAT fields
-            isVatPayer: formData.isVatPayer,
-            taxBase: formData.taxBase,
-            taxRate: formData.taxRate,
-            taxAmount: formData.taxAmount
+            isVatPayer: currentFormData.isVatPayer,
+            taxBase: currentFormData.taxBase,
+            taxRate: currentFormData.taxRate,
+            taxAmount: currentFormData.taxAmount
         }
     }
 
