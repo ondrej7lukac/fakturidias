@@ -340,6 +340,7 @@ export default function InvoiceForm({
             total
         }
 
+        console.log('[InvoiceForm] Adding item:', newItem)
         setItems([...items, newItem])
 
         // Save item to database
@@ -402,6 +403,7 @@ export default function InvoiceForm({
 
     const handleDeleteRow = (index) => {
         if (window.confirm(lang === 'cs' ? 'Smazat položku?' : 'Delete item?')) {
+            console.log('[InvoiceForm] Deleting item at index:', index)
             const newItems = [...items]
             newItems.splice(index, 1)
             setItems(newItems)
@@ -411,6 +413,7 @@ export default function InvoiceForm({
 
     const handleItemTotalChange = (e) => {
         const newTotal = Number(e.target.value)
+        console.log('[InvoiceForm] Total changed manually:', newTotal)
         // Calculate Unit Price from Total:
         // Total = (Price - Discount) * Qty * (1 + TaxMultiplier)
         // Price - Discount = Total / (Qty * TaxMultiplier)
@@ -424,6 +427,7 @@ export default function InvoiceForm({
 
         if (qty > 0 && taxMultiplier > 0) {
             const price = (newTotal / (qty * taxMultiplier)) + discount
+            console.log('[InvoiceForm] Calculated unit price:', price)
             setItemInput(prev => ({
                 ...prev,
                 price: Number(price.toFixed(2))
