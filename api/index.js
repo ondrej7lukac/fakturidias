@@ -10,9 +10,7 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const MONGODB_URI = process.env.MONGODB_URI;
 
 // Vercel serverless functions are stateless
-const GOOGLE_REDIRECT_URI = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}/auth/google/callback`
-    : "https://fakturidias.vercel.app/auth/google/callback";
+const GOOGLE_REDIRECT_URI = "https://fakturidias.vercel.app/auth/google/callback";
 
 const SCOPES = [
     'https://mail.google.com/',
