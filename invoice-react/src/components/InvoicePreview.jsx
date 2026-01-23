@@ -222,7 +222,21 @@ export default function InvoicePreview({ invoice, t, lang }) {
                                 color: '#64748b',
                                 fontSize: '12px',
                                 textTransform: 'uppercase'
-                            }}>{t.price}</th>
+                            }}>{lang === 'cs' ? 'CENA/JEDN.' : 'PRICE/UNIT'}</th>
+                            <th style={{
+                                textAlign: 'center',
+                                padding: '10px 0',
+                                color: '#64748b',
+                                fontSize: '12px',
+                                textTransform: 'uppercase'
+                            }}>{lang === 'cs' ? 'DPH %' : 'TAX %'}</th>
+                            <th style={{
+                                textAlign: 'right',
+                                padding: '10px 0',
+                                color: '#64748b',
+                                fontSize: '12px',
+                                textTransform: 'uppercase'
+                            }}>{lang === 'cs' ? 'SLEVA' : 'DISC.'}</th>
                             <th style={{
                                 textAlign: 'right',
                                 padding: '10px 0',
@@ -249,6 +263,16 @@ export default function InvoicePreview({ invoice, t, lang }) {
                                     borderBottom: '1px solid #e5e7eb',
                                     textAlign: 'right'
                                 }}>{invoice.currency} {item.price.toFixed(2)}</td>
+                                <td style={{
+                                    padding: '12px 0',
+                                    borderBottom: '1px solid #e5e7eb',
+                                    textAlign: 'center'
+                                }}>{item.taxRate || 0}%</td>
+                                <td style={{
+                                    padding: '12px 0',
+                                    borderBottom: '1px solid #e5e7eb',
+                                    textAlign: 'right'
+                                }}>{item.discount > 0 ? `${invoice.currency} ${item.discount.toFixed(2)}` : '-'}</td>
                                 <td style={{
                                     padding: '12px 0',
                                     borderBottom: '1px solid #e5e7eb',

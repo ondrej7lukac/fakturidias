@@ -30,7 +30,7 @@ export default function ItemsTable({ items, lang, t, onDelete }) {
                     <tr>
                         <th>{t.item}</th>
                         <th>{t.qty}</th>
-                        <th>{t.price}</th>
+                        <th>{lang === 'cs' ? 'CENA/JEDN.' : 'PRICE/UNIT'}</th>
                         <th>{lang === 'cs' ? 'DPH %' : 'Tax %'}</th>
                         <th>{lang === 'cs' ? 'Sleva' : 'Discount'}</th>
                         <th>{t.total}</th>
@@ -59,7 +59,15 @@ export default function ItemsTable({ items, lang, t, onDelete }) {
                             </td>
                         </tr>
                     ))}
-                    <tr style={{ fontWeight: 600, borderTop: '2px solid var(--border)' }}>
+                    <tr style={{ borderTop: '2px solid var(--border)' }}>
+                        <td colSpan="5" style={{ textAlign: 'right', paddingRight: '10px', color: 'var(--muted)', fontSize: '0.9rem' }}>
+                            {lang === 'cs' ? 'DPH' : 'Tax'}:
+                        </td>
+                        <td colSpan="2" style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>
+                            {money(items.reduce((sum, item) => sum + (item.taxAmount || 0), 0))}
+                        </td>
+                    </tr>
+                    <tr style={{ fontWeight: 600 }}>
                         <td colSpan="5" style={{ textAlign: 'right', paddingRight: '10px' }}>
                             {lang === 'cs' ? 'Celkem' : 'Total'}:
                         </td>

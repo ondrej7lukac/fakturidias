@@ -893,13 +893,15 @@ export default function InvoiceForm({
                             <div>
                                 <label>{t.total}</label>
                                 <input
-                                    type="number"
-                                    step="0.01"
                                     value={currentItemTotal()}
-                                    onChange={handleItemTotalChange}
-                                    onFocus={(e) => e.target.select()}
+                                    readOnly
                                     placeholder={formData.currency}
-                                    style={{ fontWeight: 'bold' }}
+                                    style={{
+                                        fontWeight: 'bold',
+                                        background: 'var(--bg)',
+                                        color: 'var(--text)',
+                                        cursor: 'default'
+                                    }}
                                 />
                             </div>
                         </div>
@@ -911,6 +913,34 @@ export default function InvoiceForm({
                     </div>
 
                     <ItemsTable items={items} lang={lang} t={t} onDelete={handleDeleteRow} />
+
+                    {/* Tax Breakdown Summary */}
+                    {formData.isVatPayer && items.length > 0 && (
+                        <div style={{
+                            marginTop: '1rem',
+                            padding: '1rem',
+                            background: 'var(--card)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-end',
+                            gap: '0.5rem'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
+                                <span style={{ color: 'var(--muted)' }}>{lang === 'cs' ? 'Mezisoučet (bez DPH):' : 'Subtotal (excl. VAT):'}</span>
+                                <span>{money(items.reduce((sum, item) => sum + item.subtotal, 0))} {formData.currency}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
+                                <span style={{ color: 'var(--muted)' }}>{lang === 'cs' ? 'DPH:' : 'Tax:'}</span>
+                                <span>{money(items.reduce((sum, item) => sum + (item.taxAmount || 0), 0))} {formData.currency}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px', fontWeight: 'bold', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
+                                <span>{lang === 'cs' ? 'Celkem k úhradě:' : 'Total due:'}</span>
+                                <span style={{ color: 'var(--accent)' }}>{money(items.reduce((sum, item) => sum + item.total, 0))} {formData.currency}</span>
+                            </div>
+                        </div>
+                    )}
 
                     <h3>{t.payment}</h3>
                     <div className="grid two">

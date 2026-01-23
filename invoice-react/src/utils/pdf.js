@@ -45,81 +45,30 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb;">${item.name}</td>
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.qty}</td>
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${invoice.currency} ${item.price.toFixed(2)}</td>
+            <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.taxRate || 0}%</td>
+            <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.discount > 0 ? `${invoice.currency} ${item.discount.toFixed(2)}` : '-'}</td>
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${invoice.currency} ${item.total.toFixed(2)}</td>
         </tr>
     `).join('');
 
-    container.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 50px; border-bottom: 2px solid #6366f1; padding-bottom: 20px;">
-            <div>
-                <h1 style="margin: 0; color: #6366f1; font-size: 32px; font-weight: 800; text-transform: uppercase; letter-spacing: -0.025em;">${t.invoice}</h1>
-                <p style="margin: 5px 0; color: #64748b; font-size: 16px; font-weight: 500;"># ${invoice.invoiceNumber}</p>
-            </div>
-            <div style="text-align: right; color: #1f2937;">
-                <p style="margin: 0; font-weight: 600;">${t.issueDate}: <span style="font-weight: 400;">${invoice.issueDate}</span></p>
-                <p style="margin: 5px 0; font-weight: 600;">${t.dueDate}: <span style="font-weight: 400; color: ${new Date(invoice.dueDate) < new Date() ? '#ef4444' : 'inherit'};">${invoice.dueDate || 'N/A'}</span></p>
-                ${invoice.taxableSupplyDate && invoice.taxableSupplyDate !== invoice.issueDate ? `<p style="margin: 5px 0; font-weight: 600; font-size: 12px;">DUZP: <span style="font-weight: 400;">${invoice.taxableSupplyDate}</span></p>` : ''}
-            </div>
-        </div>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
+        <thead>
+            <tr style="border-bottom: 2px solid #e5e7eb;">
+                <th style="text-align: left; padding: 10px 0; color: #64748b; font-size: 12px; text-transform: uppercase;">${t.itemDescription}</th>
+                <th style="text-align: center; padding: 10px 0; color: #64748b; font-size: 12px; text-transform: uppercase;">${t.qty}</th>
+                <th style="text-align: right; padding: 10px 0; color: #64748b; font-size: 12px; text-transform: uppercase;">${t.lang === 'cs' || !t.lang ? 'CENA/JEDN.' : 'PRICE/UNIT'}</th>
+                <th style="text-align: center; padding: 10px 0; color: #64748b; font-size: 12px; text-transform: uppercase;">${t.lang === 'cs' || !t.lang ? 'DPH %' : 'TAX %'}</th>
+                <th style="text-align: right; padding: 10px 0; color: #64748b; font-size: 12px; text-transform: uppercase;">${t.lang === 'cs' || !t.lang ? 'SLEVA' : 'DISC.'}</th>
+                <th style="text-align: right; padding: 10px 0; color: #64748b; font-size: 12px; text-transform: uppercase;">${t.total}</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${itemsHtml}
+        </tbody>
+    </table>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 60px; margin-bottom: 50px;">
-            <div>
-                <h3 style="margin: 0 0 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em;">${t.issuer}</h3>
-                <p style="margin: 0; font-weight: 700; font-size: 18px; color: #111827;">${invoice.supplier?.name || '---'}</p>
-                <p style="margin: 6px 0; line-height: 1.5; color: #374151;">${invoice.supplier?.address || ''}</p>
-                <div style="font-size: 14px; color: #4b5563;">
-                    ${invoice.supplier?.ico ? `<p style="margin: 2px 0;"><strong>${t.ico}:</strong> ${invoice.supplier.ico}</p>` : ''}
-                    ${invoice.supplier?.vat ? `<p style="margin: 2px 0;"><strong>${t.vat}:</strong> ${invoice.supplier.vat}</p>` : ''}
-                    ${invoice.supplier?.registry ? `<p style="margin: 2px 0; font-size: 12px;">${invoice.supplier.registry}</p>` : ''}
-                    ${invoice.supplier?.phone ? `<p style="margin: 2px 0;">Tel: ${invoice.supplier.phone}</p>` : ''}
-                    ${invoice.supplier?.email ? `<p style="margin: 2px 0;">Email: ${invoice.supplier.email}</p>` : ''}
-                </div>
-                ${!invoice.isVatPayer ? `<p style="margin-top: 10px; padding: 8px; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 4px; font-size: 11px; font-weight: 600;">⚠️ Nejsem plátce DPH</p>` : ''}
-            </div>
-            <div>
-                <h3 style="margin: 0 0 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em;">${t.billTo}</h3>
-                <p style="margin: 0; font-weight: 700; font-size: 18px; color: #111827;">${invoice.client.name}</p>
-                <p style="margin: 6px 0; line-height: 1.5; color: #374151;">${invoice.client.address || ''}</p>
-                <div style="font-size: 14px; color: #4b5563;">
-                    ${invoice.client.ico ? `<p style="margin: 2px 0;"><strong>${t.ico}:</strong> ${invoice.client.ico}</p>` : ''}
-                    ${invoice.client.vat ? `<p style="margin: 2px 0;"><strong>${t.vat}:</strong> ${invoice.client.vat}</p>` : ''}
-                </div>
-            </div>
-        </div>
-
-        <div style="margin-bottom: 50px; background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0;">
-            <h3 style="margin: 0 0 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em;">${t.paymentDetails}</h3>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
-                <div>
-                    <p style="margin: 0; font-size: 12px; color: #64748b; text-transform: uppercase;">${t.iban}</p>
-                    <p style="margin: 4px 0; font-weight: 600; font-family: monospace; font-size: 14px;">${invoice.payment.iban || 'N/A'}</p>
-                </div>
-                <div>
-                    <p style="margin: 0; font-size: 12px; color: #64748b; text-transform: uppercase;">${t.bic}</p>
-                    <p style="margin: 4px 0; font-weight: 600;">${invoice.payment.bic || 'N/A'}</p>
-                </div>
-                <div>
-                    <p style="margin: 0; font-size: 12px; color: #64748b; text-transform: uppercase;">${t.paymentNote}</p>
-                    <p style="margin: 4px 0; font-weight: 600;">${invoice.payment.note || invoice.invoiceNumber}</p>
-                </div>
-            </div>
-        </div>
-
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
-            <thead>
-                <tr style="border-bottom: 2px solid #e5e7eb;">
-                    <th style="text-align: left; padding: 10px 0; color: #64748b; font-size: 12px; text-transform: uppercase;">${t.itemDescription}</th>
-                    <th style="text-align: center; padding: 10px 0; color: #64748b; font-size: 12px; text-transform: uppercase;">${t.qty}</th>
-                    <th style="text-align: right; padding: 10px 0; color: #64748b; font-size: 12px; text-transform: uppercase;">${t.price}</th>
-                    <th style="text-align: right; padding: 10px 0; color: #64748b; font-size: 12px; text-transform: uppercase;">${t.total}</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${itemsHtml}
-            </tbody>
-        </table>
-
-        ${invoice.isVatPayer ? `
+        ${
+        invoice.isVatPayer ? `
             <div style="margin-bottom: 30px; padding: 15px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px;">
                 <h3 style="margin: 0 0 10px; font-size: 13px; font-weight: 700; text-transform: uppercase; color: #166534; letter-spacing: 0.05em;">Daňový doklad - Rozpis DPH</h3>
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; font-size: 14px;">
@@ -137,7 +86,8 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
                     </div>
                 </div>
             </div>
-        ` : ''}
+        ` : ''
+    }
 
         <div style="display: flex; justify-content: space-between; align-items: flex-end;">
             <div style="width: 180px;">
