@@ -177,8 +177,13 @@ export default function InvoiceForm({
         // Calculate IBAN when we have account number and bank code
         if (formData.accountNumber && formData.bankCode) {
             const newIban = calculateIban(formData.accountNumber, formData.bankCode, formData.prefix)
-            if (newIban !== formData.iban) {
-                updates.iban = newIban
+            // Fix: Only update if newIban is valid AND different from current (ignoring spaces)
+            if (newIban && newIban !== formData.iban) {
+                const currentClean = (formData.iban || '').replace(/\s/g, '')
+                const newClean = newIban.replace(/\s/g, '')
+                if (currentClean !== newClean) {
+                    updates.iban = newIban
+                }
             }
         }
 
