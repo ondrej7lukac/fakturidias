@@ -413,5 +413,193 @@ th {
 @media (max-width: 1024px) {
   main {
     grid-template-columns: 1fr;
+    padding: 1rem;
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1rem;
+  }
+
+  header .actions {
+    width: 100%;
+    justify-content: flex-start;
+    margin-top: 0.5rem;
+  }
+
+  .grid.two,
+  .grid.three {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .actions button {
+    width: 100%;
+  }
+
+  .inline-actions {
+    flex-wrap: wrap;
+  }
+
+  /* Make tables scrollable horizontally on small screens */
+  .table-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-top: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  table {
+    margin-top: 0;
+    border: none;
+  }
+
+  th,
+  td {
+    white-space: nowrap;
+    padding: 0.75rem 0.5rem;
+  }
+
+  /* Adjust headings size */
+  header h1 {
+    font-size: 1.125rem;
+  }
+
+  .card h2 {
+    font-size: 1rem;
+  }
+
+  /* Invoice Preview Mobile Styles */
+  .invoice-preview {
+    padding: 1rem !important;
+    /* Override inline 20mm */
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  .preview-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 1rem;
+    border-bottom: 2px solid #6366f1;
+    padding-bottom: 20px;
+    margin-bottom: 30px !important;
+  }
+
+  .preview-header>div {
+    text-align: left !important;
+    width: 100%;
+  }
+
+  .preview-grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 30px !important;
+    margin-bottom: 30px !important;
+  }
+
+  .preview-payment-grid {
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+  }
+
+  .preview-footer {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 20px;
+  }
+
+  .preview-footer>div {
+    width: 100% !important;
+  }
+
+  .preview-vat-grid {
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+  }
+
+  /* Keep 2 columns even on mobile for small inputs */
+  .grid.two.mobile-grid-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem;
+  }
+
+  .grid.three.mobile-grid-2 {
+    grid-template-columns: 60px 1fr 80px !important;
+    gap: 0.5rem;
+  }
+}
+
+html,
+body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Default Preview Styles (Desktop defaults if needed, but mostly inline replacement helpers) */
+.invoice-preview {
+  background: #ffffff;
+  max-width: 210mm;
+  margin: 0 auto;
+  font-family: 'Inter', sans-serif;
+  min-height: 297mm;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  color: #111827;
+}
+
+@media screen and (min-width: 769px) {
+  .invoice-preview {
+    padding: 20mm;
+  }
+
+  .preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 50px;
+    border-bottom: 2px solid #6366f1;
+    padding-bottom: 20px;
+  }
+
+  .preview-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    margin-bottom: 50px;
+  }
+
+  .preview-payment-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .preview-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  .preview-vat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    font-size: 14px;
   }
 }

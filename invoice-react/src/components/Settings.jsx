@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import AresSearch from './AresSearch'
+import { BANK_CODES, calculateIban, parseIban } from '../utils/bank'
 
 export default function Settings({
     lang,
@@ -13,7 +14,13 @@ export default function Settings({
         fromEmail: ''
     })
 
-    // Load settings on mount
+    const [bankDetails, setBankDetails] = useState({
+        accountNumber: '',
+        bankCode: '',
+        prefix: ''
+    })
+
+    // Load local settings on mount
     useEffect(() => {
         const savedSmtp = localStorage.getItem('smtpConfig')
         if (savedSmtp) {
@@ -21,12 +28,79 @@ export default function Settings({
         }
     }, [])
 
+    // Initialize bank details from loaded profile
+    useEffect(() => {
+        if (defaultSupplier?.iban) {
+            const parsed = parseIban(defaultSupplier.iban)
+            if (parsed) {
+                setBankDetails({
+                    accountNumber: parsed.accountNumber || '',
+                    bankCode: parsed.bankCode || '',
+                    prefix: parsed.prefix || ''
+                })
+            }
+        }
+    }, [defaultSupplier?.iban])
+
+    // Smart Bank Logic - Auto Calculate IBAN
+    useEffect(() => {
+        if (bankDetails.accountNumber && bankDetails.bankCode) {
+            const newIban = calculateIban(bankDetails.accountNumber, bankDetails.bankCode, bankDetails.prefix)
+            if (newIban && newIban !== defaultSupplier?.iban) {
+                // Avoid infinite loop if values match
+                const currentClean = (defaultSupplier?.iban || '').replace(/\s/g, '')
+                const newClean = newIban.replace(/\s/g, '')
+
+                if (currentClean !== newClean) {
+                    setDefaultSupplier(prev => ({ ...prev, iban: newIban }))
+                }
+            }
+        }
+    }, [bankDetails.accountNumber, bankDetails.bankCode, bankDetails.prefix])
+
+
     const handleProfileChange = (e) => {
         const { name, value, type, checked } = e.target
         setDefaultSupplier(prev => ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value
         }))
+    }
+
+    const handleBankChange = (e) => {
+        const { name, value } = e.target
+        setBankDetails(prev => ({ ...prev, [name]: value }))
+    }
+
+    const handlePasteBank = (e) => {
+        const text = e.clipboardData.getData('text').trim()
+        if (!text) return
+
+        // 1. Try parsing IBAN
+        const cleanIban = text.replace(/\s/g, '').toUpperCase()
+        if (/^[A-Z]{2}\d{10,}/.test(cleanIban)) {
+            e.preventDefault()
+            const parsed = parseIban(cleanIban)
+
+            setDefaultSupplier(prev => ({ ...prev, iban: cleanIban }))
+            setBankDetails({
+                accountNumber: parsed.accountNumber || '',
+                bankCode: parsed.bankCode || '',
+                prefix: parsed.prefix || ''
+            })
+            return
+        }
+
+        // 2. Try parsing Czech format (prefix-number/code)
+        const czechMatch = text.match(/^(\d{0,6}-)?(\d{1,10})\/(\d{4})$/)
+        if (czechMatch) {
+            e.preventDefault()
+            const prefix = czechMatch[1] ? czechMatch[1].replace('-', '') : ''
+            const accountNumber = czechMatch[2]
+            const bankCode = czechMatch[3]
+
+            setBankDetails({ prefix, accountNumber, bankCode })
+        }
     }
 
     const handleAresData = (data) => {
@@ -105,9 +179,25 @@ export default function Settings({
         }))
     }
 
-    const handleSaveProfile = () => {
-        // Already saved via App.jsx useEffect
-        alert(lang === 'cs' ? 'Profil uložen!' : 'Profile saved!')
+    const handleSaveProfile = async () => {
+        // Save to server
+        try {
+            const res = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ settings: defaultSupplier })
+            })
+            if (res.ok) {
+                alert(lang === 'cs' ? 'Profil uložen!' : 'Profile saved!')
+            } else {
+                throw new Error('Failed to save')
+            }
+        } catch (e) {
+            console.error(e)
+            // Fallback to local
+            localStorage.setItem('defaultSupplier', JSON.stringify(defaultSupplier))
+            alert(lang === 'cs' ? 'Profil uložen offline! (Chyba serveru)' : 'Profile saved offline! (Server error)')
+        }
     }
 
     return (
@@ -163,7 +253,7 @@ export default function Settings({
                     </div>
 
                     {/* IČO - REQUIRED */}
-                    <div className="grid two">
+                    <div className="grid two mobile-grid-2">
                         <div>
                             <label>{lang === 'cs' ? 'IČO *' : 'Business ID (IČO) *'}</label>
                             <input
@@ -240,19 +330,55 @@ export default function Settings({
                         </small>
                     </div>
 
-                    {/* Bank Account - IBAN */}
+                    {/* Bank Account - Smart Input */}
                     <div>
-                        <label>{lang === 'cs' ? 'IBAN (výchozí bankovní účet)' : 'IBAN (default bank account)'}</label>
+                        <label>{lang === 'cs' ? 'Bankovní spojení' : 'Bank Account'}</label>
+                        <div className="grid three mobile-grid-2" style={{ gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <div style={{ flex: '0 0 60px' }}>
+                                <input
+                                    name="prefix"
+                                    value={bankDetails.prefix}
+                                    onChange={handleBankChange}
+                                    onPaste={handlePasteBank}
+                                    placeholder={lang === 'cs' ? 'Předčíslí' : 'Prefix'}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <input
+                                    name="accountNumber"
+                                    value={bankDetails.accountNumber}
+                                    onChange={handleBankChange}
+                                    onPaste={handlePasteBank}
+                                    placeholder={lang === 'cs' ? 'Číslo účtu' : 'Account Number'}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                            <div style={{ flex: '0 0 80px' }}>
+                                <input
+                                    name="bankCode"
+                                    value={bankDetails.bankCode}
+                                    onChange={handleBankChange}
+                                    onPaste={handlePasteBank}
+                                    placeholder={lang === 'cs' ? 'Kód' : 'Code'}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                        </div>
+                        <label style={{ fontSize: '0.7rem', marginTop: '0.2rem' }}>IBAN</label>
                         <input
                             name="iban"
                             value={defaultSupplier?.iban || ''}
                             onChange={handleProfileChange}
+                            onPaste={handlePasteBank}
                             placeholder="CZ6508000000192000145399"
+                            readOnly
+                            style={{ background: 'var(--bg)', color: 'var(--muted)', cursor: 'not-allowed' }}
                         />
                     </div>
 
                     {/* Phone */}
-                    <div className="grid two">
+                    <div className="grid two mobile-grid-2">
                         <div>
                             <label>{lang === 'cs' ? 'Telefon' : 'Phone'}</label>
                             <input

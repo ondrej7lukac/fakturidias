@@ -645,6 +645,93 @@ const server = http.createServer(async (req, res) => {
   }
   // #endregion
 
+  // #region Settings Storage Helper Functions
+  /**
+   * Get the settings file path for a specific user
+   */
+  function getUserSettingsPath(userEmail) {
+    if (!userEmail) return null;
+    const safeEmail = userEmail.replace(/[^a-z0-9@._-]/gi, '_');
+    const userDir = path.join(dataDir, safeEmail);
+    if (!fs.existsSync(userDir)) {
+      fs.mkdirSync(userDir, { recursive: true });
+    }
+    return path.join(userDir, 'settings.json');
+  }
+
+  /**
+   * Get settings for a user
+   */
+  function getUserSettings(userEmail) {
+    const filePath = getUserSettingsPath(userEmail);
+    if (!filePath || !fs.existsSync(filePath)) {
+      return {};
+    }
+    try {
+      const data = fs.readFileSync(filePath, 'utf8');
+      return JSON.parse(data);
+    } catch (e) {
+      console.error('[Storage] Error reading user settings:', e);
+      return {};
+    }
+  }
+
+  /**
+   * Save settings for a user
+   */
+  function saveUserSettings(userEmail, settings) {
+    const filePath = getUserSettingsPath(userEmail);
+    if (!filePath) return false;
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf8');
+      return true;
+    } catch (e) {
+      console.error('[Storage] Error saving user settings:', e);
+      return false;
+    }
+  }
+  // #endregion
+
+  // #region Settings API Routes
+  // GET /api/settings - Get settings for current user
+  if (requestPath === "/api/settings" && req.method === "GET") {
+    const userEmail = getCurrentUserEmail();
+    if (!userEmail) {
+      return sendJson(res, 401, { error: "Not authenticated" });
+    }
+    const settings = getUserSettings(userEmail);
+    return sendJson(res, 200, { settings });
+  }
+
+  // POST /api/settings - Save settings
+  if (requestPath === "/api/settings" && req.method === "OPTIONS") {
+    return sendCors(res);
+  }
+  if (requestPath === "/api/settings" && req.method === "POST") {
+    return readJsonBody(req, (err, body) => {
+      if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+
+      const userEmail = getCurrentUserEmail();
+      if (!userEmail) {
+        return sendJson(res, 401, { error: "Not authenticated" });
+      }
+
+      const { settings } = body;
+      if (!settings) {
+        return sendJson(res, 400, { error: "Invalid settings data" });
+      }
+
+      const success = saveUserSettings(userEmail, settings);
+      if (success) {
+        console.log(`[Storage] Saved settings for ${userEmail}`);
+        return sendJson(res, 200, { success: true, settings });
+      } else {
+        return sendJson(res, 500, { error: "Failed to save settings" });
+      }
+    });
+  }
+  // #endregion
+
   // #region Email Sending
   if (requestPath === "/api/email/send" && req.method === "OPTIONS") {
     return sendCors(res);

@@ -3,26 +3,9 @@ import { getCzechQrPayload } from '../utils/bank'
 
 export default function InvoicePreview({ invoice, t, lang }) {
     return (
-        <div style={{
-            maxWidth: '210mm',
-            margin: '0 auto',
-            padding: '20mm',
-            background: '#ffffff',
-            color: '#111827',
-            fontFamily: 'Inter, sans-serif',
-            minHeight: '297mm',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            borderRadius: '4px'
-        }}>
+        <div className="invoice-preview">
             {/* Header */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                marginBottom: '50px',
-                borderBottom: '2px solid #6366f1',
-                paddingBottom: '20px'
-            }}>
+            <div className="preview-header">
                 <div>
                     <h1 style={{
                         margin: 0,
@@ -58,12 +41,7 @@ export default function InvoicePreview({ invoice, t, lang }) {
             </div>
 
             {/* Supplier and Client Info */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '60px',
-                marginBottom: '50px'
-            }}>
+            <div className="preview-grid-2">
                 {/* Supplier */}
                 <div>
                     <h3 style={{
@@ -173,11 +151,7 @@ export default function InvoicePreview({ invoice, t, lang }) {
                     color: '#64748b',
                     letterSpacing: '0.05em'
                 }}>{t.paymentDetails}</h3>
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
-                    gap: '20px'
-                }}>
+                <div className="preview-payment-grid">
                     <div>
                         <p style={{
                             margin: 0,
@@ -220,69 +194,71 @@ export default function InvoicePreview({ invoice, t, lang }) {
             </div>
 
             {/* Items Table */}
-            <table style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                marginBottom: '40px'
-            }}>
-                <thead>
-                    <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                        <th style={{
-                            textAlign: 'left',
-                            padding: '10px 0',
-                            color: '#64748b',
-                            fontSize: '12px',
-                            textTransform: 'uppercase'
-                        }}>{t.itemDescription}</th>
-                        <th style={{
-                            textAlign: 'center',
-                            padding: '10px 0',
-                            color: '#64748b',
-                            fontSize: '12px',
-                            textTransform: 'uppercase'
-                        }}>{t.qty}</th>
-                        <th style={{
-                            textAlign: 'right',
-                            padding: '10px 0',
-                            color: '#64748b',
-                            fontSize: '12px',
-                            textTransform: 'uppercase'
-                        }}>{t.price}</th>
-                        <th style={{
-                            textAlign: 'right',
-                            padding: '10px 0',
-                            color: '#64748b',
-                            fontSize: '12px',
-                            textTransform: 'uppercase'
-                        }}>{t.total}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {invoice.items.map((item, idx) => (
-                        <tr key={idx}>
-                            <td style={{
-                                padding: '12px 0',
-                                borderBottom: '1px solid #e5e7eb'
-                            }}>{item.name}</td>
-                            <td style={{
-                                padding: '12px 0',
-                                borderBottom: '1px solid #e5e7eb',
-                                textAlign: 'center'
-                            }}>{item.qty}</td>
-                            <td style={{
-                                padding: '12px 0',
-                                borderBottom: '1px solid #e5e7eb',
-                                textAlign: 'right'
-                            }}>{invoice.currency} {item.price.toFixed(2)}</td>
-                            <td style={{
-                                padding: '12px 0',
-                                borderBottom: '1px solid #e5e7eb',
-                                textAlign: 'right'
-                            }}>{invoice.currency} {item.total.toFixed(2)}</td>
+            <div className="table-container">
+                <table style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    marginBottom: '40px'
+                }}>
+                    <thead>
+                        <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                            <th style={{
+                                textAlign: 'left',
+                                padding: '10px 0',
+                                color: '#64748b',
+                                fontSize: '12px',
+                                textTransform: 'uppercase'
+                            }}>{t.itemDescription}</th>
+                            <th style={{
+                                textAlign: 'center',
+                                padding: '10px 0',
+                                color: '#64748b',
+                                fontSize: '12px',
+                                textTransform: 'uppercase'
+                            }}>{t.qty}</th>
+                            <th style={{
+                                textAlign: 'right',
+                                padding: '10px 0',
+                                color: '#64748b',
+                                fontSize: '12px',
+                                textTransform: 'uppercase'
+                            }}>{t.price}</th>
+                            <th style={{
+                                textAlign: 'right',
+                                padding: '10px 0',
+                                color: '#64748b',
+                                fontSize: '12px',
+                                textTransform: 'uppercase'
+                            }}>{t.total}</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {invoice.items.map((item, idx) => (
+                            <tr key={idx}>
+                                <td style={{
+                                    padding: '12px 0',
+                                    borderBottom: '1px solid #e5e7eb'
+                                }}>{item.name}</td>
+                                <td style={{
+                                    padding: '12px 0',
+                                    borderBottom: '1px solid #e5e7eb',
+                                    textAlign: 'center'
+                                }}>{item.qty}</td>
+                                <td style={{
+                                    padding: '12px 0',
+                                    borderBottom: '1px solid #e5e7eb',
+                                    textAlign: 'right'
+                                }}>{invoice.currency} {item.price.toFixed(2)}</td>
+                                <td style={{
+                                    padding: '12px 0',
+                                    borderBottom: '1px solid #e5e7eb',
+                                    textAlign: 'right'
+                                }}>{invoice.currency} {item.total.toFixed(2)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
 
             {/* VAT Section */}
             {invoice.isVatPayer && (
@@ -301,12 +277,7 @@ export default function InvoicePreview({ invoice, t, lang }) {
                         color: '#166534',
                         letterSpacing: '0.05em'
                     }}>Daňový doklad - Rozpis DPH</h3>
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(3, 1fr)',
-                        gap: '15px',
-                        fontSize: '14px'
-                    }}>
+                    <div className="preview-vat-grid">
                         <div>
                             <p style={{
                                 margin: 0,
@@ -351,11 +322,7 @@ export default function InvoicePreview({ invoice, t, lang }) {
             )}
 
             {/* Footer with QR and Total */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-end'
-            }}>
+            <div className="preview-footer">
                 <div style={{ width: '180px' }}>
                     <h3 style={{
                         margin: '0 0 8px',

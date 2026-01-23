@@ -32,20 +32,62 @@ function App() {
         if (savedCounter) setInvoiceCounter(Number(savedCounter))
     }, [])
 
-    // Load invoices from server on mount
+    // Load invoices and settings from server on mount
     useEffect(() => {
-        loadData().then(data => {
-            setInvoices(data.invoices || [])
-            setIsLoading(false)
-        }).catch(err => {
-            console.error('Failed to load invoices:', err)
-            setIsLoading(false)
-        })
+        const loadInitialData = async () => {
+            // 1. Load Invoices
+            try {
+                const invoiceData = await loadData() // internal fetch to /api/invoices
+                setInvoices(invoiceData.invoices || [])
+            } catch (err) {
+                console.error('Failed to load invoices:', err)
+            }
 
-        // Listen for Google Login to auto-fill email
+            // 2. Load Settings (Supplier Profile)
+            try {
+                // Check for tokens first to avoid 401 spam if not logged in
+                const tokensStr = localStorage.getItem('google_tokens')
+                if (tokensStr) {
+                    const res = await fetch('/api/settings')
+                    if (res.ok) {
+                        const { settings } = await res.json()
+                        if (settings && Object.keys(settings).length > 0) {
+                            setDefaultSupplier(settings)
+                            console.log('Loaded settings from server', settings)
+                        } else {
+                            // Fallback to local storage if server is empty (first sync)
+                            const savedSupplier = localStorage.getItem('defaultSupplier')
+                            if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
+                        }
+                    }
+                } else {
+                    // Fallback to local storage if not logged in
+                    const savedSupplier = localStorage.getItem('defaultSupplier')
+                    if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
+                }
+            } catch (err) {
+                console.error('Failed to load settings:', err)
+                // Fallback
+                const savedSupplier = localStorage.getItem('defaultSupplier')
+                if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
+            }
+
+            setIsLoading(false)
+        }
+
+        loadInitialData()
+
+        // Listen for Google Login to auto-fill email and reload settings
         const handleGoogleLogin = () => {
             const tokensStr = localStorage.getItem('google_tokens')
             if (tokensStr) {
+                // Reload settings from server after login
+                fetch('/api/settings').then(res => {
+                    if (res.ok) return res.json()
+                }).then(data => {
+                    if (data?.settings) setDefaultSupplier(data.settings)
+                })
+
                 // Try to get email from localStorage (Settings.jsx saves it there now in smtpConfig)
                 const smtpConfig = localStorage.getItem('smtpConfig')
                 if (smtpConfig) {
