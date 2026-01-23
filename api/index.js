@@ -242,12 +242,16 @@ module.exports = async (req, res) => {
                     { upsert: true, new: true }
                 );
 
+                // SECURITY: Strip refresh_token before sending to client
+                const clientTokens = { ...tokens };
+                delete clientTokens.refresh_token;
+
                 res.setHeader("Content-Type", "text/html");
                 return res.end(`
                     <script>
                         window.opener.postMessage({
                             type: 'GOOGLE_LOGIN_SUCCESS',
-                            tokens: ${JSON.stringify(tokens)},
+                            tokens: ${JSON.stringify(clientTokens)},
                             email: "${userId}"
                         }, '*');
                         window.close();
@@ -315,6 +319,65 @@ module.exports = async (req, res) => {
                 { upsert: true }
             );
             return sendJson(res, 200, { success: true });
+        }
+    }
+
+    // --- Email Sending ---
+    if (requestPath === "/api/email/send" && req.method === "POST") {
+        try {
+            const nodemailer = require('nodemailer');
+            const body = await readJsonBody(req);
+            const { to, subject, html, attachments, auth } = body;
+
+            if (!to || !subject || !html) return sendJson(res, 400, { error: "Missing fields" });
+
+            // Prefer fetching tokens from DB for security
+            const senderEmail = auth?.fromEmail || auth?.user;
+            let dbTokens = null;
+
+            if (senderEmail) {
+                const userToken = await Token.findOne({ userId: senderEmail });
+                if (userToken && userToken.tokens) {
+                    dbTokens = userToken.tokens;
+                    console.log(`[Email] Found secure tokens for ${senderEmail}`);
+                }
+            }
+
+            // Fallback to provided access token (but rely on DB for refresh token)
+            // Note: clientTokens from frontend won't have refresh_token anymore!
+            const accessToken = dbTokens?.access_token || auth?.accessToken || (auth?.tokens ? auth.tokens.access_token : null);
+            const refreshToken = dbTokens?.refresh_token;
+
+            if (!accessToken) {
+                return sendJson(res, 401, { error: "No access token found. Please reconnect Google account." });
+            }
+
+            const transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
+                    type: 'OAuth2',
+                    user: senderEmail,
+                    clientId: GOOGLE_CLIENT_ID,
+                    clientSecret: GOOGLE_CLIENT_SECRET,
+                    refreshToken: refreshToken,
+                    accessToken: accessToken
+                }
+            });
+
+            const info = await transporter.sendMail({
+                from: senderEmail,
+                to,
+                subject,
+                html,
+                attachments
+            });
+
+            console.log("[Email] Sent:", info.messageId);
+            return sendJson(res, 200, { success: true, messageId: info.messageId });
+
+        } catch (e) {
+            console.error("[Email] Error:", e);
+            return sendJson(res, 500, { error: "Internal Error", details: e.message });
         }
     }
 
