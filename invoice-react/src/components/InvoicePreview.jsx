@@ -135,63 +135,7 @@ export default function InvoicePreview({ invoice, t, lang }) {
                 </div>
             </div>
 
-            {/* Payment Details */}
-            <div style={{
-                marginBottom: '50px',
-                background: '#f8fafc',
-                padding: '20px',
-                borderRadius: '8px',
-                border: '1px solid #e2e8f0'
-            }}>
-                <h3 style={{
-                    margin: '0 0 12px',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    color: '#64748b',
-                    letterSpacing: '0.05em'
-                }}>{t.paymentDetails}</h3>
-                <div className="preview-payment-grid">
-                    <div>
-                        <p style={{
-                            margin: 0,
-                            fontSize: '12px',
-                            color: '#64748b',
-                            textTransform: 'uppercase'
-                        }}>{t.iban}</p>
-                        <p style={{
-                            margin: '4px 0',
-                            fontWeight: 600,
-                            fontFamily: 'monospace',
-                            fontSize: '14px'
-                        }}>{invoice.payment.iban || 'N/A'}</p>
-                    </div>
-                    <div>
-                        <p style={{
-                            margin: 0,
-                            fontSize: '12px',
-                            color: '#64748b',
-                            textTransform: 'uppercase'
-                        }}>{t.bic}</p>
-                        <p style={{
-                            margin: '4px 0',
-                            fontWeight: 600
-                        }}>{invoice.payment.bic || 'N/A'}</p>
-                    </div>
-                    <div>
-                        <p style={{
-                            margin: 0,
-                            fontSize: '12px',
-                            color: '#64748b',
-                            textTransform: 'uppercase'
-                        }}>{t.paymentNote}</p>
-                        <p style={{
-                            margin: '4px 0',
-                            fontWeight: 600
-                        }}>{invoice.payment.note || invoice.invoiceNumber}</p>
-                    </div>
-                </div>
-            </div>
+
 
             {/* Items Table */}
             <div className="table-container">
@@ -345,8 +289,8 @@ export default function InvoicePreview({ invoice, t, lang }) {
                 </div>
             )}
 
-            {/* Footer with QR and Total */}
-            <div className="preview-footer">
+            {/* Total & QR */}
+            <div className="preview-footer" style={{ marginBottom: '40px' }}>
                 <div style={{ width: '180px' }}>
                     <h3 style={{
                         margin: '0 0 8px',
@@ -395,13 +339,40 @@ export default function InvoicePreview({ invoice, t, lang }) {
                 </div>
             </div>
 
+            {/* Minimalistic Payment Details (Bottom) */}
+            <div style={{
+                padding: '15px 20px',
+                background: '#f8fafc',
+                borderTop: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '20px',
+                fontSize: '13px'
+            }}>
+                <div>
+                    <span style={{ color: '#64748b', marginRight: '6px' }}>{t.bankAccount}:</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{invoice.payment.accountNumber}/{invoice.payment.bankCode}</span>
+                </div>
+                <div>
+                    <span style={{ color: '#64748b', marginRight: '6px' }}>{t.iban}:</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a', fontFamily: 'monospace' }}>{invoice.payment.iban}</span>
+                </div>
+                <div>
+                    <span style={{ color: '#64748b', marginRight: '6px' }}>{t.bic}:</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{invoice.payment.bic}</span>
+                </div>
+                <div>
+                    <span style={{ color: '#64748b', marginRight: '6px' }}>{t.variableSymbol}:</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{invoice.payment.variableSymbol}</span>
+                </div>
+            </div>
+
             {/* Thank you note */}
             <div style={{
-                marginTop: '60px',
-                paddingTop: '20px',
-                borderTop: '1px solid #e5e7eb',
-                color: '#64748b',
-                fontSize: '12px',
+                marginTop: '20px',
+                color: '#94a3b8',
+                fontSize: '11px',
                 textAlign: 'center'
             }}>
                 <p>{t.thankYou}</p>

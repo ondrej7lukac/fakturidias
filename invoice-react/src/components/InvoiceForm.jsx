@@ -254,7 +254,10 @@ export default function InvoiceForm({
             payment: {
                 iban: currentFormData.iban.trim(),
                 bic: currentFormData.bic.trim(),
-                note: currentFormData.paymentNote.trim()
+                note: currentFormData.paymentNote.trim(),
+                accountNumber: currentFormData.accountNumber,
+                bankCode: currentFormData.bankCode,
+                variableSymbol: currentFormData.invoiceNumber.replace(/\D/g, '')
             },
             supplier: {
                 name: currentFormData.supplierName.trim(),
@@ -526,13 +529,6 @@ export default function InvoiceForm({
                 try { tokens = JSON.parse(tokensStr) } catch (e) { }
             }
 
-            // Get sender email from config
-            const smtpConfig = localStorage.getItem('smtpConfig')
-            let fromEmail = ''
-            if (smtpConfig) {
-                try { fromEmail = JSON.parse(smtpConfig).fromEmail } catch (e) { }
-            }
-
             if (!tokens) {
                 setIsGenerating(false)
                 setEmailStatus('')
@@ -555,16 +551,9 @@ export default function InvoiceForm({
                     to: currentData.client.email,
                     subject: `${t.invoice} ${currentData.invoiceNumber}`,
                     html: `<p>Hello,</p><p>Please find attached the invoice ${currentData.invoiceNumber}.</p><p>Thank you!</p>`,
-                    attachments: [
-                        {
-                            filename: `${currentData.invoiceNumber}.pdf`,
-                            path: pdfBase64
-                        }
-                    ],
-                    auth: {
-                        user: fromEmail,
-                        tokens: tokens
-                    }
+                    pdfBase64: pdfBase64,
+                    filename: `${currentData.invoiceNumber}.pdf`,
+                    useGoogle: true
                 })
             })
             if (response.ok) {
