@@ -70,8 +70,36 @@ export async function deleteInvoice(invoiceId) {
 
 export function formatInvoiceNumber(counter) {
     const year = new Date().getFullYear()
+    // 2024001 style - better for Variable Symbol
     const suffix = String(counter).padStart(3, '0')
-    return `INV-${year}-${suffix}`
+    return `${year}${suffix}`
+}
+
+export function getNextInvoiceCounter(invoices) {
+    const year = new Date().getFullYear()
+    const prefix = String(year)
+
+    // Find all invoices that start with current year
+    const currentYearInvoices = invoices.filter(inv =>
+        inv.invoiceNumber &&
+        String(inv.invoiceNumber).startsWith(prefix) &&
+        inv.invoiceNumber.length >= 5 // at least year + 1 digit
+    )
+
+    if (currentYearInvoices.length === 0) return 1
+
+    // Extract the counter part and find max
+    const counters = currentYearInvoices.map(inv => {
+        // Remove year prefix
+        const suffix = String(inv.invoiceNumber).slice(4)
+        // Clean non-numeric characters just in case
+        const cleanSuffix = suffix.replace(/\D/g, '')
+        return parseInt(cleanSuffix, 10)
+    }).filter(n => !isNaN(n))
+
+    if (counters.length === 0) return 1
+
+    return Math.max(...counters) + 1
 }
 
 export function addDays(date, days) {

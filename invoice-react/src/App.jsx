@@ -3,7 +3,7 @@ import Header from './components/Header'
 import InvoiceForm from './components/InvoiceForm'
 import InvoiceList from './components/InvoiceList'
 import Settings from './components/Settings'
-import { loadData, saveInvoice, deleteInvoice } from './utils/storage'
+import { getNextInvoiceCounter, loadData, saveInvoice, deleteInvoice } from './utils/storage'
 import { languages } from './utils/i18n'
 
 function App() {
@@ -24,12 +24,10 @@ function App() {
         const savedLang = localStorage.getItem('lang')
         const savedSupplier = localStorage.getItem('defaultSupplier')
         const savedCategories = localStorage.getItem('categories')
-        const savedCounter = localStorage.getItem('invoiceCounter')
 
         if (savedLang) setLang(savedLang)
         if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
         if (savedCategories) setCategories(JSON.parse(savedCategories))
-        if (savedCounter) setInvoiceCounter(Number(savedCounter))
     }, [])
 
     // Load invoices and settings from server on mount
@@ -38,7 +36,12 @@ function App() {
             // 1. Load Invoices
             try {
                 const invoiceData = await loadData() // internal fetch to /api/invoices
-                setInvoices(invoiceData.invoices || [])
+                const loadedInvoices = invoiceData.invoices || []
+                setInvoices(loadedInvoices)
+
+                // Calculate next counter based on loaded invoices
+                const nextCounter = getNextInvoiceCounter(loadedInvoices)
+                setInvoiceCounter(nextCounter)
             } catch (err) {
                 console.error('Failed to load invoices:', err)
             }
@@ -112,8 +115,8 @@ function App() {
         localStorage.setItem('lang', lang)
         localStorage.setItem('defaultSupplier', JSON.stringify(defaultSupplier))
         localStorage.setItem('categories', JSON.stringify(categories))
-        localStorage.setItem('invoiceCounter', invoiceCounter)
-    }, [lang, defaultSupplier, categories, invoiceCounter])
+        // invoiceCounter is now dynamic, no need to save to localStorage
+    }, [lang, defaultSupplier, categories])
 
     const selectedInvoice = invoices.find(inv => inv.id === selectedId)
 
@@ -123,16 +126,19 @@ function App() {
 
             // Update local state
             const existingIndex = invoices.findIndex(inv => inv.id === invoice.id)
+            let updatedInvoices = [...invoices]
 
             if (existingIndex >= 0) {
-                const updated = [...invoices]
-                updated[existingIndex] = invoice
-                setInvoices(updated)
+                updatedInvoices[existingIndex] = invoice
             } else {
-                setInvoices([invoice, ...invoices])
-                setInvoiceCounter(prev => prev + 1)
+                updatedInvoices = [invoice, ...invoices]
                 setDraftNumber('')
             }
+
+            setInvoices(updatedInvoices)
+
+            // Recalculate counter
+            setInvoiceCounter(getNextInvoiceCounter(updatedInvoices))
 
             setSelectedId(invoice.id)
 

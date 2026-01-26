@@ -97,6 +97,17 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
                         ${invoice.supplier?.phone ? `<p style="margin: 2px 0;">Tel: ${invoice.supplier.phone}</p>` : ''}
                         ${invoice.supplier?.email ? `<p style="margin: 2px 0;">Email: ${invoice.supplier.email}</p>` : ''}
                     </div>
+                    ${!invoice.isVatPayer ? `
+                        <p style="
+                            margin-top: 10px;
+                            padding: 8px;
+                            background: #fef3c7;
+                            border: 1px solid #fbbf24;
+                            border-radius: 4px;
+                            font-size: 11px;
+                            font-weight: 600;
+                        ">⚠️ Nejsem plátce DPH</p>
+                    ` : ''}
                 </div>
                 <div>
                     <h3 style="margin: 0 0 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em;">${t.billTo}</h3>
@@ -160,8 +171,22 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
                 <div style="width: 250px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                         <span style="color: #64748b;">${t.subtotal}:</span>
-                        <span style="font-weight: 600;">${invoice.currency} ${invoice.amount.toFixed(2)}</span>
+                        <span style="font-weight: 600;">${invoice.currency} ${parseFloat(invoice.taxBase || invoice.amount).toFixed(2)}</span>
                     </div>
+
+                    ${invoice.isVatPayer ? `
+                        <div style="
+                            display: flex;
+                            justify-content: space-between;
+                            margin-bottom: 10px;
+                            color: #64748b;
+                            font-size: 13px;
+                        ">
+                           <span>${t.lang === 'cs' || !t.lang ? 'DPH' : 'VAT'} (${invoice.taxRate}%)</span>
+                           <span>${invoice.currency} ${parseFloat(invoice.taxAmount || 0).toFixed(2)}</span>
+                        </div>
+                    ` : ''}
+
                     <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #6366f1;">
                         <span style="font-weight: 700; font-size: 18px;">${t.total}:</span>
                         <span style="font-weight: 700; font-size: 18px; color: #6366f1;">${invoice.currency} ${invoice.amount.toFixed(2)}</span>
