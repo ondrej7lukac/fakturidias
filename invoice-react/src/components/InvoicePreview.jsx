@@ -89,13 +89,10 @@ export default function InvoicePreview({ invoice, t, lang }) {
                     {!invoice.isVatPayer && (
                         <p style={{
                             marginTop: '10px',
-                            padding: '8px',
-                            background: '#fef3c7',
-                            border: '1px solid #fbbf24',
-                            borderRadius: '4px',
+                            color: '#64748b',
                             fontSize: '11px',
-                            fontWeight: 600
-                        }}>⚠️ Nejsem plátce DPH</p>
+                            fontStyle: 'italic'
+                        }}>Nejsem plátce DPH</p>
                     )}
                 </div>
 

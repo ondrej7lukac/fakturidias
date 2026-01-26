@@ -30,8 +30,8 @@ export const generateInvoicePDF = async (invoice, t, qrDataUrl = null) => {
     pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
     heightLeft -= pdfHeight;
 
-    // Add more pages if content overflows
-    while (heightLeft > 0) {
+    // Add more pages if content overflows (with 5mm tolerance for rounding errors)
+    while (heightLeft > 5) {
         position = heightLeft - imgHeight; // Negative position to shift image up
         pdf.addPage();
         pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
@@ -109,13 +109,10 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
                     ${!invoice.isVatPayer ? `
                         <p style="
                             margin-top: 10px;
-                            padding: 8px;
-                            background: #fef3c7;
-                            border: 1px solid #fbbf24;
-                            border-radius: 4px;
+                            color: #64748b;
                             font-size: 11px;
-                            font-weight: 600;
-                        ">⚠️ Nejsem plátce DPH</p>
+                            font-style: italic;
+                        ">Nejsem plátce DPH</p>
                     ` : ''}
                 </div>
                 <div>

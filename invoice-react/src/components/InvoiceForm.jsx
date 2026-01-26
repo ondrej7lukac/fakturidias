@@ -999,9 +999,9 @@ export default function InvoiceForm({
                         </button>
                     </div>
 
-                    <div style={{ position: 'absolute', left: '-9999px', top: '0' }} ref={qrCanvasRef}>
+                    <div style={{ position: 'fixed', left: 0, top: 0, opacity: 0, pointerEvents: 'none', zIndex: -1 }} ref={qrCanvasRef}>
                         <QRCodeCanvas
-                            value={getCzechQrPayload(getCurrentInvoiceData())}
+                            value={getCzechQrPayload(getCurrentInvoiceData(formData, items))}
                             size={256}
                             level="M"
                             includeMargin={false}
