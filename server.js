@@ -906,7 +906,6 @@ const requestHandler = async (req, res) => {
     });
     fs.createReadStream(filePath).pipe(res);
   });
-});
 };
 
 // Start server if run directly (Local Dev)
