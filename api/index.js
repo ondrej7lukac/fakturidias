@@ -3,7 +3,7 @@ const zlib = require("zlib");
 const { URL } = require("url");
 // Vercel Serverless Function - Revision 2
 const mongoose = require('mongoose');
-const { gooogle } = require('googleapis'); // Typo fix below
+
 
 // Environment variables
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -365,40 +365,35 @@ module.exports = async (req, res) => {
     }
 
     // --- Email Sending ---
+    // --- Email Sending ---
     if (requestPath.includes("/api/email/send") && req.method === "POST") {
         try {
             const nodemailer = require('nodemailer');
             const body = await readJsonBody(req);
-            const { to, subject, html, attachments, auth } = body;
+            const { to, cc, subject, html, pdfBase64, filename, userEmail } = body;
 
-            if (!to || !subject || !html) return sendJson(res, 400, { error: "Missing fields" });
+            if (!to || !subject) return sendJson(res, 400, { error: "Missing fields" });
 
-            // Prefer fetching tokens from DB for security
-            const senderEmail = auth?.fromEmail || auth?.user;
-            let dbTokens = null;
-
-            if (senderEmail) {
-                const userToken = await Token.findOne({ userId: senderEmail });
-                if (userToken && userToken.tokens) {
-                    dbTokens = userToken.tokens;
-                    console.log(`[Email] Found secure tokens for ${senderEmail}`);
-                }
+            if (!userEmail) {
+                return sendJson(res, 401, { error: "No user identified. Please reconnect Google account." });
             }
 
-            // Fallback to provided access token (but rely on DB for refresh token)
-            // Note: clientTokens from frontend won't have refresh_token anymore!
-            const accessToken = dbTokens?.access_token || auth?.accessToken || (auth?.tokens ? auth.tokens.access_token : null);
-            const refreshToken = dbTokens?.refresh_token;
+            // Fetch tokens from DB
+            const userToken = await Token.findOne({ userId: userEmail });
 
-            if (!accessToken) {
+            if (!userToken || !userToken.tokens) {
                 return sendJson(res, 401, { error: "No access token found. Please reconnect Google account." });
             }
+
+            const tokens = userToken.tokens;
+            const accessToken = tokens.access_token;
+            const refreshToken = tokens.refresh_token;
 
             const transporter = nodemailer.createTransport({
                 service: 'gmail',
                 auth: {
                     type: 'OAuth2',
-                    user: senderEmail,
+                    user: userEmail,
                     clientId: GOOGLE_CLIENT_ID,
                     clientSecret: GOOGLE_CLIENT_SECRET,
                     refreshToken: refreshToken,
@@ -406,9 +401,20 @@ module.exports = async (req, res) => {
                 }
             });
 
+            // Construct attachments
+            const attachments = [];
+            if (pdfBase64) {
+                attachments.push({
+                    filename: filename || "invoice.pdf",
+                    content: pdfBase64.split("base64,")[1],
+                    encoding: "base64"
+                });
+            }
+
             const info = await transporter.sendMail({
-                from: senderEmail,
+                from: userEmail,
                 to,
+                cc,
                 subject,
                 html,
                 attachments

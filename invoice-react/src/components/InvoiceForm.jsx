@@ -585,6 +585,7 @@ export default function InvoiceForm({
                     html: `<p>Hello,</p><p>Please find attached the invoice ${currentData.invoiceNumber}.</p><p>Thank you!</p>`,
                     pdfBase64: pdfBase64,
                     filename: `${currentData.invoiceNumber}.pdf`,
+                    userEmail: tokens?.email, // Required for backend to identify user tokens
                     useGoogle: true
                 })
             })
