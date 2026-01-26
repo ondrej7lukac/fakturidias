@@ -31,6 +31,7 @@ export default function InvoiceForm({
         category: '',
         clientName: '',
         clientEmail: '',
+        clientEmailCopy: '',
         clientArea: 'Prague',
         clientIco: '',
         clientVat: '',
@@ -128,6 +129,7 @@ export default function InvoiceForm({
                 category: '',
                 clientName: '',
                 clientEmail: '',
+                clientEmailCopy: '',
                 clientArea: '',
                 clientIco: '',
                 clientVat: '',
@@ -244,6 +246,7 @@ export default function InvoiceForm({
             client: {
                 name: currentFormData.clientName.trim(),
                 email: currentFormData.clientEmail.trim(),
+                emailCopy: (currentFormData.clientEmailCopy || '').trim(),
                 area: currentFormData.clientArea.trim(),
                 ico: currentFormData.clientIco.trim(),
                 vat: currentFormData.clientVat.trim(),
@@ -577,6 +580,7 @@ export default function InvoiceForm({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     to: currentData.client.email,
+                    cc: currentData.client.emailCopy,
                     subject: `${t.invoice} ${currentData.invoiceNumber}`,
                     html: `<p>Hello,</p><p>Please find attached the invoice ${currentData.invoiceNumber}.</p><p>Thank you!</p>`,
                     pdfBase64: pdfBase64,
@@ -805,6 +809,10 @@ export default function InvoiceForm({
                         <div>
                             <label>{t.email}</label>
                             <input name="clientEmail" type="email" value={formData.clientEmail} onChange={handleChange} />
+                        </div>
+                        <div>
+                            <label>CC Email</label>
+                            <input name="clientEmailCopy" type="email" value={formData.clientEmailCopy} onChange={handleChange} placeholder="copy@email.com" />
                         </div>
                         <div>
                             <label>{t.area}</label>

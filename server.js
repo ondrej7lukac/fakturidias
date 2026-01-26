@@ -740,8 +740,8 @@ const server = http.createServer(async (req, res) => {
     return readJsonBody(req, async (err, body) => {
       if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
 
-      const { to, subject, text, pdfBase64, filename, useGoogle } = body;
-      console.log(`[Email] Request received to: ${to}, subject: ${subject}`);
+      const { to, cc, subject, text, pdfBase64, filename, useGoogle } = body;
+      console.log(`[Email] Request received to: ${to}, cc: ${cc}, subject: ${subject}`);
 
       try {
         let nodemailer;
@@ -799,6 +799,7 @@ const server = http.createServer(async (req, res) => {
         const info = await transporter.sendMail({
           from: userEmail ? `"Invoice Maker" <${userEmail}>` : undefined,
           to,
+          cc,
           subject,
           text,
           attachments: [
