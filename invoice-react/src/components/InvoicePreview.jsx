@@ -324,18 +324,16 @@ export default function InvoicePreview({ invoice, t, lang }) {
                         <span style={{ fontWeight: 600 }}>{invoice.currency} {parseFloat(invoice.isVatPayer ? (invoice.taxBase || invoice.amount) : invoice.amount).toFixed(2)}</span>
                     </div>
 
-                    {invoice.isVatPayer && (
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            marginBottom: '10px',
-                            color: '#64748b',
-                            fontSize: '13px'
-                        }}>
-                            <span>{lang === 'cs' ? 'DPH' : 'VAT'} ({invoice.taxRate}%)</span>
-                            <span>{invoice.currency} {parseFloat(invoice.taxAmount || 0).toFixed(2)}</span>
-                        </div>
-                    )}
+                    <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '10px',
+                        color: '#64748b',
+                        fontSize: '13px'
+                    }}>
+                        <span>{lang === 'cs' ? 'DPH' : 'VAT'} ({invoice.isVatPayer ? invoice.taxRate : '0'}%)</span>
+                        <span>{invoice.currency} {parseFloat(invoice.isVatPayer ? (invoice.taxAmount || 0) : 0).toFixed(2)}</span>
+                    </div>
 
                     <div style={{
                         display: 'flex',

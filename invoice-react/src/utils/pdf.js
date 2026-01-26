@@ -7,7 +7,8 @@ export const generateInvoicePDF = async (invoice, t, qrDataUrl = null) => {
     const { jsPDF } = window.jspdf;
     const canvas = await createInvoiceCanvas(invoice, t, qrDataUrl);
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.8);
+    // Higher quality output
+    const imgData = canvas.toDataURL('image/jpeg', 1.0);
     const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -56,6 +57,14 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
     container.style.fontFamily = 'Inter, sans-serif';
     container.style.boxSizing = 'border-box'; // Ensure padding is included in width
 
+    // Inject font style explicitly to ensure capture
+    const style = document.createElement('style');
+    style.innerHTML = `
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { -webkit-font-smoothing: antialiased; }
+    `;
+    container.appendChild(style);
+
     const itemsHtml = invoice.items.map(item => `
         <tr>
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb;">${item.name}</td>
@@ -67,10 +76,10 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
         </tr>
     `).join('');
 
-    container.innerHTML = `
-        <div style="font-family: sans-serif;">
+    container.innerHTML += `
+        <div style="font-family: 'Inter', sans-serif;">
             <!-- Header -->
-            <div style="display: flex; justify-content: space-between; margin-bottom: 40px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 50px; border-bottom: 2px solid #6366f1; padding-bottom: 20px;">
                 <div>
                     <h1 style="margin: 0; color: #6366f1; font-size: 32px; font-weight: 800; text-transform: uppercase;">${t.invoice}</h1>
                     <p style="margin: 5px 0; color: #64748b; font-size: 16px; font-weight: 500;"># ${invoice.invoiceNumber}</p>
@@ -174,18 +183,16 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
                         <span style="font-weight: 600;">${invoice.currency} ${parseFloat(invoice.isVatPayer ? (invoice.taxBase || invoice.amount) : invoice.amount).toFixed(2)}</span>
                     </div>
 
-                    ${invoice.isVatPayer ? `
-                        <div style="
-                            display: flex;
-                            justify-content: space-between;
-                            margin-bottom: 10px;
-                            color: #64748b;
-                            font-size: 13px;
-                        ">
-                           <span>${t.lang === 'cs' || !t.lang ? 'DPH' : 'VAT'} (${invoice.taxRate}%)</span>
-                           <span>${invoice.currency} ${parseFloat(invoice.taxAmount || 0).toFixed(2)}</span>
-                        </div>
-                    ` : ''}
+                    <div style="
+                        display: flex;
+                        justify-content: space-between;
+                        margin-bottom: 10px;
+                        color: #64748b;
+                        font-size: 13px;
+                    ">
+                        <span>${t.lang === 'cs' || !t.lang ? 'DPH' : 'VAT'} (${invoice.isVatPayer ? invoice.taxRate : '0'}%)</span>
+                        <span>${invoice.currency} ${parseFloat(invoice.isVatPayer ? (invoice.taxAmount || 0) : 0).toFixed(2)}</span>
+                    </div>
 
                     <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #6366f1;">
                         <span style="font-weight: 700; font-size: 18px;">${t.total}:</span>
@@ -233,10 +240,10 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
 
     document.body.appendChild(container);
     // Ensure fonts and images are loaded
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 800));
 
     const canvas = await window.html2canvas(container, {
-        scale: 2, // Higher quality
+        scale: 3, // High quality, reasonable size
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff'
