@@ -173,10 +173,18 @@ function readJsonBody(req, callback) {
 // Load environment variables
 require('dotenv').config();
 
+const mongoose = require('mongoose');
+
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const GOOGLE_REDIRECT_URI = "http://localhost:5500/auth/google/callback";
+const MONGODB_URI = process.env.MONGODB_URI;
 
+// Vercel helper: Dynamic Redirect URI
+const getRedirectUri = (req) => {
+  const protocol = req.headers['x-forwarded-proto'] || 'http';
+  const host = req.headers.host;
+  return `${protocol}://${host}/auth/google/callback`;
+};
 
 const SCOPES = [
   'https://mail.google.com/',
@@ -185,29 +193,108 @@ const SCOPES = [
 const TOKENS_PATH = path.join(baseDir, 'google_tokens.json');
 
 let oAuth2Client;
-let google;
 
 try {
-  google = require('googleapis').google;
+  const { google } = require('googleapis');
   oAuth2Client = new google.auth.OAuth2(
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
-    GOOGLE_REDIRECT_URI
+    // Redirect URI will be set dynamically per request
+    "http://localhost:5500/auth/google/callback"
   );
 } catch (e) {
   console.warn("googleapis not installed or failed to load");
 }
 
-// Load saved tokens if exist
+// #region MongoDB Schemas & Connection
+let isConnected = false;
+
+const InvoiceSchema = new mongoose.Schema({
+  userEmail: { type: String, required: true, index: true },
+  id: { type: String, required: true, unique: true }, // UUID from frontend
+  invoiceNumber: String,
+  issueDate: String,
+  dueDate: String,
+  taxableSupplyDate: String,
+  status: String,
+  category: String,
+  client: Object,
+  items: Array,
+  currency: String,
+  amount: Number,
+  payment: Object,
+  supplier: Object,
+  isVatPayer: Boolean,
+  taxBase: String,
+  taxRate: String,
+  taxAmount: String,
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const ItemSchema = new mongoose.Schema({
+  userEmail: { type: String, required: true, index: true },
+  name: { type: String, required: true },
+  price: Number,
+  taxRate: String,
+  lastUpdated: { type: Date, default: Date.now }
+});
+// Create a compound index for unique items per user
+ItemSchema.index({ userEmail: 1, name: 1 }, { unique: true });
+
+const SettingsSchema = new mongoose.Schema({
+  userEmail: { type: String, required: true, unique: true },
+  defaultSupplier: Object,
+  smtp: Object, // Although we use Google OAuth mainly now
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const TokenSchema = new mongoose.Schema({
+  userEmail: { type: String, required: true, unique: true },
+  tokens: Object,
+  updatedAt: { type: Date, default: Date.now }
+});
+
+let InvoiceModel, ItemModel, SettingsModel, TokenModel;
+
+// Initialize models only once
+if (mongoose.models.Invoice) {
+  InvoiceModel = mongoose.model('Invoice');
+  ItemModel = mongoose.model('Item');
+  SettingsModel = mongoose.model('Settings');
+  TokenModel = mongoose.model('Token');
+} else {
+  InvoiceModel = mongoose.model('Invoice', InvoiceSchema);
+  ItemModel = mongoose.model('Item', ItemSchema);
+  SettingsModel = mongoose.model('Settings', SettingsSchema);
+  TokenModel = mongoose.model('Token', TokenSchema);
+}
+
+const connectDB = async () => {
+  if (isConnected) return;
+  if (!MONGODB_URI) {
+    console.warn("[MongoDB] Missing MONGODB_URI, falling back to file system (Ephemeral on Vercel!)");
+    return;
+  }
+  try {
+    await mongoose.connect(MONGODB_URI);
+    isConnected = true;
+    console.log("[MongoDB] Connected successfully");
+  } catch (error) {
+    console.error("[MongoDB] Connection error:", error);
+  }
+};
+// #endregion
+
+// Load saved tokens if exist (Local FS Fallback)
 if (oAuth2Client && fs.existsSync(TOKENS_PATH)) {
   try {
     const tokens = JSON.parse(fs.readFileSync(TOKENS_PATH, 'utf8'));
     oAuth2Client.setCredentials(tokens);
-    // Store email separately since it's not part of standard OAuth credentials
     if (tokens.email) {
       oAuth2Client.credentials.email = tokens.email;
     }
-    console.log(`[OAuth] Loaded saved Google tokens${tokens.email ? ' for ' + tokens.email : ''}`);
+    console.log(`[OAuth] Loaded saved Google tokens (FS)${tokens.email ? ' for ' + tokens.email : ''}`);
   } catch (e) {
     console.error("[OAuth] Failed to load saved tokens", e);
   }
@@ -231,7 +318,24 @@ function getUserDataPath(userEmail) {
 /**
  * Get all invoices for a user
  */
-function getUserInvoices(userEmail) {
+/**
+ * Get all invoices for a user
+ */
+async function getUserInvoices(userEmail) {
+  if (isConnected) {
+    try {
+      // MongoDB Fetch
+      const invoices = await InvoiceModel.find({ userEmail }).lean();
+      // Map _id to clean objects if needed, but lean() is close enough
+      // We might need to ensure 'id' is preserved (which it is in our schema)
+      return invoices || [];
+    } catch (e) {
+      console.error('[MongoDB] Error fetching invoices:', e);
+      return [];
+    }
+  }
+
+  // FS Fallback
   const filePath = getUserDataPath(userEmail);
   if (!filePath || !fs.existsSync(filePath)) {
     return [];
@@ -247,8 +351,35 @@ function getUserInvoices(userEmail) {
 
 /**
  * Save invoices for a user
+ * NOTE: For MongoDB, we shouldn't overwrite all. 
+ * But the current API sends ONE invoice to save/update.
+ * We need to adjust the API handler to call a different function or handle it here.
+ * For now, let's keep this signature but we will REWRITE the API handler usage.
  */
-function saveUserInvoices(userEmail, invoices) {
+// WARNING: This function signature was designed for bulk overwrite (array of invoices).
+// We'll update the API handler to use `saveSingleInvoice` instead.
+async function saveSingleInvoice(userEmail, invoice) {
+  if (isConnected) {
+    try {
+      await InvoiceModel.findOneAndUpdate(
+        { userEmail, id: invoice.id },
+        { ...invoice, userEmail, updatedAt: new Date() },
+        { upsert: true, new: true }
+      );
+      return true;
+    } catch (e) {
+      console.error('[MongoDB] Error saving invoice:', e);
+      return false;
+    }
+  }
+
+  // FS Fallback (Old Logic: Load All, Find Index, Update, Save All)
+  // We can't easily reuse the old bulk save logic here without loading everything.
+  // So let's rely on the old saveUserInvoices for FS.
+  return false; // Should not reach here if we update API handler correctly
+}
+
+function saveUserInvoices_FS(userEmail, invoices) {
   const filePath = getUserDataPath(userEmail);
   if (!filePath) return false;
   try {
@@ -263,18 +394,26 @@ function saveUserInvoices(userEmail, invoices) {
 /**
  * Get current user email from session
  */
-function getCurrentUserEmail() {
+/**
+ * Get current user email from session
+ * Updated to support Async retrieval potentially
+ */
+async function getCurrentUserEmail() {
   if (oAuth2Client?.credentials?.email) {
     return oAuth2Client.credentials.email;
   }
+
+  // Try FS
   if (fs.existsSync(TOKENS_PATH)) {
     try {
       const tokens = JSON.parse(fs.readFileSync(TOKENS_PATH, 'utf8'));
-      return tokens.email;
-    } catch (e) {
-      return null;
-    }
+      if (tokens.email) return tokens.email;
+    } catch (e) { }
   }
+
+  // Try DB if we have a refresh token but no email in memory? 
+  // Difficult because we don't know WHICH user to look up without a key.
+  // We rely on oAuth2Client having credentials set.
   return null;
 }
 
@@ -294,56 +433,63 @@ function getUserItemsPath(userEmail) {
 /**
  * Get all items for a user
  */
-function getUserItems(userEmail) {
-  const filePath = getUserItemsPath(userEmail);
-  if (!filePath || !fs.existsSync(filePath)) {
-    return [];
+/**
+ * Get all items for a user
+ */
+async function getUserItems(userEmail) {
+  if (isConnected) {
+    try {
+      return await ItemModel.find({ userEmail }).lean();
+    } catch (e) { return []; }
   }
+
+  const filePath = getUserItemsPath(userEmail);
+  if (!filePath || !fs.existsSync(filePath)) return [];
   try {
     const data = fs.readFileSync(filePath, 'utf8');
     return JSON.parse(data);
-  } catch (e) {
-    console.error('[Storage] Error reading user items:', e);
-    return [];
-  }
+  } catch (e) { return []; }
 }
 
 /**
  * Save or update an item in user's database
  */
-function saveUserItem(userEmail, item) {
+async function saveUserItem(userEmail, item) {
+  if (isConnected) {
+    try {
+      await ItemModel.findOneAndUpdate(
+        { userEmail, name: item.name }, // Key by name
+        { ...item, userEmail, lastUpdated: new Date() },
+        { upsert: true, new: true }
+      );
+      return true;
+    } catch (e) { return false; }
+  }
+
   const filePath = getUserItemsPath(userEmail);
   if (!filePath) return false;
 
   try {
-    let items = getUserItems(userEmail);
+    // FS implementation: Load all, find, update/push, save
+    const items = await getUserItems(userEmail); // Now async!
     const existingIndex = items.findIndex(i => i.name.toLowerCase() === item.name.toLowerCase());
 
     if (existingIndex >= 0) {
-      // Update existing item with new price/tax
-      items[existingIndex] = {
-        ...items[existingIndex],
-        ...item,
-        lastUpdated: Date.now()
-      };
+      items[existingIndex] = { ...items[existingIndex], ...item, lastUpdated: Date.now() };
     } else {
-      // Add new item
-      items.push({
-        ...item,
-        lastUpdated: Date.now()
-      });
+      items.push({ ...item, lastUpdated: Date.now() });
     }
 
     fs.writeFileSync(filePath, JSON.stringify(items, null, 2), 'utf8');
     return true;
   } catch (e) {
-    console.error('[Storage] Error saving user item:', e);
     return false;
   }
 }
 // #endregion
 
 const requestHandler = async (req, res) => {
+  await connectDB();
   const url = new URL(req.url, `http://${req.headers.host}`);
   let requestPath = decodeURIComponent(url.pathname || "/");
 
@@ -487,8 +633,28 @@ const requestHandler = async (req, res) => {
         }
 
         const tokensToSave = { ...tokens, email: userEmail };
-        fs.writeFileSync(TOKENS_PATH, JSON.stringify(tokensToSave));
-        console.log(`[OAuth] Tokens acquired${userEmail ? ' for ' + userEmail : ''}`);
+
+        // SAVE TOKENS LOCALLY (FS)
+        try {
+          fs.writeFileSync(TOKENS_PATH, JSON.stringify(tokensToSave));
+          console.log(`[OAuth] Tokens acquired${userEmail ? ' for ' + userEmail : ''}`);
+        } catch (e) {
+          console.error("[OAuth] Failed to save tokens to disk:", e.message);
+        }
+
+        // SAVE TOKENS TO DB
+        if (isConnected && userEmail) {
+          try {
+            await TokenModel.findOneAndUpdate(
+              { userEmail },
+              { tokens: tokensToSave, userEmail, updatedAt: new Date() },
+              { upsert: true, new: true }
+            );
+            console.log('[OAuth] Tokens saved to MongoDB');
+          } catch (e) {
+            console.error('[OAuth] Failed to save tokens to DB:', e);
+          }
+        }
 
         // Return a simple HTML page that closes itself or redirects back to app
         res.writeHead(200, {
@@ -537,11 +703,11 @@ const requestHandler = async (req, res) => {
 
   // GET /api/invoices - Get all invoices for current user
   if (requestPath === "/api/invoices" && req.method === "GET") {
-    const userEmail = getCurrentUserEmail();
+    const userEmail = await getCurrentUserEmail();
     if (!userEmail) {
       return sendJson(res, 401, { error: "Not authenticated. Please connect Google account." });
     }
-    const invoices = getUserInvoices(userEmail);
+    const invoices = await getUserInvoices(userEmail);
     return sendJson(res, 200, { invoices });
   }
 
@@ -550,10 +716,10 @@ const requestHandler = async (req, res) => {
     return sendCors(res);
   }
   if (requestPath === "/api/invoices" && req.method === "POST") {
-    return readJsonBody(req, (err, body) => {
+    return readJsonBody(req, async (err, body) => {
       if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
 
-      const userEmail = getCurrentUserEmail();
+      const userEmail = await getCurrentUserEmail();
       if (!userEmail) {
         return sendJson(res, 401, { error: "Not authenticated" });
       }
@@ -563,18 +729,19 @@ const requestHandler = async (req, res) => {
         return sendJson(res, 400, { error: "Invalid invoice data" });
       }
 
-      const invoices = getUserInvoices(userEmail);
-      const existingIndex = invoices.findIndex(inv => inv.id === invoice.id);
-
-      if (existingIndex >= 0) {
-        // Update existing
-        invoices[existingIndex] = invoice;
+      let success = false;
+      if (isConnected) {
+        // MongoDB Single Save
+        success = await saveSingleInvoice(userEmail, invoice);
       } else {
-        // Create new
-        invoices.push(invoice);
+        // FS Legacy Bulk Save
+        const invoices = await getUserInvoices(userEmail); // Fallback to FS
+        const existingIndex = invoices.findIndex(inv => inv.id === invoice.id);
+        if (existingIndex >= 0) invoices[existingIndex] = invoice;
+        else invoices.push(invoice);
+        success = saveUserInvoices_FS(userEmail, invoices);
       }
 
-      const success = saveUserInvoices(userEmail, invoices);
       if (success) {
         console.log(`[Storage] Saved invoice ${invoice.invoiceNumber} for ${userEmail}`);
         return sendJson(res, 200, { success: true, invoice });
@@ -587,25 +754,27 @@ const requestHandler = async (req, res) => {
   // DELETE /api/invoices/:id - Delete invoice
   if (requestPath.startsWith("/api/invoices/") && req.method === "DELETE") {
     const invoiceId = requestPath.split("/api/invoices/")[1];
-    const userEmail = getCurrentUserEmail();
+    const userEmail = await getCurrentUserEmail();
 
     if (!userEmail) {
       return sendJson(res, 401, { error: "Not authenticated" });
     }
 
-    const invoices = getUserInvoices(userEmail);
-    const filteredInvoices = invoices.filter(inv => inv.id !== invoiceId);
-
-    if (filteredInvoices.length === invoices.length) {
-      return sendJson(res, 404, { error: "Invoice not found" });
-    }
-
-    const success = saveUserInvoices(userEmail, filteredInvoices);
-    if (success) {
-      console.log(`[Storage] Deleted invoice ${invoiceId} for ${userEmail}`);
-      return sendJson(res, 200, { success: true });
+    if (isConnected) {
+      try {
+        await InvoiceModel.deleteOne({ userEmail, id: invoiceId });
+        return sendJson(res, 200, { success: true });
+      } catch (e) {
+        return sendJson(res, 500, { error: "Failed to delete" });
+      }
     } else {
-      return sendJson(res, 500, { error: "Failed to delete invoice" });
+      const invoices = await getUserInvoices(userEmail);
+      const filteredInvoices = invoices.filter(inv => inv.id !== invoiceId);
+      if (filteredInvoices.length === invoices.length) {
+        return sendJson(res, 404, { error: "Invoice not found" });
+      }
+      const success = saveUserInvoices_FS(userEmail, filteredInvoices);
+      return success ? sendJson(res, 200, { success: true }) : sendJson(res, 500, { error: "Failed to delete" });
     }
   }
   // #endregion
@@ -668,7 +837,17 @@ const requestHandler = async (req, res) => {
   /**
    * Get settings for a user
    */
-  function getUserSettings(userEmail) {
+  /**
+   * Get settings for a user
+   */
+  async function getUserSettings(userEmail) {
+    if (isConnected) {
+      try {
+        const doc = await SettingsModel.findOne({ userEmail }).lean();
+        return doc || {};
+      } catch (e) { return {}; }
+    }
+
     const filePath = getUserSettingsPath(userEmail);
     if (!filePath || !fs.existsSync(filePath)) {
       return {};
@@ -677,7 +856,6 @@ const requestHandler = async (req, res) => {
       const data = fs.readFileSync(filePath, 'utf8');
       return JSON.parse(data);
     } catch (e) {
-      console.error('[Storage] Error reading user settings:', e);
       return {};
     }
   }
@@ -685,14 +863,24 @@ const requestHandler = async (req, res) => {
   /**
    * Save settings for a user
    */
-  function saveUserSettings(userEmail, settings) {
+  async function saveUserSettings(userEmail, settings) {
+    if (isConnected) {
+      try {
+        await SettingsModel.findOneAndUpdate(
+          { userEmail },
+          { ...settings, userEmail, updatedAt: new Date() },
+          { upsert: true, new: true }
+        );
+        return true;
+      } catch (e) { return false; }
+    }
+
     const filePath = getUserSettingsPath(userEmail);
     if (!filePath) return false;
     try {
       fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf8');
       return true;
     } catch (e) {
-      console.error('[Storage] Error saving user settings:', e);
       return false;
     }
   }
