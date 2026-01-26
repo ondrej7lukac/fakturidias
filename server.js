@@ -343,9 +343,15 @@ function saveUserItem(userEmail, item) {
 }
 // #endregion
 
-const server = http.createServer(async (req, res) => {
+const requestHandler = async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   let requestPath = decodeURIComponent(url.pathname || "/");
+
+  // Normalize path: remove trailing slash if present (and not root)
+  if (requestPath.length > 1 && requestPath.endsWith('/')) {
+    requestPath = requestPath.slice(0, -1);
+  }
+
   logDebug(
     "server.js:86",
     "incoming request",
@@ -877,7 +883,9 @@ const server = http.createServer(async (req, res) => {
         });
         return;
       }
-      return sendNotFound(res);
+      // API 404
+      console.log(`[Server] 404 Not Found for API path: ${requestPath}`);
+      return sendJson(res, 404, { error: "Not Found", path: requestPath, note: "Handled by server.js fallback" });
     }
 
     const ext = path.extname(filePath).toLowerCase();
@@ -899,9 +907,16 @@ const server = http.createServer(async (req, res) => {
     fs.createReadStream(filePath).pipe(res);
   });
 });
+};
 
-server.listen(port, () => {
-  console.log(`Invoice app running at http://localhost:${port}/`);
-  logDebug("server.js:162", "server listening", { port }, "H5");
-});
+// Start server if run directly (Local Dev)
+if (require.main === module) {
+  const server = http.createServer(requestHandler);
+  server.listen(port, () => {
+    console.log(`Invoice app running at http://localhost:${port}/`);
+    logDebug("server.js:162", "server listening", { port }, "H5");
+  });
+}
+
+module.exports = requestHandler;
 
