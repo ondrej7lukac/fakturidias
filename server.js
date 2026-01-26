@@ -411,9 +411,29 @@ async function getCurrentUserEmail() {
     } catch (e) { }
   }
 
-  // Try DB if we have a refresh token but no email in memory? 
-  // Difficult because we don't know WHICH user to look up without a key.
-  // We rely on oAuth2Client having credentials set.
+  // 3. Check MongoDB (Serverless / Vercel Persistence)
+  // Since we don't have auth cookies/headers implemented yet, 
+  // we assume Single-Tenant (Personal App) mode and grab the first available credential.
+  if (isConnected) {
+    try {
+      const doc = await TokenModel.findOne({}).sort({ updatedAt: -1 }).lean();
+      if (doc && doc.tokens) {
+        const tokens = doc.tokens;
+        oAuth2Client.setCredentials(tokens);
+        // Ensure email is attached if missing in token object
+        const email = doc.userEmail || tokens.email;
+        if (email) {
+          oAuth2Client.credentials.email = email;
+          console.log(`[Auth] Restored User from MongoDB: ${email}`);
+          return email;
+        }
+      }
+    } catch (e) {
+      console.error("[Auth] DB Restore Error:", e.message);
+    }
+  }
+
+  console.log("[Auth] No credentials found in Memory, FS, or DB");
   return null;
 }
 
