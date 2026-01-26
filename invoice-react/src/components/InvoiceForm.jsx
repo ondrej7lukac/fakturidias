@@ -1000,14 +1000,12 @@ export default function InvoiceForm({
                     </div>
 
                     <div style={{ position: 'absolute', left: '-9999px', top: '0' }} ref={qrCanvasRef}>
-                        {invoice && (
-                            <QRCodeCanvas
-                                value={getCzechQrPayload(invoice)}
-                                size={256}
-                                level="M"
-                                includeMargin={false}
-                            />
-                        )}
+                        <QRCodeCanvas
+                            value={getCzechQrPayload(getCurrentInvoiceData())}
+                            size={256}
+                            level="M"
+                            includeMargin={false}
+                        />
                     </div>
                 </form>
             )}

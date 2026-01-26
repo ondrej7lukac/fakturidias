@@ -321,7 +321,7 @@ export default function InvoicePreview({ invoice, t, lang }) {
                         marginBottom: '10px'
                     }}>
                         <span style={{ color: '#64748b' }}>{t.subtotal}:</span>
-                        <span style={{ fontWeight: 600 }}>{invoice.currency} {parseFloat(invoice.taxBase || invoice.amount).toFixed(2)}</span>
+                        <span style={{ fontWeight: 600 }}>{invoice.currency} {parseFloat(invoice.isVatPayer ? (invoice.taxBase || invoice.amount) : invoice.amount).toFixed(2)}</span>
                     </div>
 
                     {invoice.isVatPayer && (

@@ -171,7 +171,7 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
                 <div style="width: 250px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                         <span style="color: #64748b;">${t.subtotal}:</span>
-                        <span style="font-weight: 600;">${invoice.currency} ${parseFloat(invoice.taxBase || invoice.amount).toFixed(2)}</span>
+                        <span style="font-weight: 600;">${invoice.currency} ${parseFloat(invoice.isVatPayer ? (invoice.taxBase || invoice.amount) : invoice.amount).toFixed(2)}</span>
                     </div>
 
                     ${invoice.isVatPayer ? `
