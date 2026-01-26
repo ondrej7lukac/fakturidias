@@ -6,6 +6,7 @@ import InvoicePreview from './InvoicePreview'
 import { generateInvoicePDF } from '../utils/pdf'
 import { BANK_CODES, calculateIban, parseIban, getCzechQrPayload } from '../utils/bank'
 import { QRCodeCanvas } from 'qrcode.react'
+import QRCode from 'qrcode'
 
 export default function InvoiceForm({
     invoice,
@@ -505,7 +506,21 @@ export default function InvoiceForm({
         const currentData = getCurrentInvoiceData()
         setIsGenerating(true)
         try {
-            const qrDataUrl = getQrDataUrl()
+            // Generate QR code directly using the library
+            let qrDataUrl = null
+            try {
+                const qrPayload = getCzechQrPayload(currentData)
+                if (qrPayload) {
+                    qrDataUrl = await QRCode.toDataURL(qrPayload, {
+                        errorCorrectionLevel: 'M',
+                        margin: 0,
+                        width: 256
+                    })
+                }
+            } catch (err) {
+                console.error('QR Generation Error:', err)
+            }
+
             const pdf = await generateInvoicePDF(currentData, t, qrDataUrl)
             pdf.save(`${currentData.invoiceNumber}.pdf`)
         } catch (error) {
@@ -539,7 +554,20 @@ export default function InvoiceForm({
                 )
             }
 
-            const qrDataUrl = getQrDataUrl()
+            let qrDataUrl = null
+            try {
+                const qrPayload = getCzechQrPayload(currentData)
+                if (qrPayload) {
+                    qrDataUrl = await QRCode.toDataURL(qrPayload, {
+                        errorCorrectionLevel: 'M',
+                        margin: 0,
+                        width: 256
+                    })
+                }
+            } catch (err) {
+                console.error('QR Gen Error:', err)
+            }
+
             const pdf = await generateInvoicePDF(currentData, t, qrDataUrl)
             const pdfBase64 = pdf.output('datauristring')
             setEmailStatus(t.alertSending)
@@ -999,14 +1027,7 @@ export default function InvoiceForm({
                         </button>
                     </div>
 
-                    <div style={{ position: 'fixed', left: 0, top: 0, opacity: 0, pointerEvents: 'none', zIndex: -1 }} ref={qrCanvasRef}>
-                        <QRCodeCanvas
-                            value={getCzechQrPayload(getCurrentInvoiceData(formData, items))}
-                            size={256}
-                            level="M"
-                            includeMargin={false}
-                        />
-                    </div>
+
                 </form>
             )}
         </section>
