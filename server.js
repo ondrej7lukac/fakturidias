@@ -679,6 +679,10 @@ const requestHandler = async (req, res) => {
           console.error("[OAuth] Failed to save tokens to disk:", e.message);
         }
 
+        // Ensure DB is connected before trying to save
+        if (!isConnected) await connectDB();
+
+        let savedToDb = false;
         // SAVE TOKENS TO DB
         if (isConnected && userEmail) {
           try {
@@ -688,6 +692,7 @@ const requestHandler = async (req, res) => {
               { upsert: true, new: true }
             );
             console.log('[OAuth] Tokens saved to MongoDB');
+            savedToDb = true;
           } catch (e) {
             console.error('[OAuth] Failed to save tokens to DB:', e);
           }
@@ -698,14 +703,18 @@ const requestHandler = async (req, res) => {
           "Content-Type": "text/html",
           "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
         });
+
+        const statusMessage = savedToDb
+          ? '<h1 style="color: green;">Successfully Connected!</h1><p>Tokens saved to database.</p>'
+          : '<h1 style="color: orange;">Connected (Local Only)</h1><p>Warning: Could not save to Database. You may need to whitelist Vercel IPs in MongoDB Atlas.</p>';
+
         res.end(`
           <html>
             <body style="font-family: sans-serif; text-align: center; padding: 50px;">
-              <h1 style="color: green;">Successfully Connected!</h1>
-              <p>You can now close this window and go back to Invoice Maker.</p>
+              ${statusMessage}
+              <p>Closing window...</p>
               <script>
                 setTimeout(() => window.close(), 3000);
-                // Try redirecting back to main app if window.close fails
                 setTimeout(() => window.location.href = '/', 4000);
               </script>
             </body>
