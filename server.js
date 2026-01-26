@@ -709,12 +709,36 @@ const requestHandler = async (req, res) => {
   }
 
   if (requestPath === "/auth/google/disconnect" && req.method === "POST") {
-    if (fs.existsSync(TOKENS_PATH)) {
-      fs.unlinkSync(TOKENS_PATH);
+    let userEmail = null;
+    if (oAuth2Client?.credentials?.email) {
+      userEmail = oAuth2Client.credentials.email;
     }
+
+    // 1. Delete local file
+    if (fs.existsSync(TOKENS_PATH)) {
+      try {
+        const fileContent = fs.readFileSync(TOKENS_PATH, 'utf8'); // Read before delete to get email if needed
+        const tokens = JSON.parse(fileContent);
+        if (!userEmail && tokens.email) userEmail = tokens.email;
+        fs.unlinkSync(TOKENS_PATH);
+      } catch (e) { }
+    }
+
+    // 2. Clear InMemory
     if (oAuth2Client) {
       oAuth2Client.setCredentials({});
     }
+
+    // 3. Delete from MongoDB
+    if (isConnected && userEmail) {
+      try {
+        await TokenModel.deleteOne({ userEmail });
+        console.log(`[Auth] Deleted tokens for ${userEmail} from DB`);
+      } catch (e) {
+        console.error("[Auth] Failed to delete tokens from DB:", e);
+      }
+    }
+
     return sendJson(res, 200, { success: true });
   }
   // #endregion

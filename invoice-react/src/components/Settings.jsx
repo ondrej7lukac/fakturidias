@@ -482,17 +482,36 @@ export default function Settings({
                             <button
                                 type="button"
                                 className="danger"
-                                onClick={() => {
+                                onClick={async () => {
+                                    if (!confirm(lang === 'cs' ? 'Opravdu se chcete odhlásit? Aplikace se restartuje.' : 'Are you sure you want to log out? The application will restart.')) return;
+
+                                    try {
+                                        // 1. Call Backend to clear session/tokens
+                                        await fetch('/auth/google/disconnect', { method: 'POST' });
+                                    } catch (e) {
+                                        console.error("Logout failed on server", e);
+                                    }
+
+                                    // 2. Clear Local Storage
                                     localStorage.removeItem('google_tokens');
+                                    localStorage.removeItem('smtpConfig');
+                                    localStorage.removeItem('defaultSupplier');
+                                    localStorage.removeItem('categories');
+                                    // localStorage.removeItem('lang'); // Keep language preference
+
+                                    // 3. Reset State & Reload
                                     const newConfig = {
                                         useGoogle: false,
                                         fromName: '',
                                         fromEmail: ''
                                     };
                                     setSmtpConfig(newConfig);
-                                    localStorage.setItem('smtpConfig', JSON.stringify(newConfig));
+
                                     // Dispatch global event
-                                    window.dispatchEvent(new Event('google_login_update'))
+                                    window.dispatchEvent(new Event('google_login_update'));
+
+                                    // 4. Force Reload to clear App state
+                                    window.location.reload();
                                 }}
                             >
                                 {lang === 'cs' ? 'Odpojit' : 'Disconnect'}
