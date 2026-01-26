@@ -741,67 +741,92 @@ const server = http.createServer(async (req, res) => {
       if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
 
       const { to, cc, subject, text, pdfBase64, filename, useGoogle } = body;
-      console.log(`[Email] Request received to: ${to}, cc: ${cc}, subject: ${subject}`);
+      console.log(`[Email] Request received to: ${to}, cc: ${cc}, subject: ${subject}, useGoogle: ${useGoogle}`);
 
       try {
         let nodemailer;
         try {
           nodemailer = require("nodemailer");
         } catch (e) {
+          console.error("[Email] Nodemailer missing");
           return sendJson(res, 501, {
             error: "nodemailer not installed",
             message: "Run 'npm install nodemailer'"
           });
         }
 
-        // ONLY Google OAuth - no fallbacks
-        if (!useGoogle || !oAuth2Client?.credentials?.refresh_token) {
-          console.log("[Email] Rejected: Google OAuth not connected");
-          return sendJson(res, 403, {
+        // Check if OAuth client is ready
+        if (!oAuth2Client) {
+          console.error("[Email] OAuth client not initialized (missing env vars?)");
+          return sendJson(res, 401, { error: "Server authentication error. Google Client ID missing." });
+        }
+
+        // Reload tokens from disk to be sure
+        if (fs.existsSync(TOKENS_PATH)) {
+          try {
+            const navTokens = JSON.parse(fs.readFileSync(TOKENS_PATH, 'utf8'));
+            if (navTokens) {
+              oAuth2Client.setCredentials(navTokens);
+            }
+          } catch (e) {
+            console.warn("[Email] Failed to reload tokens from disk:", e);
+          }
+        }
+
+        if (!useGoogle || !oAuth2Client.credentials || !oAuth2Client.credentials.refresh_token) {
+          console.log("[Email] Rejected: Google OAuth not connected or missing refresh token");
+          return sendJson(res, 401, {
             error: "Google account not connected. Please connect in Settings."
           });
         }
 
-        console.log("[Email] Using Google OAuth2");
-        let transporter;
-        let userEmail; // Declare here, outside the try block
+        console.log("[Email] Using Google OAuth2. Token status: ", !!oAuth2Client.credentials.access_token ? "Has Access Token" : "Needs Refresh");
 
-        try {
-          // Get user email from saved tokens
-          userEmail = oAuth2Client.credentials.email;
-          if (!userEmail && fs.existsSync(TOKENS_PATH)) {
+        let transporter;
+        let userEmail = oAuth2Client.credentials.email;
+
+        // Try to get email from tokens file if missing in memory
+        if (!userEmail && fs.existsSync(TOKENS_PATH)) {
+          try {
             const savedTokens = JSON.parse(fs.readFileSync(TOKENS_PATH, 'utf8'));
             userEmail = savedTokens.email;
-            if (userEmail) {
-              oAuth2Client.credentials.email = userEmail;
-            }
+          } catch (e) { }
+        }
+
+        try {
+          // Force token refresh if needed
+          const accessTokenResponse = await oAuth2Client.getAccessToken();
+          const accessToken = accessTokenResponse.token;
+
+          if (!accessToken) {
+            throw new Error("Failed to generate access token");
           }
 
-          const accessToken = await oAuth2Client.getAccessToken();
+          console.log("[Email] Access token generated successfully");
+
           transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
               type: 'OAuth2',
-              user: userEmail || 'me',
+              user: userEmail, // Can be undefined, Gmail might infer from token or throw
               clientId: GOOGLE_CLIENT_ID,
               clientSecret: GOOGLE_CLIENT_SECRET,
               refreshToken: oAuth2Client.credentials.refresh_token,
-              accessToken: accessToken.token
+              accessToken: accessToken
             }
           });
 
         } catch (oauthError) {
-          console.error("[Email] OAuth token refresh failed", oauthError);
-          return sendJson(res, 403, { error: "Google Auth expired. Please reconnect in Settings." });
+          console.error("[Email] OAuth token refresh failed:", oauthError.message);
+          return sendJson(res, 401, { error: "Google Auth expired or invalid. Please reconnect in Settings." });
         }
 
-        console.log("[Email] userEmail value:", userEmail); // Debug log
         const info = await transporter.sendMail({
           from: userEmail ? `"Invoice Maker" <${userEmail}>` : undefined,
           to,
           cc,
           subject,
-          text,
+          html: body.html || text, // Support html body if passed
           attachments: [
             {
               filename: filename || "invoice.pdf",
@@ -813,12 +838,17 @@ const server = http.createServer(async (req, res) => {
 
         console.log("[Email] Sent: %s", info.messageId);
         sendJson(res, 200, {
-          message: "Email sent successfully via Google"
+          success: true,
+          message: "Email sent successfully"
         });
 
       } catch (error) {
-        console.error("[Email] Error:", error);
-        sendJson(res, 500, { error: "Failed to send", details: error.message });
+        console.error("[Email] Sending Error:", error);
+        // If it's an auth error from Gmail/Nodemailer, return 401 so frontend knows to re-auth
+        if (error.code === 'EAUTH' || error.response?.includes('Authentication')) {
+          return sendJson(res, 401, { error: "Authentication failed. Please reconnect Google account." });
+        }
+        sendJson(res, 500, { error: "Failed to send email", details: error.message });
       }
     });
   }

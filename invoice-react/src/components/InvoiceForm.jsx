@@ -44,6 +44,7 @@ export default function InvoiceForm({
         accountNumber: '',
         bankCode: '',
         prefix: '',
+        variableSymbol: '',
         supplierName: '',
         supplierIco: '',
         supplierVat: '',
@@ -89,6 +90,7 @@ export default function InvoiceForm({
                 category: invoice.category || '',
                 clientName: invoice.client.name,
                 clientEmail: invoice.client.email || '',
+                clientEmailCopy: invoice.client.emailCopy || '',
                 clientArea: invoice.client.area || '',
                 clientIco: invoice.client.ico || '',
                 clientVat: invoice.client.vat || '',
@@ -101,6 +103,7 @@ export default function InvoiceForm({
                 accountNumber: ibanData?.accountNumber || '',
                 bankCode: ibanData?.bankCode || '',
                 prefix: ibanData?.prefix || '',
+                variableSymbol: invoice.payment.variableSymbol || invoice.invoiceNumber.replace(/\D/g, ''),
                 supplierName: invoice.supplier?.name || '',
                 supplierIco: invoice.supplier?.ico || '',
                 supplierVat: invoice.supplier?.vat || '',
@@ -142,6 +145,7 @@ export default function InvoiceForm({
                 accountNumber: '',
                 bankCode: '',
                 prefix: '',
+                variableSymbol: newDraftNumber.replace(/\D/g, ''),
                 supplierName: defaultSupplier?.name || '',
                 supplierIco: defaultSupplier?.ico || '',
                 supplierVat: defaultSupplier?.vat || '',
@@ -261,7 +265,7 @@ export default function InvoiceForm({
                 note: currentFormData.paymentNote.trim(),
                 accountNumber: currentFormData.accountNumber,
                 bankCode: currentFormData.bankCode,
-                variableSymbol: currentFormData.invoiceNumber.replace(/\D/g, '')
+                variableSymbol: currentFormData.variableSymbol || currentFormData.invoiceNumber.replace(/\D/g, '')
             },
             supplier: {
                 name: currentFormData.supplierName.trim(),
@@ -819,6 +823,13 @@ export default function InvoiceForm({
                             <label>{t.area}</label>
                             <input name="clientArea" value={formData.clientArea} onChange={handleChange} />
                         </div>
+                    </div>
+
+                    <div className="grid two">
+                        <div>
+                            <label>{t.ico}</label>
+                            <input name="clientIco" value={formData.clientIco} onChange={handleChange} placeholder="12345678" />
+                        </div>
                         <div>
                             <label>{t.vat}</label>
                             <input name="clientVat" value={formData.clientVat} onChange={handleChange} />
@@ -1013,6 +1024,11 @@ export default function InvoiceForm({
                             <label>{t.bic}</label>
                             <input name="bic" value={formData.bic} onChange={handleChange} />
                         </div>
+                    </div>
+
+                    <div>
+                        <label>{lang === 'cs' ? 'Variabilní symbol' : 'Variable Symbol'}</label>
+                        <input name="variableSymbol" value={formData.variableSymbol} onChange={handleChange} />
                     </div>
 
                     <div>
