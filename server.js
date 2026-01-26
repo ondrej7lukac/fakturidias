@@ -620,10 +620,15 @@ const requestHandler = async (req, res) => {
 
   if (requestPath === "/auth/google/url" && req.method === "GET") {
     if (!oAuth2Client) return sendJson(res, 500, { error: "OAuth not initialized" });
+
+    // Dynamic Redirect URI based on request host
+    const redirectUri = getRedirectUri(req);
+
     const authUrl = oAuth2Client.generateAuthUrl({
       access_type: 'offline', // Crucial for getting refresh_token
       scope: SCOPES,
-      prompt: 'consent' // Force consent to ensure refresh_token is returned
+      prompt: 'consent', // Force consent to ensure refresh_token is returned
+      redirect_uri: redirectUri // Override default localhost
     });
     return sendJson(res, 200, { url: authUrl });
   }
@@ -633,7 +638,19 @@ const requestHandler = async (req, res) => {
     const code = url.searchParams.get('code');
     if (code) {
       try {
-        const { tokens } = await oAuth2Client.getToken(code);
+        // Create a temporary client with the correct redirect URI for this specific request
+        // This ensures the code exchange matches the redirect_uri sent in the auth URL
+        const redirectUri = getRedirectUri(req);
+        const { google } = require('googleapis');
+        const tempClient = new google.auth.OAuth2(
+          GOOGLE_CLIENT_ID,
+          GOOGLE_CLIENT_SECRET,
+          redirectUri
+        );
+
+        const { tokens } = await tempClient.getToken(code);
+
+        // Update the global client as well for memory caching
         oAuth2Client.setCredentials(tokens);
 
         // Extract email from ID token (more reliable than API call)
@@ -641,7 +658,7 @@ const requestHandler = async (req, res) => {
         if (tokens.id_token) {
           try {
             // Decode the ID token to get email
-            const ticket = await oAuth2Client.verifyIdToken({
+            const ticket = await tempClient.verifyIdToken({
               idToken: tokens.id_token,
               audience: GOOGLE_CLIENT_ID
             });
