@@ -36,3 +36,18 @@ Thumbs.db
 
 # Data storage
 data/
+
+# Local Documentation & Guides
+VERCEL_SETUP_REQUIRED.md
+VERCEL_DEPLOYMENT_GUIDE.md
+VERCEL_CHECKLIST.md
+SECURITY_FIX_GUIDE.md
+MONGODB_SETUP_GUIDE.md
+GIT_GUIDE.md
+GIT_SETUP_COMPLETE.md
+
+# Local Scripts
+*.bat
+create-env.bat
+push.bat
+start.bat
