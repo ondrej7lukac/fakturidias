@@ -298,9 +298,15 @@ const connectDB = async () => {
 // #region Session Middleware Setup (CRITICAL FOR MULTI-USER)
 let sessionMiddleware = null;
 
+console.log('[Session Init] Starting session middleware initialization...');
+console.log('[Session Init] SESSION_SECRET exists?', !!SESSION_SECRET);
+console.log('[Session Init] MONGODB_URI exists?', !!MONGODB_URI);
+console.log('[Session Init] NODE_ENV:', process.env.NODE_ENV);
+
 // Initialize session middleware (async safe)
 if (SESSION_SECRET && MONGODB_URI) {
   try {
+    console.log('[Session Init] Creating session middleware...');
     sessionMiddleware = session({
       secret: SESSION_SECRET,
       resave: false,
@@ -320,13 +326,14 @@ if (SESSION_SECRET && MONGODB_URI) {
       },
       name: 'fakturidias.sid' // Custom cookie name
     });
-    console.log('[Session] Middleware initialized with MongoDB store');
+    console.log('[Session Init] ✅ Session middleware initialized successfully');
+    console.log('[Session Init] sessionMiddleware is:', typeof sessionMiddleware);
   } catch (error) {
-    console.error('[Session] Failed to initialize middleware:', error);
+    console.error('[Session Init] ❌ Failed to initialize middleware:', error);
   }
 } else {
-  console.warn('[Session] Middleware NOT initialized - missing SESSION_SECRET or MONGODB_URI');
-  console.warn('[Session] Multi-user authentication will NOT work!');
+  console.error('[Session Init] ❌ Middleware NOT initialized - missing SESSION_SECRET or MONGODB_URI');
+  console.error('[Session Init] This means multi-user authentication will NOT work!');
 }
 // #endregion
 
@@ -1384,13 +1391,19 @@ const requestHandler = async (req, res) => {
 // #region Session Wrapper
 // Wrapper to apply session middleware to request handler
 const requestHandlerWithSession = (req, res) => {
+  console.log('[Session Wrapper] Request:', req.method, req.url);
+  console.log('[Session Wrapper] sessionMiddleware exists?', !!sessionMiddleware);
+
   if (sessionMiddleware) {
+    console.log('[Session Wrapper] Applying session middleware...');
     // Apply session middleware first
     sessionMiddleware(req, res, () => {
       // After session is processed, call main request handler
+      console.log('[Session Wrapper] Session middleware applied, calling main handler');
       requestHandler(req, res);
     });
   } else {
+    console.warn('[Session Wrapper] ⚠️  NO SESSION MIDDLEWARE - falling back to direct handler');
     // Fallback without session
     requestHandler(req, res);
   }
