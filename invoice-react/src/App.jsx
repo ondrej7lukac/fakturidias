@@ -3,6 +3,7 @@ import Header from './components/Header'
 import InvoiceForm from './components/InvoiceForm'
 import InvoiceList from './components/InvoiceList'
 import Settings from './components/Settings'
+import LoginPage from './components/LoginPage'
 import { getNextInvoiceCounter, loadData, saveInvoice, deleteInvoice } from './utils/storage'
 import { languages } from './utils/i18n'
 
@@ -16,6 +17,8 @@ function App() {
     const [defaultSupplier, setDefaultSupplier] = useState(null)
     const [currentView, setCurrentView] = useState('invoices')
     const [isLoading, setIsLoading] = useState(true)
+    const [isAuthenticated, setIsAuthenticated] = useState(false)
+    const [isAuthChecking, setIsAuthChecking] = useState(true)
 
     const t = languages[lang]
 
@@ -49,86 +52,66 @@ function App() {
     }
 
     // Load invoices and settings from server on mount
+    // Check Auth and Load Data
     useEffect(() => {
-        const loadInitialData = async () => {
-            await fetchInvoices()
-
-            // 2. Load Settings (Supplier Profile)
+        const checkAuthAndLoad = async () => {
+            setIsAuthChecking(true)
             try {
-                // Check for tokens first to avoid 401 spam if not logged in
-                const tokensStr = localStorage.getItem('google_tokens')
-                if (tokensStr) {
-                    const res = await fetch('/api/settings')
-                    if (res.ok) {
-                        const { settings } = await res.json()
-                        if (settings && Object.keys(settings).length > 0) {
-                            setDefaultSupplier(settings)
-                            console.log('Loaded settings from server', settings)
-                        } else {
-                            // Fallback to local storage if server is empty (first sync)
-                            const savedSupplier = localStorage.getItem('defaultSupplier')
-                            if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
-                        }
-                    }
-                } else {
-                    // Fallback to local storage if not logged in
-                    const savedSupplier = localStorage.getItem('defaultSupplier')
-                    if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
-                }
-            } catch (err) {
-                console.error('Failed to load settings:', err)
-                // Fallback
-                const savedSupplier = localStorage.getItem('defaultSupplier')
-                if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
-            }
-        }
+                // 1. Check Session
+                const authRes = await fetch('/api/me')
+                const authData = await authRes.json()
 
-        loadInitialData()
+                if (authData.authenticated) {
+                    setIsAuthenticated(true)
 
-        // Listen for Google Login to auto-fill email and reload data
-        const handleGoogleLogin = async () => {
-            const tokensStr = localStorage.getItem('google_tokens')
+                    // 2. Load Invoices
+                    await fetchInvoices()
 
-            // Reload invoices regardless of login or logout (if logout, it fetches public/empty)
-            await fetchInvoices()
-
-            if (tokensStr) {
-                // Reload settings from server after login
-                fetch('/api/settings').then(res => {
-                    if (res.ok) return res.json()
-                }).then(data => {
-                    if (data?.settings) setDefaultSupplier(data.settings)
-                })
-
-                // Try to get email from localStorage (Settings.jsx saves it there now in smtpConfig)
-                const smtpConfig = localStorage.getItem('smtpConfig')
-                if (smtpConfig) {
-                    const { fromEmail } = JSON.parse(smtpConfig)
-                    if (fromEmail) {
-                        setDefaultSupplier(prev => {
-                            if (!prev || !prev.email) {
-                                return { ...prev, email: fromEmail }
+                    // 3. Load Settings
+                    try {
+                        const res = await fetch('/api/settings')
+                        if (res.ok) {
+                            const { settings } = await res.json()
+                            if (settings && Object.keys(settings).length > 0) {
+                                setDefaultSupplier(settings)
                             }
-                            return prev
-                        })
-                    }
+                        }
+                    } catch (e) { console.error("Failed to load settings", e) }
+
+                } else {
+                    setIsAuthenticated(false)
                 }
-            } else {
-                // Explicit logout handling - clear sensitive data if needed, but fetchInvoices handles the list
-                setInvoices([])
+            } catch (e) {
+                console.error("Auth check failed", e)
+                setIsAuthenticated(false)
+            } finally {
+                setIsAuthChecking(false)
             }
         }
-        window.addEventListener('google_login_update', handleGoogleLogin)
-        return () => window.removeEventListener('google_login_update', handleGoogleLogin)
+
+        checkAuthAndLoad()
+
+        // Handle success from LoginPage
+        const handleLoginSuccess = async () => {
+            // Re-run the full check to load data
+            checkAuthAndLoad()
+        }
+
+        // Listen for global login events (e.g. from Settings reconnection or LoginPage)
+        window.addEventListener('google_login_update', handleLoginSuccess)
+        return () => window.removeEventListener('google_login_update', handleLoginSuccess)
     }, [])
 
-    // Save local settings to localStorage (not server)
+    // Save local settings to localStorage (only preferences)
     useEffect(() => {
         localStorage.setItem('lang', lang)
-        localStorage.setItem('defaultSupplier', JSON.stringify(defaultSupplier))
+        // localStorage.setItem('defaultSupplier', JSON.stringify(defaultSupplier)) // Don't cache supplier locally for security? Or maybe ok.
+        // Let's keep caching for offline fallback visual consistency?
+        // Actually, for multi-user, local storage shared is BAD.
+        // We should clear supplier from local storage or namespace it?
+        // For now, let's NOT save defaultSupplier to global localStorage to avoid leaking to other users on same PC
         localStorage.setItem('categories', JSON.stringify(categories))
-        // invoiceCounter is now dynamic, no need to save to localStorage
-    }, [lang, defaultSupplier, categories])
+    }, [lang, categories])
 
     const selectedInvoice = invoices.find(inv => inv.id === selectedId)
 
@@ -186,6 +169,18 @@ function App() {
         if (!categories.includes(category)) {
             setCategories([...categories, category].sort())
         }
+    }
+
+    if (isAuthChecking) {
+        return (
+            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '100px' }}>
+                Loading...
+            </div>
+        )
+    }
+
+    if (!isAuthenticated) {
+        return <LoginPage lang={lang} onLoginSuccess={() => window.dispatchEvent(new Event('google_login_update'))} />
     }
 
     return (

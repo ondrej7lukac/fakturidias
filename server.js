@@ -4,10 +4,16 @@ const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 
+const jwt = require('jsonwebtoken');
+const cookie = require('cookie');
+
 const port = 5500;
 const baseDir = __dirname;
 const debugLogPath = path.join(baseDir, ".cursor", "debug.log");
 const dataDir = path.join(baseDir, "data"); // User data storage
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-prod-12345';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
 function logDebug(location, message, data, hypothesisId) {
   // #region agent log
@@ -190,21 +196,24 @@ const SCOPES = [
   'https://mail.google.com/',
   'https://www.googleapis.com/auth/userinfo.email'
 ];
-const TOKENS_PATH = path.join(baseDir, 'google_tokens.json');
 
-let oAuth2Client;
-
+let googleAuthAvailable = false;
 try {
-  const { google } = require('googleapis');
-  oAuth2Client = new google.auth.OAuth2(
-    GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET,
-    // Redirect URI will be set dynamically per request
-    "http://localhost:5500/auth/google/callback"
-  );
+  require('googleapis');
+  googleAuthAvailable = true;
 } catch (e) {
   console.warn("googleapis not installed or failed to load");
 }
+
+const getOAuthClient = (req) => {
+  if (!googleAuthAvailable) return null;
+  const { google } = require('googleapis');
+  return new google.auth.OAuth2(
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    getRedirectUri(req)
+  );
+};
 
 // #region MongoDB Schemas & Connection
 let isConnected = false;
@@ -286,19 +295,9 @@ const connectDB = async () => {
 };
 // #endregion
 
-// Load saved tokens if exist (Local FS Fallback)
-if (oAuth2Client && fs.existsSync(TOKENS_PATH)) {
-  try {
-    const tokens = JSON.parse(fs.readFileSync(TOKENS_PATH, 'utf8'));
-    oAuth2Client.setCredentials(tokens);
-    if (tokens.email) {
-      oAuth2Client.credentials.email = tokens.email;
-    }
-    console.log(`[OAuth] Loaded saved Google tokens (FS)${tokens.email ? ' for ' + tokens.email : ''}`);
-  } catch (e) {
-    console.error("[OAuth] Failed to load saved tokens", e);
-  }
-}
+// Remove Legacy Global Token Loading
+// We now rely on Per-User DB Tokens authentication via JWT
+
 // #endregion
 
 // #region Invoice Storage Helper Functions
@@ -425,48 +424,23 @@ function saveUserInvoices_FS(userEmail, invoices) {
 }
 
 /**
- * Get current user email from session
+ * Authenticate User from Cookie
+ * Returns userEmail or null
  */
-/**
- * Get current user email from session
- * Updated to support Async retrieval potentially
- */
-async function getCurrentUserEmail() {
-  if (oAuth2Client?.credentials?.email) {
-    return oAuth2Client.credentials.email;
-  }
+async function authenticateUser(req) {
+  const cookies = cookie.parse(req.headers.cookie || '');
+  const token = cookies.auth_token;
 
-  // Try FS
-  if (fs.existsSync(TOKENS_PATH)) {
-    try {
-      const tokens = JSON.parse(fs.readFileSync(TOKENS_PATH, 'utf8'));
-      if (tokens.email) return tokens.email;
-    } catch (e) { }
-  }
+  if (!token) return null;
 
-  // 3. Check MongoDB (Serverless / Vercel Persistence)
-  // Since we don't have auth cookies/headers implemented yet, 
-  // we assume Single-Tenant (Personal App) mode and grab the first available credential.
-  if (isConnected) {
-    try {
-      const doc = await TokenModel.findOne({}).sort({ updatedAt: -1 }).lean();
-      if (doc && doc.tokens) {
-        const tokens = doc.tokens;
-        oAuth2Client.setCredentials(tokens);
-        // Ensure email is attached if missing in token object
-        const email = doc.userEmail || tokens.email;
-        if (email) {
-          oAuth2Client.credentials.email = email;
-          console.log(`[Auth] Restored User from MongoDB: ${email}`);
-          return email;
-        }
-      }
-    } catch (e) {
-      console.error("[Auth] DB Restore Error:", e.message);
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded && decoded.email) {
+      return decoded.email;
     }
+  } catch (e) {
+    // console.log("[Auth] Invalid Token:", e.message);
   }
-
-  console.log("[Auth] No credentials found in Memory, FS, or DB");
   return null;
 }
 
@@ -682,47 +656,35 @@ const requestHandler = async (req, res) => {
 
   // #region Google OAuth Routes
 
-  if (requestPath === "/auth/google/url" && req.method === "GET") {
-    if (!oAuth2Client) return sendJson(res, 500, { error: "OAuth not initialized" });
+  // #region Google OAuth Routes
 
-    // Dynamic Redirect URI based on request host
-    const redirectUri = getRedirectUri(req);
+  if (requestPath === "/auth/google/url" && req.method === "GET") {
+    const oAuth2Client = getOAuthClient(req);
+    if (!oAuth2Client) return sendJson(res, 500, { error: "OAuth not initialized" });
 
     const authUrl = oAuth2Client.generateAuthUrl({
       access_type: 'offline', // Crucial for getting refresh_token
       scope: SCOPES,
       prompt: 'consent', // Force consent to ensure refresh_token is returned
-      redirect_uri: redirectUri // Override default localhost
     });
     return sendJson(res, 200, { url: authUrl });
   }
 
   if (requestPath === "/auth/google/callback") {
+    const oAuth2Client = getOAuthClient(req);
     if (!oAuth2Client) return sendNotFound(res);
+
     const code = url.searchParams.get('code');
     if (code) {
       try {
-        // Create a temporary client with the correct redirect URI for this specific request
-        // This ensures the code exchange matches the redirect_uri sent in the auth URL
-        const redirectUri = getRedirectUri(req);
-        const { google } = require('googleapis');
-        const tempClient = new google.auth.OAuth2(
-          GOOGLE_CLIENT_ID,
-          GOOGLE_CLIENT_SECRET,
-          redirectUri
-        );
-
-        const { tokens } = await tempClient.getToken(code);
-
-        // Update the global client as well for memory caching
+        const { tokens } = await oAuth2Client.getToken(code);
         oAuth2Client.setCredentials(tokens);
 
-        // Extract email from ID token (more reliable than API call)
+        // Extract email from ID token
         let userEmail = null;
         if (tokens.id_token) {
           try {
-            // Decode the ID token to get email
-            const ticket = await tempClient.verifyIdToken({
+            const ticket = await oAuth2Client.verifyIdToken({
               idToken: tokens.id_token,
               audience: GOOGLE_CLIENT_ID
             });
@@ -733,63 +695,58 @@ const requestHandler = async (req, res) => {
           }
         }
 
-        const tokensToSave = { ...tokens, email: userEmail };
-
-        // SAVE TOKENS LOCALLY (FS)
-        try {
-          fs.writeFileSync(TOKENS_PATH, JSON.stringify(tokensToSave));
-          console.log(`[OAuth] Tokens acquired${userEmail ? ' for ' + userEmail : ''}`);
-        } catch (e) {
-          console.error("[OAuth] Failed to save tokens to disk:", e.message);
+        if (!userEmail) {
+          throw new Error("Could not identify user email from Google Login");
         }
 
-        // Ensure DB is connected before trying to save
+        // SAVE TOKENS TO DB for this User
         if (!isConnected) await connectDB();
 
+        // Always Try to Save to DB if possible
         let savedToDb = false;
-        // SAVE TOKENS TO DB
-        if (isConnected && userEmail) {
+        if (isConnected) {
           try {
             await TokenModel.findOneAndUpdate(
               { userEmail },
-              { tokens: tokensToSave, userEmail, updatedAt: new Date() },
+              { tokens: { ...tokens, email: userEmail }, userEmail, updatedAt: new Date() },
               { upsert: true, new: true }
             );
-            console.log('[OAuth] Tokens saved to MongoDB');
             savedToDb = true;
           } catch (e) {
             console.error('[OAuth] Failed to save tokens to DB:', e);
           }
         }
 
-        // Return a simple HTML page that closes itself or redirects back to app
+        // GENERATE JWT SESSION
+        const token = jwt.sign({ email: userEmail }, JWT_SECRET, { expiresIn: '30d' });
+
+        // Set Cookie
+        res.setHeader('Set-Cookie', cookie.serialize('auth_token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production', // true in prod
+          sameSite: 'lax',
+          maxAge: 30 * 24 * 60 * 60, // 30 days
+          path: '/'
+        }));
+
         res.writeHead(200, {
           "Content-Type": "text/html",
           "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
         });
 
         const statusMessage = savedToDb
-          ? '<h1 style="color: green;">Successfully Connected!</h1><p>Tokens saved to database.</p>'
-          : '<h1 style="color: orange;">Connected (Local Only)</h1><p>Warning: Could not save to Database. You may need to whitelist Vercel IPs in MongoDB Atlas.</p>';
-
-        // Pass minimal info to client to update UI state
-        const clientData = JSON.stringify({
-          type: 'GOOGLE_LOGIN_SUCCESS',
-          email: userEmail,
-          tokens: { connected: true, note: "managed_by_server" }
-        });
+          ? `<h1 style="color: green;">Welcome ${userEmail}!</h1><p>You are now logged in.</p>`
+          : '<h1 style="color: orange;">Connected (Local)</h1><p>Warning: Could not save to Database.</p>';
 
         res.end(`
           <html>
             <body style="font-family: sans-serif; text-align: center; padding: 50px;">
               ${statusMessage}
-              <p>Closing window...</p>
               <script>
-                // Notify the opener (React App)
                 if (window.opener) {
-                  window.opener.postMessage(${clientData}, '*');
+                  window.opener.postMessage({ type: 'GOOGLE_LOGIN_SUCCESS', email: '${userEmail}' }, '*');
                 }
-                setTimeout(() => window.close(), 3000);
+                setTimeout(() => window.close(), 1500);
               </script>
             </body>
           </html>
@@ -803,64 +760,55 @@ const requestHandler = async (req, res) => {
     }
   }
 
-  if (requestPath === "/auth/google/status" && req.method === "GET") {
-    if (!oAuth2Client?.credentials?.refresh_token) {
-      await getCurrentUserEmail(); // Try to restore
+  // Check Auth Status (Replace 'status' with 'me')
+  if (requestPath === "/api/me" && req.method === "GET") {
+    const userEmail = await authenticateUser(req);
+    if (userEmail) {
+      return sendJson(res, 200, { authenticated: true, email: userEmail });
+    } else {
+      return sendJson(res, 200, { authenticated: false });
     }
-    const isConnected = !!(oAuth2Client?.credentials?.refresh_token);
-    return sendJson(res, 200, { connected: isConnected });
+  }
+
+  // Logout
+  if (requestPath === "/auth/logout" && req.method === "POST") {
+    res.setHeader('Set-Cookie', cookie.serialize('auth_token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      expires: new Date(0), // Expire immediately
+      path: '/'
+    }));
+    return sendJson(res, 200, { success: true });
+  }
+
+  if (requestPath === "/auth/google/status" && req.method === "GET") {
+    // Legacy support or just redirect to /api/me logic
+    const userEmail = await authenticateUser(req);
+    return sendJson(res, 200, { connected: !!userEmail, email: userEmail });
   }
 
   if (requestPath === "/auth/google/disconnect" && req.method === "POST") {
-    // Identify user to disconnect (restoring from DB if needed to match the active session)
-    let userEmail = await getCurrentUserEmail();
-    console.log(`[Auth] Disconnect requested. activeUser: ${userEmail}`);
-
-    // 1. Delete local file
-    if (fs.existsSync(TOKENS_PATH)) {
-      try {
-        fs.unlinkSync(TOKENS_PATH);
-        console.log("[Auth] Local tokens file deleted.");
-      } catch (e) {
-        console.error("[Auth] Failed to delete local tokens:", e);
-      }
+    // Treat specific disconnect as Logout
+    const userEmail = await authenticateUser(req);
+    if (isConnected && userEmail) {
+      await TokenModel.deleteOne({ userEmail }); // Optional: Delete tokens on explicit disconnect
     }
-
-    // 2. Clear InMemory
-    if (oAuth2Client) {
-      oAuth2Client.setCredentials({});
-      console.log("[Auth] In-memory credentials cleared.");
-    }
-
-    // 3. Delete from MongoDB
-    if (isConnected) {
-      try {
-        if (userEmail) {
-          const res = await TokenModel.deleteOne({ userEmail });
-          console.log(`[Auth] DB Delete result for ${userEmail}:`, res);
-        } else {
-          // Fallback: If no email identified (e.g. restart loss), try to delete the most recent token
-          // This prevents "Zombie Login" where DB restores session after reload
-          const latest = await TokenModel.findOne({}, {}, { sort: { 'updatedAt': -1 } });
-          if (latest) {
-            console.log(`[Auth] No active email found, but deleting latest DB token for: ${latest.userEmail}`);
-            await TokenModel.deleteOne({ _id: latest._id });
-          }
-        }
-      } catch (e) {
-        console.error("[Auth] Failed to delete tokens from DB:", e);
-      }
-    }
-
+    res.setHeader('Set-Cookie', cookie.serialize('auth_token', '', {
+      httpOnly: true,
+      path: '/',
+      expires: new Date(0)
+    }));
     return sendJson(res, 200, { success: true });
   }
+  // #endregion
   // #endregion
 
   // #region Invoice API Routes
 
   // GET /api/invoices - Get all invoices for current user
   if (requestPath === "/api/invoices" && req.method === "GET") {
-    const userEmail = await getCurrentUserEmail();
+    const userEmail = await authenticateUser(req);
     if (!userEmail) {
       return sendJson(res, 401, { error: "Not authenticated. Please connect Google account." });
     }
@@ -873,249 +821,249 @@ const requestHandler = async (req, res) => {
     return sendCors(res);
   }
   if (requestPath === "/api/invoices" && req.method === "POST") {
-    return readJsonBody(req, async (err, body) => {
-      if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+    if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
 
-      const userEmail = await getCurrentUserEmail();
-      if (!userEmail) {
-        return sendJson(res, 401, { error: "Not authenticated" });
-      }
-
-      const { invoice } = body;
-      if (!invoice || !invoice.id) {
-        return sendJson(res, 400, { error: "Invalid invoice data" });
-      }
-
-      let success = false;
-      if (isConnected) {
-        // MongoDB Single Save
-        success = await saveSingleInvoice(userEmail, invoice);
-      } else {
-        // FS Legacy Bulk Save
-        const invoices = await getUserInvoices(userEmail); // Fallback to FS
-        const existingIndex = invoices.findIndex(inv => inv.id === invoice.id);
-        if (existingIndex >= 0) invoices[existingIndex] = invoice;
-        else invoices.push(invoice);
-        success = saveUserInvoices_FS(userEmail, invoices);
-      }
-
-      if (success) {
-        console.log(`[Storage] Saved invoice ${invoice.invoiceNumber} for ${userEmail}`);
-        return sendJson(res, 200, { success: true, invoice });
-      } else {
-        return sendJson(res, 500, { error: "Failed to save invoice" });
-      }
-    });
-  }
-
-  // DELETE /api/invoices/:id - Delete invoice
-  if (requestPath.startsWith("/api/invoices/") && req.method === "DELETE") {
-    const invoiceId = requestPath.split("/api/invoices/")[1];
-    const userEmail = await getCurrentUserEmail();
-
+    const userEmail = await authenticateUser(req);
     if (!userEmail) {
       return sendJson(res, 401, { error: "Not authenticated" });
     }
 
+    const { invoice } = body;
+    if (!invoice || !invoice.id) {
+      return sendJson(res, 400, { error: "Invalid invoice data" });
+    }
+
+    let success = false;
     if (isConnected) {
-      try {
-        await InvoiceModel.deleteOne({ userEmail, id: invoiceId });
-        return sendJson(res, 200, { success: true });
-      } catch (e) {
-        return sendJson(res, 500, { error: "Failed to delete" });
-      }
+      // MongoDB Single Save
+      success = await saveSingleInvoice(userEmail, invoice);
     } else {
-      const invoices = await getUserInvoices(userEmail);
-      const filteredInvoices = invoices.filter(inv => inv.id !== invoiceId);
-      if (filteredInvoices.length === invoices.length) {
-        return sendJson(res, 404, { error: "Invoice not found" });
-      }
-      const success = saveUserInvoices_FS(userEmail, filteredInvoices);
-      return success ? sendJson(res, 200, { success: true }) : sendJson(res, 500, { error: "Failed to delete" });
+      // FS Legacy Bulk Save
+      const invoices = await getUserInvoices(userEmail); // Fallback to FS
+      const existingIndex = invoices.findIndex(inv => inv.id === invoice.id);
+      if (existingIndex >= 0) invoices[existingIndex] = invoice;
+      else invoices.push(invoice);
+      success = saveUserInvoices_FS(userEmail, invoices);
     }
+
+    if (success) {
+      console.log(`[Storage] Saved invoice ${invoice.invoiceNumber} for ${userEmail}`);
+      return sendJson(res, 200, { success: true, invoice });
+    } else {
+      return sendJson(res, 500, { error: "Failed to save invoice" });
+    }
+  });
+}
+
+// DELETE /api/invoices/:id - Delete invoice
+if (requestPath.startsWith("/api/invoices/") && req.method === "DELETE") {
+  const invoiceId = requestPath.split("/api/invoices/")[1];
+  const userEmail = await authenticateUser(req);
+
+  if (!userEmail) {
+    return sendJson(res, 401, { error: "Not authenticated" });
   }
-  // #endregion
 
-  // #region Items Database API Routes
+  if (isConnected) {
+    try {
+      await InvoiceModel.deleteOne({ userEmail, id: invoiceId });
+      return sendJson(res, 200, { success: true });
+    } catch (e) {
+      return sendJson(res, 500, { error: "Failed to delete" });
+    }
+  } else {
+    const invoices = await getUserInvoices(userEmail);
+    const filteredInvoices = invoices.filter(inv => inv.id !== invoiceId);
+    if (filteredInvoices.length === invoices.length) {
+      return sendJson(res, 404, { error: "Invoice not found" });
+    }
+    const success = saveUserInvoices_FS(userEmail, filteredInvoices);
+    return success ? sendJson(res, 200, { success: true }) : sendJson(res, 500, { error: "Failed to delete" });
+  }
+}
+// #endregion
 
-  // GET /api/items - Get all items for current user
-  if (requestPath === "/api/items" && req.method === "GET") {
-    const userEmail = getCurrentUserEmail();
+// #region Items Database API Routes
+
+// GET /api/items - Get all items for current user
+if (requestPath === "/api/items" && req.method === "GET") {
+  const userEmail = await authenticateUser(req);
+  if (!userEmail) {
+    return sendJson(res, 401, { error: "Not authenticated. Please connect Google account." });
+  }
+  const items = getUserItems(userEmail);
+  return sendJson(res, 200, { items });
+}
+
+// POST /api/items - Save or update item
+if (requestPath === "/api/items" && req.method === "OPTIONS") {
+  return sendCors(res);
+}
+if (requestPath === "/api/items" && req.method === "POST") {
+  return readJsonBody(req, (err, body) => {
+    if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+
+    const userEmail = await authenticateUser(req);
     if (!userEmail) {
-      return sendJson(res, 401, { error: "Not authenticated. Please connect Google account." });
+      return sendJson(res, 401, { error: "Not authenticated" });
     }
-    const items = getUserItems(userEmail);
-    return sendJson(res, 200, { items });
-  }
 
-  // POST /api/items - Save or update item
-  if (requestPath === "/api/items" && req.method === "OPTIONS") {
-    return sendCors(res);
-  }
-  if (requestPath === "/api/items" && req.method === "POST") {
-    return readJsonBody(req, (err, body) => {
-      if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
-
-      const userEmail = getCurrentUserEmail();
-      if (!userEmail) {
-        return sendJson(res, 401, { error: "Not authenticated" });
-      }
-
-      const { item } = body;
-      if (!item || !item.name) {
-        return sendJson(res, 400, { error: "Invalid item data" });
-      }
-
-      const success = saveUserItem(userEmail, item);
-      if (success) {
-        console.log(`[Storage] Saved item ${item.name} for ${userEmail}`);
-        return sendJson(res, 200, { success: true, item });
-      } else {
-        return sendJson(res, 500, { error: "Failed to save item" });
-      }
-    });
-  }
-  // #endregion
-
-  // #region Settings Storage Helper Functions
-  /**
-   * Get the settings file path for a specific user
-   */
-  function getUserSettingsPath(userEmail) {
-    if (!userEmail) return null;
-    const safeEmail = userEmail.replace(/[^a-z0-9@._-]/gi, '_');
-    const userDir = path.join(dataDir, safeEmail);
-    if (!fs.existsSync(userDir)) {
-      fs.mkdirSync(userDir, { recursive: true });
+    const { item } = body;
+    if (!item || !item.name) {
+      return sendJson(res, 400, { error: "Invalid item data" });
     }
-    return path.join(userDir, 'settings.json');
+
+    const success = saveUserItem(userEmail, item);
+    if (success) {
+      console.log(`[Storage] Saved item ${item.name} for ${userEmail}`);
+      return sendJson(res, 200, { success: true, item });
+    } else {
+      return sendJson(res, 500, { error: "Failed to save item" });
+    }
+  });
+}
+// #endregion
+
+// #region Settings Storage Helper Functions
+/**
+ * Get the settings file path for a specific user
+ */
+function getUserSettingsPath(userEmail) {
+  if (!userEmail) return null;
+  const safeEmail = userEmail.replace(/[^a-z0-9@._-]/gi, '_');
+  const userDir = path.join(dataDir, safeEmail);
+  if (!fs.existsSync(userDir)) {
+    fs.mkdirSync(userDir, { recursive: true });
   }
+  return path.join(userDir, 'settings.json');
+}
 
-  /**
-   * Get settings for a user
-   */
-  /**
-   * Get settings for a user
-   */
-  async function getUserSettings(userEmail) {
-    if (isConnected) {
-      try {
-        let doc = await SettingsModel.findOne({ userEmail }).lean();
+/**
+ * Get settings for a user
+ */
+/**
+ * Get settings for a user
+ */
+async function getUserSettings(userEmail) {
+  if (isConnected) {
+    try {
+      let doc = await SettingsModel.findOne({ userEmail }).lean();
 
-        // Auto-Migration: If DB is empty but FS has data, import it once.
-        if (!doc && userEmail) {
-          const filePath = getUserSettingsPath(userEmail);
-          if (filePath && fs.existsSync(filePath)) {
-            try {
-              const localData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-              if (localData && Object.keys(localData).length > 0) {
-                console.log(`[Storage] Migrating settings from FS to MongoDB for ${userEmail}`);
-                await SettingsModel.findOneAndUpdate(
-                  { userEmail },
-                  { ...localData, userEmail, updatedAt: new Date() },
-                  { upsert: true, new: true }
-                );
-                doc = await SettingsModel.findOne({ userEmail }).lean();
-              }
-            } catch (fsErr) {
-              console.error('[Storage] Settings Migration failed:', fsErr);
+      // Auto-Migration: If DB is empty but FS has data, import it once.
+      if (!doc && userEmail) {
+        const filePath = getUserSettingsPath(userEmail);
+        if (filePath && fs.existsSync(filePath)) {
+          try {
+            const localData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            if (localData && Object.keys(localData).length > 0) {
+              console.log(`[Storage] Migrating settings from FS to MongoDB for ${userEmail}`);
+              await SettingsModel.findOneAndUpdate(
+                { userEmail },
+                { ...localData, userEmail, updatedAt: new Date() },
+                { upsert: true, new: true }
+              );
+              doc = await SettingsModel.findOne({ userEmail }).lean();
             }
+          } catch (fsErr) {
+            console.error('[Storage] Settings Migration failed:', fsErr);
           }
         }
+      }
 
-        return doc || {};
-      } catch (e) { return {}; }
-    }
-
-    const filePath = getUserSettingsPath(userEmail);
-    if (!filePath || !fs.existsSync(filePath)) {
-      return {};
-    }
-    try {
-      const data = fs.readFileSync(filePath, 'utf8');
-      return JSON.parse(data);
-    } catch (e) {
-      return {};
-    }
+      return doc || {};
+    } catch (e) { return {}; }
   }
 
-  /**
-   * Save settings for a user
-   */
-  async function saveUserSettings(userEmail, settings) {
-    if (isConnected) {
-      try {
-        await SettingsModel.findOneAndUpdate(
-          { userEmail },
-          { ...settings, userEmail, updatedAt: new Date() },
-          { upsert: true, new: true }
-        );
-        return true;
-      } catch (e) { return false; }
-    }
+  const filePath = getUserSettingsPath(userEmail);
+  if (!filePath || !fs.existsSync(filePath)) {
+    return {};
+  }
+  try {
+    const data = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(data);
+  } catch (e) {
+    return {};
+  }
+}
 
-    const filePath = getUserSettingsPath(userEmail);
-    if (!filePath) return false;
+/**
+ * Save settings for a user
+ */
+async function saveUserSettings(userEmail, settings) {
+  if (isConnected) {
     try {
-      fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf8');
+      await SettingsModel.findOneAndUpdate(
+        { userEmail },
+        { ...settings, userEmail, updatedAt: new Date() },
+        { upsert: true, new: true }
+      );
       return true;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { return false; }
   }
-  // #endregion
 
-  // #region Settings API Routes
-  // GET /api/settings - Get settings for current user
-  if (requestPath === "/api/settings" && req.method === "GET") {
-    const userEmail = getCurrentUserEmail();
+  const filePath = getUserSettingsPath(userEmail);
+  if (!filePath) return false;
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf8');
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+// #endregion
+
+// #region Settings API Routes
+// GET /api/settings - Get settings for current user
+if (requestPath === "/api/settings" && req.method === "GET") {
+  const userEmail = await authenticateUser(req);
+  if (!userEmail) {
+    return sendJson(res, 401, { error: "Not authenticated" });
+  }
+  const settings = getUserSettings(userEmail);
+  return sendJson(res, 200, { settings });
+}
+
+// POST /api/settings - Save settings
+if (requestPath === "/api/settings" && req.method === "OPTIONS") {
+  return sendCors(res);
+}
+if (requestPath === "/api/settings" && req.method === "POST") {
+  return readJsonBody(req, (err, body) => {
+    if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+
+    const userEmail = await authenticateUser(req);
     if (!userEmail) {
       return sendJson(res, 401, { error: "Not authenticated" });
     }
-    const settings = getUserSettings(userEmail);
-    return sendJson(res, 200, { settings });
-  }
 
-  // POST /api/settings - Save settings
-  if (requestPath === "/api/settings" && req.method === "OPTIONS") {
-    return sendCors(res);
-  }
-  if (requestPath === "/api/settings" && req.method === "POST") {
-    return readJsonBody(req, (err, body) => {
-      if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+    const { settings } = body;
+    if (!settings) {
+      return sendJson(res, 400, { error: "Invalid settings data" });
+    }
 
-      const userEmail = getCurrentUserEmail();
-      if (!userEmail) {
-        return sendJson(res, 401, { error: "Not authenticated" });
-      }
+    const success = saveUserSettings(userEmail, settings);
+    if (success) {
+      console.log(`[Storage] Saved settings for ${userEmail}`);
+      return sendJson(res, 200, { success: true, settings });
+    } else {
+      return sendJson(res, 500, { error: "Failed to save settings" });
+    }
+  });
+}
+// #endregion
 
-      const { settings } = body;
-      if (!settings) {
-        return sendJson(res, 400, { error: "Invalid settings data" });
-      }
+// #region Email Sending
+if (requestPath === "/api/email/send" && req.method === "OPTIONS") {
+  return sendCors(res);
+}
+if (requestPath === "/api/email/send" && req.method === "POST") {
+  return readJsonBody(req, async (err, body) => {
+    if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
 
-      const success = saveUserSettings(userEmail, settings);
-      if (success) {
-        console.log(`[Storage] Saved settings for ${userEmail}`);
-        return sendJson(res, 200, { success: true, settings });
-      } else {
-        return sendJson(res, 500, { error: "Failed to save settings" });
-      }
-    });
-  }
-  // #endregion
+    const { to, cc, subject, text, pdfBase64, filename, useGoogle } = body;
+    console.log(`[Email] Request received to: ${to}, cc: ${cc}, subject: ${subject}, useGoogle: ${useGoogle}`);
 
-  // #region Email Sending
-  if (requestPath === "/api/email/send" && req.method === "OPTIONS") {
-    return sendCors(res);
-  }
-  if (requestPath === "/api/email/send" && req.method === "POST") {
-    return readJsonBody(req, async (err, body) => {
-      if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
-
-      const { to, cc, subject, text, pdfBase64, filename, useGoogle } = body;
-      console.log(`[Email] Request received to: ${to}, cc: ${cc}, subject: ${subject}, useGoogle: ${useGoogle}`);
-
+    try {
       try {
         let nodemailer;
         try {
@@ -1128,69 +1076,49 @@ const requestHandler = async (req, res) => {
           });
         }
 
-        // Check if OAuth client is ready
-        if (!oAuth2Client) {
-          console.error("[Email] OAuth client not initialized (missing env vars?)");
-          return sendJson(res, 401, { error: "Server authentication error. Google Client ID missing." });
+        const userEmail = await authenticateUser(req);
+        if (!userEmail) {
+          return sendJson(res, 401, { error: "Not authenticated. Please Login." });
         }
 
-        // Reload tokens from disk to be sure
-        if (fs.existsSync(TOKENS_PATH)) {
-          try {
-            const navTokens = JSON.parse(fs.readFileSync(TOKENS_PATH, 'utf8'));
-            if (navTokens) {
-              oAuth2Client.setCredentials(navTokens);
-            }
-          } catch (e) {
-            console.warn("[Email] Failed to reload tokens from disk:", e);
+        if (!useGoogle) {
+          return sendJson(res, 501, { error: "Only Google SMTP is currently supported in this version." });
+        }
+
+        let userTokens = null;
+        if (isConnected) {
+          const tokenDoc = await TokenModel.findOne({ userEmail });
+          if (tokenDoc && tokenDoc.tokens) {
+            userTokens = tokenDoc.tokens;
           }
         }
 
-        // 2. If no tokens in Memory/FS, Try restore from DB (Robustness for Serverless)
-        if (!oAuth2Client.credentials || !oAuth2Client.credentials.refresh_token) {
-          console.log("[Email] Tokens missing in memory/FS, attempting DB restore...");
-          await getCurrentUserEmail();
+        if (!userTokens || !userTokens.refresh_token) {
+          return sendJson(res, 401, { error: "Missing Google Credentials for User. Please Re-Connect in Settings." });
         }
 
-        if (!useGoogle || !oAuth2Client.credentials || !oAuth2Client.credentials.refresh_token) {
-          console.log("[Email] Rejected: Google OAuth not connected or missing refresh token");
-          return sendJson(res, 401, {
-            error: "Google account not connected. Please connect in Settings."
-          });
-        }
-
-        console.log("[Email] Using Google OAuth2. Token status: ", !!oAuth2Client.credentials.access_token ? "Has Access Token" : "Needs Refresh");
-
-        let transporter;
-        let userEmail = oAuth2Client.credentials.email;
-
-        // Try to get email from tokens file if missing in memory
-        if (!userEmail && fs.existsSync(TOKENS_PATH)) {
-          try {
-            const savedTokens = JSON.parse(fs.readFileSync(TOKENS_PATH, 'utf8'));
-            userEmail = savedTokens.email;
-          } catch (e) { }
-        }
+        const sendOAuthClient = getOAuthClient(req);
+        sendOAuthClient.setCredentials(userTokens);
 
         try {
           // Force token refresh if needed
-          const accessTokenResponse = await oAuth2Client.getAccessToken();
+          const accessTokenResponse = await sendOAuthClient.getAccessToken();
           const accessToken = accessTokenResponse.token;
 
           if (!accessToken) {
             throw new Error("Failed to generate access token");
           }
 
-          console.log("[Email] Access token generated successfully");
+          console.log(`[Email] Sending as ${userEmail}`);
 
           transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
               type: 'OAuth2',
-              user: userEmail, // Can be undefined, Gmail might infer from token or throw
+              user: userEmail,
               clientId: GOOGLE_CLIENT_ID,
               clientSecret: GOOGLE_CLIENT_SECRET,
-              refreshToken: oAuth2Client.credentials.refresh_token,
+              refreshToken: userTokens.refresh_token,
               accessToken: accessToken
             }
           });
@@ -1230,55 +1158,55 @@ const requestHandler = async (req, res) => {
         sendJson(res, 500, { error: "Failed to send email", details: error.message });
       }
     });
-  }
-  // #endregion
+}
+// #endregion
 
-  // Static file serving for React App (invoice-react/dist)
-  const distDir = path.join(__dirname, "invoice-react", "dist");
-  let filePath = path.join(distDir, requestPath);
+// Static file serving for React App (invoice-react/dist)
+const distDir = path.join(__dirname, "invoice-react", "dist");
+let filePath = path.join(distDir, requestPath);
 
-  // Prevent directory traversal
-  if (!filePath.startsWith(distDir)) {
-    return sendNotFound(res);
-  }
+// Prevent directory traversal
+if (!filePath.startsWith(distDir)) {
+  return sendNotFound(res);
+}
 
-  fs.stat(filePath, (err, stats) => {
-    if (err || !stats.isFile()) {
-      // SPA Fallback: Serve index.html for non-API routes
-      if (!requestPath.startsWith("/api")) {
-        const indexHtml = path.join(distDir, "index.html");
-        fs.readFile(indexHtml, (err, content) => {
-          if (err) {
-            return sendNotFound(res);
-          }
-          res.writeHead(200, { "Content-Type": "text/html" });
-          res.end(content);
-        });
-        return;
-      }
-      // API 404
-      console.log(`[Server] 404 Not Found for API path: ${requestPath}`);
-      return sendJson(res, 404, { error: "Not Found", path: requestPath, note: "Handled by server.js fallback" });
+fs.stat(filePath, (err, stats) => {
+  if (err || !stats.isFile()) {
+    // SPA Fallback: Serve index.html for non-API routes
+    if (!requestPath.startsWith("/api")) {
+      const indexHtml = path.join(distDir, "index.html");
+      fs.readFile(indexHtml, (err, content) => {
+        if (err) {
+          return sendNotFound(res);
+        }
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end(content);
+      });
+      return;
     }
+    // API 404
+    console.log(`[Server] 404 Not Found for API path: ${requestPath}`);
+    return sendJson(res, 404, { error: "Not Found", path: requestPath, note: "Handled by server.js fallback" });
+  }
 
-    const ext = path.extname(filePath).toLowerCase();
-    const mimeTypes = {
-      ".html": "text/html",
-      ".js": "application/javascript",
-      ".css": "text/css",
-      ".json": "application/json",
-      ".png": "image/png",
-      ".jpg": "image/jpg",
-      ".svg": "image/svg+xml",
-      ".ico": "image/x-icon"
-    };
-    const contentType = mimeTypes[ext] || "application/octet-stream";
-    res.writeHead(200, {
-      "Content-Type": contentType,
-      "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
-    });
-    fs.createReadStream(filePath).pipe(res);
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeTypes = {
+    ".html": "text/html",
+    ".js": "application/javascript",
+    ".css": "text/css",
+    ".json": "application/json",
+    ".png": "image/png",
+    ".jpg": "image/jpg",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon"
+  };
+  const contentType = mimeTypes[ext] || "application/octet-stream";
+  res.writeHead(200, {
+    "Content-Type": contentType,
+    "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
   });
+  fs.createReadStream(filePath).pipe(res);
+});
 };
 
 // Start server if run directly (Local Dev)
