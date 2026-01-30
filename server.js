@@ -749,25 +749,40 @@ const requestHandler = async (req, res) => {
 
   if (requestPath === "/auth/google/disconnect" && req.method === "POST") {
     // Identify user to disconnect (restoring from DB if needed to match the active session)
-    const userEmail = await getCurrentUserEmail();
+    let userEmail = await getCurrentUserEmail();
+    console.log(`[Auth] Disconnect requested. activeUser: ${userEmail}`);
 
     // 1. Delete local file
     if (fs.existsSync(TOKENS_PATH)) {
       try {
         fs.unlinkSync(TOKENS_PATH);
-      } catch (e) { }
+        console.log("[Auth] Local tokens file deleted.");
+      } catch (e) {
+        console.error("[Auth] Failed to delete local tokens:", e);
+      }
     }
 
     // 2. Clear InMemory
     if (oAuth2Client) {
       oAuth2Client.setCredentials({});
+      console.log("[Auth] In-memory credentials cleared.");
     }
 
     // 3. Delete from MongoDB
-    if (isConnected && userEmail) {
+    if (isConnected) {
       try {
-        await TokenModel.deleteOne({ userEmail });
-        console.log(`[Auth] Deleted tokens for ${userEmail} from DB`);
+        if (userEmail) {
+          const res = await TokenModel.deleteOne({ userEmail });
+          console.log(`[Auth] DB Delete result for ${userEmail}:`, res);
+        } else {
+          // Fallback: If no email identified (e.g. restart loss), try to delete the most recent token
+          // This prevents "Zombie Login" where DB restores session after reload
+          const latest = await TokenModel.findOne({}, {}, { sort: { 'updatedAt': -1 } });
+          if (latest) {
+            console.log(`[Auth] No active email found, but deleting latest DB token for: ${latest.userEmail}`);
+            await TokenModel.deleteOne({ _id: latest._id });
+          }
+        }
       } catch (e) {
         console.error("[Auth] Failed to delete tokens from DB:", e);
       }
