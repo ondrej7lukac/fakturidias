@@ -748,30 +748,13 @@ const requestHandler = async (req, res) => {
   }
 
   if (requestPath === "/auth/google/disconnect" && req.method === "POST") {
-    let userEmail = null;
-    if (oAuth2Client?.credentials?.email) {
-      userEmail = oAuth2Client.credentials.email;
-    }
+    // Identify user to disconnect (restoring from DB if needed to match the active session)
+    const userEmail = await getCurrentUserEmail();
 
     // 1. Delete local file
     if (fs.existsSync(TOKENS_PATH)) {
       try {
-        const fileContent = fs.readFileSync(TOKENS_PATH, 'utf8'); // Read before delete to get email if needed
-        const tokens = JSON.parse(fileContent);
-        if (!userEmail && tokens.email) userEmail = tokens.email;
         fs.unlinkSync(TOKENS_PATH);
-      } catch (e) { }
-    }
-
-    // 1.5. If still no email, try to find the "current" active user from DB
-    // This handles the case where memory/FS are empty (server restart) but DB has the session.
-    if (!userEmail && isConnected) {
-      try {
-        const latestToken = await TokenModel.findOne({}).sort({ updatedAt: -1 }).lean();
-        if (latestToken) {
-          userEmail = latestToken.userEmail;
-          console.log(`[Auth] Identified user to disconnect from DB: ${userEmail}`);
-        }
       } catch (e) { }
     }
 
