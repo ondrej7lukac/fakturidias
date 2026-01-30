@@ -870,14 +870,23 @@ const requestHandler = async (req, res) => {
     }
   }
 
+
   // Session Status Endpoint (NEW - Multi-User)
   if (requestPath === "/auth/session" && req.method === "GET") {
+    console.log('[Session Check] Checking session status...');
+    console.log('[Session Check] req.session exists?', !!req.session);
+    console.log('[Session Check] req.session.authenticated:', req.session?.authenticated);
+    console.log('[Session Check] req.session.userEmail:', req.session?.userEmail);
+    console.log('[Session Check] Cookie header:', req.headers.cookie);
+
     if (req.session?.authenticated && req.session?.userEmail) {
+      console.log('[Session Check] ✅ User is authenticated:', req.session.userEmail);
       return sendJson(res, 200, {
         authenticated: true,
         email: req.session.userEmail
       });
     } else {
+      console.log('[Session Check] ❌ User is NOT authenticated');
       return sendJson(res, 200, {
         authenticated: false,
         email: null
