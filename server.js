@@ -827,13 +827,21 @@ const requestHandler = async (req, res) => {
         }
 
         // CREATE USER SESSION (CRITICAL FOR MULTI-USER)
+        console.log('[OAuth Callback] About to create session...');
+        console.log('[OAuth Callback] userEmail:', userEmail);
+        console.log('[OAuth Callback] req.session exists?', !!req.session);
+        console.log('[OAuth Callback] req.session:', req.session);
+
         if (userEmail && req.session) {
+          console.log('[OAuth Callback] ✅ Both userEmail and req.session exist - creating session...');
           req.session.authenticated = true;
           req.session.userEmail = userEmail;
           await new Promise((resolve) => req.session.save(resolve));
-          console.log(`[Session] Created session for user: ${userEmail}`);
+          console.log(`[OAuth Callback] ✅ Session created for user: ${userEmail}`);
         } else {
-          console.warn('[Session] Could not create session - req.session is undefined');
+          console.error('[OAuth Callback] ❌ Could not create session!');
+          console.error('[OAuth Callback] userEmail:', userEmail);
+          console.error('[OAuth Callback] req.session:', req.session);
         }
 
         // Return a simple HTML page that closes itself or redirects back to app
