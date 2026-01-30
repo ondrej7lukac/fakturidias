@@ -30,21 +30,28 @@ function App() {
         if (savedCategories) setCategories(JSON.parse(savedCategories))
     }, [])
 
+    // Reusable data loader
+    const fetchInvoices = async () => {
+        setIsLoading(true)
+        try {
+            const invoiceData = await loadData() // internal fetch to /api/invoices
+            const loadedInvoices = invoiceData.invoices || []
+            setInvoices(loadedInvoices)
+
+            // Calculate next counter based on loaded invoices
+            const nextCounter = getNextInvoiceCounter(loadedInvoices)
+            setInvoiceCounter(nextCounter)
+        } catch (err) {
+            console.error('Failed to load invoices:', err)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     // Load invoices and settings from server on mount
     useEffect(() => {
         const loadInitialData = async () => {
-            // 1. Load Invoices
-            try {
-                const invoiceData = await loadData() // internal fetch to /api/invoices
-                const loadedInvoices = invoiceData.invoices || []
-                setInvoices(loadedInvoices)
-
-                // Calculate next counter based on loaded invoices
-                const nextCounter = getNextInvoiceCounter(loadedInvoices)
-                setInvoiceCounter(nextCounter)
-            } catch (err) {
-                console.error('Failed to load invoices:', err)
-            }
+            await fetchInvoices()
 
             // 2. Load Settings (Supplier Profile)
             try {
@@ -74,15 +81,17 @@ function App() {
                 const savedSupplier = localStorage.getItem('defaultSupplier')
                 if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
             }
-
-            setIsLoading(false)
         }
 
         loadInitialData()
 
-        // Listen for Google Login to auto-fill email and reload settings
-        const handleGoogleLogin = () => {
+        // Listen for Google Login to auto-fill email and reload data
+        const handleGoogleLogin = async () => {
             const tokensStr = localStorage.getItem('google_tokens')
+
+            // Reload invoices regardless of login or logout (if logout, it fetches public/empty)
+            await fetchInvoices()
+
             if (tokensStr) {
                 // Reload settings from server after login
                 fetch('/api/settings').then(res => {
@@ -104,6 +113,9 @@ function App() {
                         })
                     }
                 }
+            } else {
+                // Explicit logout handling - clear sensitive data if needed, but fetchInvoices handles the list
+                setInvoices([])
             }
         }
         window.addEventListener('google_login_update', handleGoogleLogin)

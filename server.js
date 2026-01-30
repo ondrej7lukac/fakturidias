@@ -325,9 +325,42 @@ async function getUserInvoices(userEmail) {
   if (isConnected) {
     try {
       // MongoDB Fetch
-      const invoices = await InvoiceModel.find({ userEmail }).lean();
-      // Map _id to clean objects if needed, but lean() is close enough
-      // We might need to ensure 'id' is preserved (which it is in our schema)
+      let invoices = await InvoiceModel.find({ userEmail }).lean();
+
+      // Auto-Migration: If DB is empty but FS has data, import it once.
+      if ((!invoices || invoices.length === 0) && userEmail) {
+        const filePath = getUserDataPath(userEmail);
+        if (filePath && fs.existsSync(filePath)) {
+          try {
+            const localData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            if (Array.isArray(localData) && localData.length > 0) {
+              console.log(`[Storage] Migrating ${localData.length} invoices from FS to MongoDB for ${userEmail}`);
+              // Add userEmail to each and prepare for bulk insert
+              const toInsert = localData.map(inv => ({
+                ...inv,
+                userEmail,
+                createdAt: inv.createdAt || new Date(),
+                updatedAt: inv.updatedAt || new Date()
+              }));
+
+              // Use updateOne with upsert for safety, or insertMany
+              // process serially to avoid errors
+              for (const inv of toInsert) {
+                await InvoiceModel.findOneAndUpdate(
+                  { userEmail, id: inv.id },
+                  inv,
+                  { upsert: true, new: true }
+                );
+              }
+
+              invoices = await InvoiceModel.find({ userEmail }).lean();
+            }
+          } catch (fsErr) {
+            console.error('[Storage] Migration failed:', fsErr);
+          }
+        }
+      }
+
       return invoices || [];
     } catch (e) {
       console.error('[MongoDB] Error fetching invoices:', e);
@@ -459,7 +492,38 @@ function getUserItemsPath(userEmail) {
 async function getUserItems(userEmail) {
   if (isConnected) {
     try {
-      return await ItemModel.find({ userEmail }).lean();
+      let items = await ItemModel.find({ userEmail }).lean();
+
+      // Auto-Migration: If DB is empty but FS has data, import it once.
+      if ((!items || items.length === 0) && userEmail) {
+        const filePath = getUserItemsPath(userEmail);
+        if (filePath && fs.existsSync(filePath)) {
+          try {
+            const localData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            if (Array.isArray(localData) && localData.length > 0) {
+              console.log(`[Storage] Migrating ${localData.length} items from FS to MongoDB for ${userEmail}`);
+              const toInsert = localData.map(item => ({
+                ...item,
+                userEmail,
+                lastUpdated: item.lastUpdated || new Date()
+              }));
+
+              for (const item of toInsert) {
+                await ItemModel.findOneAndUpdate(
+                  { userEmail, name: item.name },
+                  item,
+                  { upsert: true, new: true }
+                );
+              }
+              items = await ItemModel.find({ userEmail }).lean();
+            }
+          } catch (fsErr) {
+            console.error('[Storage] Items Migration failed:', fsErr);
+          }
+        }
+      }
+
+      return items || [];
     } catch (e) { return []; }
   }
 
@@ -936,7 +1000,29 @@ const requestHandler = async (req, res) => {
   async function getUserSettings(userEmail) {
     if (isConnected) {
       try {
-        const doc = await SettingsModel.findOne({ userEmail }).lean();
+        let doc = await SettingsModel.findOne({ userEmail }).lean();
+
+        // Auto-Migration: If DB is empty but FS has data, import it once.
+        if (!doc && userEmail) {
+          const filePath = getUserSettingsPath(userEmail);
+          if (filePath && fs.existsSync(filePath)) {
+            try {
+              const localData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+              if (localData && Object.keys(localData).length > 0) {
+                console.log(`[Storage] Migrating settings from FS to MongoDB for ${userEmail}`);
+                await SettingsModel.findOneAndUpdate(
+                  { userEmail },
+                  { ...localData, userEmail, updatedAt: new Date() },
+                  { upsert: true, new: true }
+                );
+                doc = await SettingsModel.findOne({ userEmail }).lean();
+              }
+            } catch (fsErr) {
+              console.error('[Storage] Settings Migration failed:', fsErr);
+            }
+          }
+        }
+
         return doc || {};
       } catch (e) { return {}; }
     }
