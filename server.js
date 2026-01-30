@@ -927,7 +927,7 @@ const requestHandler = async (req, res) => {
       if (!userEmail) {
         return sendJson(res, 401, { error: "Not authenticated. Please connect Google account." });
       }
-      const items = getUserItems(userEmail);
+      const items = await getUserItems(userEmail);
       return sendJson(res, 200, { items });
     }
 
@@ -936,7 +936,7 @@ const requestHandler = async (req, res) => {
       return sendCors(res);
     }
     if (requestPath === "/api/items" && req.method === "POST") {
-      return readJsonBody(req, (err, body) => {
+      return readJsonBody(req, async (err, body) => {
         if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
 
         const userEmail = await authenticateUser(req);
@@ -949,7 +949,7 @@ const requestHandler = async (req, res) => {
           return sendJson(res, 400, { error: "Invalid item data" });
         }
 
-        const success = saveUserItem(userEmail, item);
+        const success = await saveUserItem(userEmail, item);
         if (success) {
           console.log(`[Storage] Saved item ${item.name} for ${userEmail}`);
           return sendJson(res, 200, { success: true, item });
@@ -1100,100 +1100,99 @@ const requestHandler = async (req, res) => {
         console.log(`[Email] Request received to: ${to}, cc: ${cc}, subject: ${subject}, useGoogle: ${useGoogle}`);
 
         try {
+          let nodemailer;
           try {
-            let nodemailer;
-            try {
-              nodemailer = require("nodemailer");
-            } catch (e) {
-              console.error("[Email] Nodemailer missing");
-              return sendJson(res, 501, {
-                error: "nodemailer not installed",
-                message: "Run 'npm install nodemailer'"
-              });
-            }
-
-            const userEmail = await authenticateUser(req);
-            if (!userEmail) {
-              return sendJson(res, 401, { error: "Not authenticated. Please Login." });
-            }
-
-            if (!useGoogle) {
-              return sendJson(res, 501, { error: "Only Google SMTP is currently supported in this version." });
-            }
-
-            let userTokens = null;
-            if (isConnected) {
-              const tokenDoc = await TokenModel.findOne({ userEmail });
-              if (tokenDoc && tokenDoc.tokens) {
-                userTokens = tokenDoc.tokens;
-              }
-            }
-
-            if (!userTokens || !userTokens.refresh_token) {
-              return sendJson(res, 401, { error: "Missing Google Credentials for User. Please Re-Connect in Settings." });
-            }
-
-            const sendOAuthClient = getOAuthClient(req);
-            sendOAuthClient.setCredentials(userTokens);
-
-            try {
-              // Force token refresh if needed
-              const accessTokenResponse = await sendOAuthClient.getAccessToken();
-              const accessToken = accessTokenResponse.token;
-
-              if (!accessToken) {
-                throw new Error("Failed to generate access token");
-              }
-
-              console.log(`[Email] Sending as ${userEmail}`);
-
-              transporter = nodemailer.createTransport({
-                service: 'gmail',
-                auth: {
-                  type: 'OAuth2',
-                  user: userEmail,
-                  clientId: GOOGLE_CLIENT_ID,
-                  clientSecret: GOOGLE_CLIENT_SECRET,
-                  refreshToken: userTokens.refresh_token,
-                  accessToken: accessToken
-                }
-              });
-
-            } catch (oauthError) {
-              console.error("[Email] OAuth token refresh failed:", oauthError.message);
-              return sendJson(res, 401, { error: "Google Auth expired or invalid. Please reconnect in Settings." });
-            }
-
-            const info = await transporter.sendMail({
-              from: userEmail ? `"Invoice Maker" <${userEmail}>` : undefined,
-              to,
-              cc,
-              subject,
-              html: body.html || text, // Support html body if passed
-              attachments: [
-                {
-                  filename: filename || "invoice.pdf",
-                  content: pdfBase64.split("base64,")[1],
-                  encoding: "base64"
-                }
-              ]
+            nodemailer = require("nodemailer");
+          } catch (e) {
+            console.error("[Email] Nodemailer missing");
+            return sendJson(res, 501, {
+              error: "nodemailer not installed",
+              message: "Run 'npm install nodemailer'"
             });
-
-            console.log("[Email] Sent: %s", info.messageId);
-            sendJson(res, 200, {
-              success: true,
-              message: "Email sent successfully"
-            });
-
-          } catch (error) {
-            console.error("[Email] Sending Error:", error);
-            // If it's an auth error from Gmail/Nodemailer, return 401 so frontend knows to re-auth
-            if (error.code === 'EAUTH' || error.response?.includes('Authentication')) {
-              return sendJson(res, 401, { error: "Authentication failed. Please reconnect Google account." });
-            }
-            sendJson(res, 500, { error: "Failed to send email", details: error.message });
           }
-        });
+
+          const userEmail = await authenticateUser(req);
+          if (!userEmail) {
+            return sendJson(res, 401, { error: "Not authenticated. Please Login." });
+          }
+
+          if (!useGoogle) {
+            return sendJson(res, 501, { error: "Only Google SMTP is currently supported in this version." });
+          }
+
+          let userTokens = null;
+          if (isConnected) {
+            const tokenDoc = await TokenModel.findOne({ userEmail });
+            if (tokenDoc && tokenDoc.tokens) {
+              userTokens = tokenDoc.tokens;
+            }
+          }
+
+          if (!userTokens || !userTokens.refresh_token) {
+            return sendJson(res, 401, { error: "Missing Google Credentials for User. Please Re-Connect in Settings." });
+          }
+
+          const sendOAuthClient = getOAuthClient(req);
+          sendOAuthClient.setCredentials(userTokens);
+
+          try {
+            // Force token refresh if needed
+            const accessTokenResponse = await sendOAuthClient.getAccessToken();
+            const accessToken = accessTokenResponse.token;
+
+            if (!accessToken) {
+              throw new Error("Failed to generate access token");
+            }
+
+            console.log(`[Email] Sending as ${userEmail}`);
+
+            transporter = nodemailer.createTransport({
+              service: 'gmail',
+              auth: {
+                type: 'OAuth2',
+                user: userEmail,
+                clientId: GOOGLE_CLIENT_ID,
+                clientSecret: GOOGLE_CLIENT_SECRET,
+                refreshToken: userTokens.refresh_token,
+                accessToken: accessToken
+              }
+            });
+
+          } catch (oauthError) {
+            console.error("[Email] OAuth token refresh failed:", oauthError.message);
+            return sendJson(res, 401, { error: "Google Auth expired or invalid. Please reconnect in Settings." });
+          }
+
+          const info = await transporter.sendMail({
+            from: userEmail ? `"Invoice Maker" <${userEmail}>` : undefined,
+            to,
+            cc,
+            subject,
+            html: body.html || text, // Support html body if passed
+            attachments: [
+              {
+                filename: filename || "invoice.pdf",
+                content: pdfBase64.split("base64,")[1],
+                encoding: "base64"
+              }
+            ]
+          });
+
+          console.log("[Email] Sent: %s", info.messageId);
+          sendJson(res, 200, {
+            success: true,
+            message: "Email sent successfully"
+          });
+
+        } catch (error) {
+          console.error("[Email] Sending Error:", error);
+          // If it's an auth error from Gmail/Nodemailer, return 401 so frontend knows to re-auth
+          if (error.code === 'EAUTH' || error.response?.includes('Authentication')) {
+            return sendJson(res, 401, { error: "Authentication failed. Please reconnect Google account." });
+          }
+          sendJson(res, 500, { error: "Failed to send email", details: error.message });
+        }
+      });
     }
     // #endregion
 
