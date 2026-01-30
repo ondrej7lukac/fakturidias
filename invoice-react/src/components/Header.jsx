@@ -1,87 +1,57 @@
 import { useState, useEffect } from 'react'
 
 export default function Header({ onNewInvoice, lang, setLang, t, currentView, onViewChange }) {
-    const [isGoogleConnected, setIsGoogleConnected] = useState(false)
+    const [isAuthenticated, setIsAuthenticated] = useState(false)
+    const [userEmail, setUserEmail] = useState(null)
 
     useEffect(() => {
-        checkGoogleStatus()
-
-        // Listen for storage changes (e.g. login/logout in other tab or component)
-        const handleStorageChange = () => checkGoogleStatus()
-        window.addEventListener('storage', handleStorageChange)
-        // Also listen for custom event we might dispatch
-        window.addEventListener('google_login_update', handleStorageChange)
-
-        return () => {
-            window.removeEventListener('storage', handleStorageChange)
-            window.removeEventListener('google_login_update', handleStorageChange)
-        }
+        checkAuthStatus()
+        const handleAuthUpdate = () => checkAuthStatus()
+        window.addEventListener('google_login_update', handleAuthUpdate)
+        return () => window.removeEventListener('google_login_update', handleAuthUpdate)
     }, [])
 
-    const checkGoogleStatus = async () => {
-        // 1. Check Local (Fast DB)
-        const tokens = localStorage.getItem('google_tokens')
-        if (tokens) {
-            setIsGoogleConnected(true)
-        }
-
-        // 2. data Source of Truth (Server)
+    const checkAuthStatus = async () => {
         try {
-            const res = await fetch('/auth/google/status')
+            const res = await fetch('/api/me')
             if (res.ok) {
                 const data = await res.json()
-                setIsGoogleConnected(data.connected)
-
-                // Sync Local Storage state if server says connected but local differs
-                if (data.connected && !tokens) {
-                    localStorage.setItem('google_tokens', JSON.stringify({ connected: true, note: 'synced_from_server' }))
-                } else if (!data.connected && tokens) {
-                    // Server lost auth -> Clear local
-                    localStorage.removeItem('google_tokens')
-                }
+                setIsAuthenticated(data.authenticated)
+                setUserEmail(data.user)
             }
         } catch (e) {
-            console.error('Failed to check google status', e)
+            setIsAuthenticated(false)
         }
     }
 
-    const handleGoogleLogin = async () => {
-        if (isGoogleConnected) {
-            // If connected, clicking might mean "Show settings" or "Logout". 
-            // For now, let's just go to Settings to manage account
+    const handleLogin = async () => {
+        if (isAuthenticated) {
             onViewChange('settings')
             return
         }
 
         try {
             const res = await fetch('/auth/google/url')
+            if (!res.ok) throw new Error('Failed to start login')
             const data = await res.json()
+
             if (data.url) {
-                window.open(data.url, 'Google Auth', 'width=600,height=700')
+                const width = 500
+                const height = 600
+                const left = window.screen.width / 2 - width / 2
+                const top = window.screen.height / 2 - height / 2
+                window.open(data.url, 'Google Login', `width=${width},height=${height},top=${top},left=${left}`)
 
                 const handleMessage = (event) => {
-                    if (event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
-                        const { tokens, email } = event.data
-                        localStorage.setItem('google_tokens', JSON.stringify(tokens))
-
-                        // Save email to smtpConfig (used by Settings and App)
-                        const currentSmtp = JSON.parse(localStorage.getItem('smtpConfig') || '{}')
-                        localStorage.setItem('smtpConfig', JSON.stringify({
-                            ...currentSmtp,
-                            useGoogle: true,
-                            fromEmail: email
-                        }))
-
-                        checkGoogleStatus()
+                    if (event.data && event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
                         window.removeEventListener('message', handleMessage)
-                        // Dispath event for other components
                         window.dispatchEvent(new Event('google_login_update'))
                     }
                 }
                 window.addEventListener('message', handleMessage)
             }
         } catch (e) {
-            alert('Failed to start auth flow')
+            alert('Failed to connect to login server.')
         }
     }
 
@@ -107,21 +77,21 @@ export default function Header({ onNewInvoice, lang, setLang, t, currentView, on
                     <option value="en">English</option>
                 </select>
                 <button
-                    onClick={handleGoogleLogin}
+                    onClick={handleLogin}
                     className="secondary"
                     style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        background: isGoogleConnected ? 'var(--success-bg, #d4edda)' : undefined,
-                        borderColor: isGoogleConnected ? 'var(--success-border, #28a745)' : undefined,
-                        color: isGoogleConnected ? 'var(--success-text, #155724)' : undefined
+                        background: isAuthenticated ? 'var(--success-bg, #d4edda)' : undefined,
+                        borderColor: isAuthenticated ? 'var(--success-border, #28a745)' : undefined,
+                        color: isAuthenticated ? 'var(--success-text, #155724)' : undefined
                     }}
-                    title={isGoogleConnected ? (lang === 'cs' ? 'Připojeno k Google' : 'Connected to Google') : (lang === 'cs' ? 'Připojit Google' : 'Connect Google')}
+                    title={isAuthenticated ? (userEmail || 'Logged in') : (lang === 'cs' ? 'Přihlásit se' : 'Log in')}
                 >
                     <span style={{ fontWeight: 'bold', fontSize: '16px' }}>G</span>
-                    <span>{lang === 'cs' ? 'Přihlášení' : 'Login'}</span>
-                    {isGoogleConnected && <span>✓</span>}
+                    <span>{isAuthenticated ? (userEmail?.split('@')[0] || 'Account') : (lang === 'cs' ? 'Přihlášení' : 'Login')}</span>
+                    {isAuthenticated && <span>✓</span>}
                 </button>
             </div>
         </header>

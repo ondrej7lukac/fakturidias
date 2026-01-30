@@ -52,7 +52,7 @@ function App() {
     }
 
     // Load invoices and settings from server on mount
-    // Check Auth and Load Data
+    // Check Auth and Load Data (but don't require it)
     useEffect(() => {
         const checkAuthAndLoad = async () => {
             setIsAuthChecking(true)
@@ -64,7 +64,7 @@ function App() {
                 if (authData.authenticated) {
                     setIsAuthenticated(true)
 
-                    // 2. Load Invoices
+                    // 2. Load Invoices from server
                     await fetchInvoices()
 
                     // 3. Load Settings
@@ -79,7 +79,20 @@ function App() {
                     } catch (e) { console.error("Failed to load settings", e) }
 
                 } else {
+                    // Not authenticated - that's OK! User can still use the app locally
                     setIsAuthenticated(false)
+                    // Load from localStorage for offline mode
+                    const localInvoices = localStorage.getItem('local_invoices')
+                    if (localInvoices) {
+                        try {
+                            const parsed = JSON.parse(localInvoices)
+                            setInvoices(parsed)
+                            const nextCounter = getNextInvoiceCounter(parsed)
+                            setInvoiceCounter(nextCounter)
+                        } catch (e) {
+                            console.error('Failed to load local invoices', e)
+                        }
+                    }
                 }
             } catch (e) {
                 console.error("Auth check failed", e)
@@ -117,9 +130,7 @@ function App() {
 
     const handleSaveInvoice = async (invoice) => {
         try {
-            await saveInvoice(invoice)
-
-            // Update local state
+            // Update local state first
             const existingIndex = invoices.findIndex(inv => inv.id === invoice.id)
             let updatedInvoices = [...invoices]
 
@@ -132,6 +143,15 @@ function App() {
 
             setInvoices(updatedInvoices)
 
+            // Save based on authentication status
+            if (isAuthenticated) {
+                // Save to server if logged in
+                await saveInvoice(invoice)
+            } else {
+                // Save to localStorage if not logged in
+                localStorage.setItem('local_invoices', JSON.stringify(updatedInvoices))
+            }
+
             // Recalculate counter
             setInvoiceCounter(getNextInvoiceCounter(updatedInvoices))
 
@@ -142,7 +162,12 @@ function App() {
                 setCategories([...categories, invoice.category].sort())
             }
         } catch (error) {
-            alert(t.alertError || 'Failed to save invoice')
+            // Only show error if we were trying to save to server
+            if (isAuthenticated) {
+                alert(t.alertError || 'Failed to save invoice to server')
+            } else {
+                console.error('Local save error:', error)
+            }
         }
     }
 
@@ -150,13 +175,24 @@ function App() {
         if (!window.confirm(lang === 'cs' ? 'Smazat fakturu?' : 'Delete invoice?')) return
 
         try {
-            await deleteInvoice(id)
-            setInvoices(invoices.filter(inv => inv.id !== id))
+            const updatedInvoices = invoices.filter(inv => inv.id !== id)
+            setInvoices(updatedInvoices)
+
+            if (isAuthenticated) {
+                // Delete from server if logged in
+                await deleteInvoice(id)
+            } else {
+                // Update localStorage if not logged in
+                localStorage.setItem('local_invoices', JSON.stringify(updatedInvoices))
+            }
+
             if (selectedId === id) {
                 setSelectedId(null)
             }
         } catch (error) {
-            alert(t.alertError || 'Failed to delete invoice')
+            if (isAuthenticated) {
+                alert(t.alertError || 'Failed to delete invoice')
+            }
         }
     }
 
@@ -177,10 +213,6 @@ function App() {
                 Loading...
             </div>
         )
-    }
-
-    if (!isAuthenticated) {
-        return <LoginPage lang={lang} onLoginSuccess={() => window.dispatchEvent(new Event('google_login_update'))} />
     }
 
     return (
@@ -215,6 +247,7 @@ function App() {
                             t={t}
                             defaultSupplier={defaultSupplier}
                             setDefaultSupplier={setDefaultSupplier}
+                            isAuthenticated={isAuthenticated}
                         />
                         <div>
                             <InvoiceList

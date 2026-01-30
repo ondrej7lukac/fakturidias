@@ -19,7 +19,8 @@ export default function InvoiceForm({
     lang,
     t,
     defaultSupplier,
-    setDefaultSupplier
+    setDefaultSupplier,
+    isAuthenticated
 }) {
     const qrCanvasRef = useRef(null)
     const [formData, setFormData] = useState({
@@ -538,29 +539,21 @@ export default function InvoiceForm({
     }
 
     const handleEmailPDF = async () => {
+        // Check authentication first
+        if (!isAuthenticated) {
+            return alert(
+                lang === 'cs'
+                    ? 'Pro odesílání emailů se musíte přihlásit. Klikněte na tlačítko "Přihlášení" v záhlaví.'
+                    : 'You must be logged in to send emails. Click the "Login" button in the header.'
+            )
+        }
+
         const currentData = getCurrentInvoiceData()
         if (!currentData.client.email) return alert(t.alertEmailMissing)
 
         setIsGenerating(true)
         setEmailStatus(t.alertGenerating)
         try {
-            // Check for local tokens
-            const tokensStr = localStorage.getItem('google_tokens')
-            let tokens = null
-            if (tokensStr) {
-                try { tokens = JSON.parse(tokensStr) } catch (e) { }
-            }
-
-            if (!tokens) {
-                setIsGenerating(false)
-                setEmailStatus('')
-                return alert(
-                    lang === 'cs'
-                        ? 'Email nelze odeslat. Připojte prosím váš Google účet v Nastavení.'
-                        : 'Cannot send email. Please connect your Google account in Settings.'
-                )
-            }
-
             let qrDataUrl = null
             try {
                 const qrPayload = getCzechQrPayload(currentData)
@@ -589,7 +582,6 @@ export default function InvoiceForm({
                     html: `<p>Hello,</p><p>Please find attached the invoice ${currentData.invoiceNumber}.</p><p>Thank you!</p>`,
                     pdfBase64: pdfBase64,
                     filename: `${currentData.invoiceNumber}.pdf`,
-                    userEmail: tokens?.email, // Required for backend to identify user tokens
                     useGoogle: true
                 })
             })
