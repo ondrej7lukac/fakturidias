@@ -1,14 +1,24 @@
-const http = require("http");
-const https = require("https");
-const fs = require("fs");
-const path = require("path");
-// Load environment variables immediately
-require('dotenv').config();
+// Safe Module Loading
+let http, https, fs, path, zlib, jwt, cookie, mongoose;
+let startupError = null;
 
-const zlib = require("zlib");
+try {
+  http = require("http");
+  https = require("https");
+  fs = require("fs");
+  path = require("path");
 
-const jwt = require('jsonwebtoken');
-const cookie = require('cookie');
+  // Load environment variables immediately
+  require('dotenv').config();
+
+  zlib = require("zlib");
+  jwt = require('jsonwebtoken');
+  cookie = require('cookie');
+  mongoose = require('mongoose');
+} catch (e) {
+  startupError = { message: e.message, stack: e.stack, code: "STARTUP_CRASH" };
+  console.error("Critical Startup Error:", e);
+}
 
 const port = 5500;
 const baseDir = __dirname;
@@ -182,7 +192,7 @@ function readJsonBody(req, callback) {
 // Load environment variables
 require('dotenv').config();
 
-const mongoose = require('mongoose');
+// const mongoose = require('mongoose'); // Moved to top-level safe load
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -550,8 +560,15 @@ async function saveUserItem(userEmail, item) {
 // #endregion
 
 const requestHandler = async (req, res) => {
+  // Check for startup crashes
+  if (startupError) {
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Server Startup Failed", details: startupError }));
+    return;
+  }
+
   try {
-    await connectDB();
+    if (mongoose) await connectDB();
     const url = new URL(req.url, `http://${req.headers.host}`);
     let requestPath = decodeURIComponent(url.pathname || "/");
 
