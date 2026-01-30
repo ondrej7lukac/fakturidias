@@ -763,6 +763,18 @@ const requestHandler = async (req, res) => {
       } catch (e) { }
     }
 
+    // 1.5. If still no email, try to find the "current" active user from DB
+    // This handles the case where memory/FS are empty (server restart) but DB has the session.
+    if (!userEmail && isConnected) {
+      try {
+        const latestToken = await TokenModel.findOne({}).sort({ updatedAt: -1 }).lean();
+        if (latestToken) {
+          userEmail = latestToken.userEmail;
+          console.log(`[Auth] Identified user to disconnect from DB: ${userEmail}`);
+        }
+      } catch (e) { }
+    }
+
     // 2. Clear InMemory
     if (oAuth2Client) {
       oAuth2Client.setCredentials({});
