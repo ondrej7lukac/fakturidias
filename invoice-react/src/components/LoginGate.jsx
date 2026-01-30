@@ -43,8 +43,9 @@ export default function LoginGate({ children }) {
                     if (event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
                         window.removeEventListener('message', handleMessage);
                         popup?.close();
-                        // Re-check session after successful login
-                        checkSession();
+                        // Reload page to pick up session cookie
+                        // (SameSite=lax cookies need top-level navigation)
+                        window.location.reload();
                     }
                 };
                 window.addEventListener('message', handleMessage);
