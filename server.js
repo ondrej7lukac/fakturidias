@@ -661,6 +661,15 @@ const requestHandler = async (req, res) => {
 
   // #region Google OAuth Routes
 
+  // GET /api/me - Check current session
+  if (requestPath === "/api/me" && req.method === "GET") {
+    const userEmail = await authenticateUser(req);
+    return sendJson(res, 200, {
+      authenticated: !!userEmail,
+      user: userEmail || null
+    });
+  }
+
   if (requestPath === "/auth/google/url" && req.method === "GET") {
     const oAuth2Client = getOAuthClient(req);
     if (!oAuth2Client) return sendJson(res, 500, { error: "OAuth not initialized" });
@@ -1022,7 +1031,7 @@ if (requestPath === "/api/settings" && req.method === "GET") {
   if (!userEmail) {
     return sendJson(res, 401, { error: "Not authenticated" });
   }
-  const settings = getUserSettings(userEmail);
+  const settings = await getUserSettings(userEmail);
   return sendJson(res, 200, { settings });
 }
 
