@@ -40,27 +40,35 @@ export default function LoginGate({ children }) {
 
                 // Listen for success message from popup
                 const handleMessage = async (event) => {
+                    console.log('[LoginGate] Received postMessage:', event.data);
+
                     if (event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
+                        console.log('[LoginGate] OAuth success! Email:', event.data.email);
                         window.removeEventListener('message', handleMessage);
                         popup?.close();
 
                         // Create session in main window context
                         try {
+                            console.log('[LoginGate] Calling /auth/login with email:', event.data.email);
                             const loginRes = await fetch('/auth/login', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ email: event.data.email })
                             });
 
+                            console.log('[LoginGate] /auth/login response status:', loginRes.status);
+
                             if (loginRes.ok) {
+                                console.log('[LoginGate] Session created! Reloading...');
                                 // Session created successfully - reload to show app
                                 window.location.reload();
                             } else {
-                                console.error('Failed to create session:', await loginRes.text());
+                                const errorText = await loginRes.text();
+                                console.error('[LoginGate] Failed to create session:', errorText);
                                 alert('Login failed. Please try again.');
                             }
                         } catch (e) {
-                            console.error('Login error:', e);
+                            console.error('[LoginGate] Login error:', e);
                             alert('Login failed. Please try again.');
                         }
                     }
