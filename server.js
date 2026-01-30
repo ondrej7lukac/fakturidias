@@ -885,6 +885,51 @@ const requestHandler = async (req, res) => {
     }
   }
 
+  // Login Endpoint - Creates session for main window after OAuth popup success
+  if (requestPath === "/auth/login" && req.method === "POST") {
+    return readJsonBody(req, async (err, body) => {
+      if (err) return sendJson(res, 400, { error: "Invalid JSON" });
+
+      const { email } = body;
+      console.log('[Auth Login] Login request for email:', email);
+
+      if (!email) {
+        console.error('[Auth Login] No email provided');
+        return sendJson(res, 400, { error: "Email required" });
+      }
+
+      // Verify this user exists in MongoDB (has completed OAuth)
+      if (!isConnected) await connectDB();
+
+      if (isConnected) {
+        try {
+          const tokenDoc = await TokenModel.findOne({ userEmail: email });
+          if (!tokenDoc) {
+            console.error('[Auth Login] No tokens found for email:', email);
+            return sendJson(res, 401, { error: "User not authenticated with Google" });
+          }
+
+          // Create session for this user
+          if (req.session) {
+            req.session.authenticated = true;
+            req.session.userEmail = email;
+            await new Promise((resolve) => req.session.save(resolve));
+            console.log(`[Auth Login] ✅ Session created for user: ${email}`);
+            return sendJson(res, 200, { success: true, email });
+          } else {
+            console.error('[Auth Login] req.session is undefined!');
+            return sendJson(res, 500, { error: "Session not available" });
+          }
+        } catch (e) {
+          console.error('[Auth Login] Database error:', e);
+          return sendJson(res, 500, { error: "Database error" });
+        }
+      } else {
+        console.error('[Auth Login] Database not connected');
+        return sendJson(res, 500, { error: "Database not available" });
+      }
+    });
+  }
 
   // Session Status Endpoint (NEW - Multi-User)
   if (requestPath === "/auth/session" && req.method === "GET") {

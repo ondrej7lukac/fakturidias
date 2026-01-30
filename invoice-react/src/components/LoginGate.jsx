@@ -39,13 +39,30 @@ export default function LoginGate({ children }) {
                 const popup = window.open(data.url, 'Google Auth', 'width=600,height=700');
 
                 // Listen for success message from popup
-                const handleMessage = (event) => {
+                const handleMessage = async (event) => {
                     if (event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
                         window.removeEventListener('message', handleMessage);
                         popup?.close();
-                        // Reload page to pick up session cookie
-                        // (SameSite=lax cookies need top-level navigation)
-                        window.location.reload();
+
+                        // Create session in main window context
+                        try {
+                            const loginRes = await fetch('/auth/login', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ email: event.data.email })
+                            });
+
+                            if (loginRes.ok) {
+                                // Session created successfully - reload to show app
+                                window.location.reload();
+                            } else {
+                                console.error('Failed to create session:', await loginRes.text());
+                                alert('Login failed. Please try again.');
+                            }
+                        } catch (e) {
+                            console.error('Login error:', e);
+                            alert('Login failed. Please try again.');
+                        }
                     }
                 };
                 window.addEventListener('message', handleMessage);
