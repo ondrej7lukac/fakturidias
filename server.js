@@ -550,47 +550,91 @@ async function saveUserItem(userEmail, item) {
 // #endregion
 
 const requestHandler = async (req, res) => {
-  await connectDB();
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  let requestPath = decodeURIComponent(url.pathname || "/");
+  try {
+    await connectDB();
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    let requestPath = decodeURIComponent(url.pathname || "/");
 
-  // Normalize path: remove trailing slash if present (and not root)
-  if (requestPath.length > 1 && requestPath.endsWith('/')) {
-    requestPath = requestPath.slice(0, -1);
-  }
+    // Normalize path: remove trailing slash if present (and not root)
+    if (requestPath.length > 1 && requestPath.endsWith('/')) {
+      requestPath = requestPath.slice(0, -1);
+    }
 
-  logDebug(
-    "server.js:86",
-    "incoming request",
-    { method: req.method, path: requestPath },
-    "H5"
-  );
+    logDebug(
+      "server.js:86",
+      "incoming request",
+      { method: req.method, path: requestPath },
+      "H5"
+    );
 
-  if (requestPath === "/api/ares/search" && req.method === "OPTIONS") {
-    logDebug("server.js:93", "ares search preflight", { path: requestPath }, "H5");
-    return sendCors(res);
-  }
-  if (requestPath === "/api/ares/search" && req.method === "POST") {
-    logDebug("server.js:97", "ares search handler", { path: requestPath }, "H5");
-    return readJsonBody(req, (err, body) => {
-      if (err) {
-        return sendJson(res, 400, { error: "Invalid JSON body" });
-      }
-      const payload = JSON.stringify({
-        obchodniJmeno: String(body.obchodniJmeno || "").trim(),
-        ico: body.ico ? String(body.ico).trim() : undefined,
-        pocet: body.pocet || 8,
-        strana: body.strana || 1
+    if (requestPath === "/api/ares/search" && req.method === "OPTIONS") {
+      logDebug("server.js:93", "ares search preflight", { path: requestPath }, "H5");
+      return sendCors(res);
+    }
+    if (requestPath === "/api/ares/search" && req.method === "POST") {
+      logDebug("server.js:97", "ares search handler", { path: requestPath }, "H5");
+      return readJsonBody(req, (err, body) => {
+        if (err) {
+          return sendJson(res, 400, { error: "Invalid JSON body" });
+        }
+        const payload = JSON.stringify({
+          obchodniJmeno: String(body.obchodniJmeno || "").trim(),
+          ico: body.ico ? String(body.ico).trim() : undefined,
+          pocet: body.pocet || 8,
+          strana: body.strana || 1
+        });
+        return proxyJsonWithFallback(
+          [
+            {
+              hostname: "ares.gov.cz",
+              path: "/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/vyhledat",
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Content-Length": Buffer.byteLength(payload),
+                "Accept": "application/json",
+                "Accept-Encoding": "gzip, deflate",
+                "User-Agent": "InvoiceMaker/1.0 (+http://localhost:5500)"
+              }
+            },
+            {
+              hostname: "ares.gov.cz",
+              path: "/ekonomicke-subjekty/rest/ekonomicke-subjekty/vyhledat",
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Content-Length": Buffer.byteLength(payload),
+                "Accept": "application/json",
+                "Accept-Encoding": "gzip, deflate",
+                "User-Agent": "InvoiceMaker/1.0 (+http://localhost:5500)"
+              }
+            }
+          ],
+          payload,
+          res
+        );
       });
+    }
+
+    if (requestPath === "/api/ares/ico" && req.method === "OPTIONS") {
+      logDebug("server.js:123", "ares ico preflight", { path: requestPath }, "H5");
+      return sendCors(res);
+    }
+    if (requestPath === "/api/ares/ico" && req.method === "GET") {
+      logDebug("server.js:127", "ares ico handler", { path: requestPath }, "H5");
+      const ico = (url.searchParams.get("ico") || "").trim();
+      if (!ico) {
+        return sendJson(res, 400, { error: "Missing ico" });
+      }
       return proxyJsonWithFallback(
         [
           {
             hostname: "ares.gov.cz",
-            path: "/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/vyhledat",
-            method: "POST",
+            path: `/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/${encodeURIComponent(
+              ico
+            )}`,
+            method: "GET",
             headers: {
-              "Content-Type": "application/json",
-              "Content-Length": Buffer.byteLength(payload),
               "Accept": "application/json",
               "Accept-Encoding": "gzip, deflate",
               "User-Agent": "InvoiceMaker/1.0 (+http://localhost:5500)"
@@ -598,159 +642,116 @@ const requestHandler = async (req, res) => {
           },
           {
             hostname: "ares.gov.cz",
-            path: "/ekonomicke-subjekty/rest/ekonomicke-subjekty/vyhledat",
-            method: "POST",
+            path: `/ekonomicke-subjekty/rest/ekonomicke-subjekty/${encodeURIComponent(
+              ico
+            )}`,
+            method: "GET",
             headers: {
-              "Content-Type": "application/json",
-              "Content-Length": Buffer.byteLength(payload),
               "Accept": "application/json",
               "Accept-Encoding": "gzip, deflate",
               "User-Agent": "InvoiceMaker/1.0 (+http://localhost:5500)"
             }
           }
         ],
-        payload,
+        null,
         res
       );
-    });
-  }
-
-  if (requestPath === "/api/ares/ico" && req.method === "OPTIONS") {
-    logDebug("server.js:123", "ares ico preflight", { path: requestPath }, "H5");
-    return sendCors(res);
-  }
-  if (requestPath === "/api/ares/ico" && req.method === "GET") {
-    logDebug("server.js:127", "ares ico handler", { path: requestPath }, "H5");
-    const ico = (url.searchParams.get("ico") || "").trim();
-    if (!ico) {
-      return sendJson(res, 400, { error: "Missing ico" });
     }
-    return proxyJsonWithFallback(
-      [
-        {
-          hostname: "ares.gov.cz",
-          path: `/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/${encodeURIComponent(
-            ico
-          )}`,
-          method: "GET",
-          headers: {
-            "Accept": "application/json",
-            "Accept-Encoding": "gzip, deflate",
-            "User-Agent": "InvoiceMaker/1.0 (+http://localhost:5500)"
+
+    // #region Google OAuth Routes
+
+    // #region Google OAuth Routes
+
+    // GET /api/me - Check current session
+    if (requestPath === "/api/me" && req.method === "GET") {
+      const userEmail = await authenticateUser(req);
+      return sendJson(res, 200, {
+        authenticated: !!userEmail,
+        user: userEmail || null
+      });
+    }
+
+    if (requestPath === "/auth/google/url" && req.method === "GET") {
+      const oAuth2Client = getOAuthClient(req);
+      if (!oAuth2Client) return sendJson(res, 500, { error: "OAuth not initialized" });
+
+      const authUrl = oAuth2Client.generateAuthUrl({
+        access_type: 'offline', // Crucial for getting refresh_token
+        scope: SCOPES,
+        prompt: 'consent', // Force consent to ensure refresh_token is returned
+      });
+      return sendJson(res, 200, { url: authUrl });
+    }
+
+    if (requestPath === "/auth/google/callback") {
+      const oAuth2Client = getOAuthClient(req);
+      if (!oAuth2Client) return sendNotFound(res);
+
+      const code = url.searchParams.get('code');
+      if (code) {
+        try {
+          const { tokens } = await oAuth2Client.getToken(code);
+          oAuth2Client.setCredentials(tokens);
+
+          // Extract email from ID token
+          let userEmail = null;
+          if (tokens.id_token) {
+            try {
+              const ticket = await oAuth2Client.verifyIdToken({
+                idToken: tokens.id_token,
+                audience: GOOGLE_CLIENT_ID
+              });
+              const payload = ticket.getPayload();
+              userEmail = payload.email;
+            } catch (e) {
+              console.warn('[OAuth] Could not decode ID token:', e.message);
+            }
           }
-        },
-        {
-          hostname: "ares.gov.cz",
-          path: `/ekonomicke-subjekty/rest/ekonomicke-subjekty/${encodeURIComponent(
-            ico
-          )}`,
-          method: "GET",
-          headers: {
-            "Accept": "application/json",
-            "Accept-Encoding": "gzip, deflate",
-            "User-Agent": "InvoiceMaker/1.0 (+http://localhost:5500)"
+
+          if (!userEmail) {
+            throw new Error("Could not identify user email from Google Login");
           }
-        }
-      ],
-      null,
-      res
-    );
-  }
 
-  // #region Google OAuth Routes
+          // SAVE TOKENS TO DB for this User
+          if (!isConnected) await connectDB();
 
-  // #region Google OAuth Routes
-
-  // GET /api/me - Check current session
-  if (requestPath === "/api/me" && req.method === "GET") {
-    const userEmail = await authenticateUser(req);
-    return sendJson(res, 200, {
-      authenticated: !!userEmail,
-      user: userEmail || null
-    });
-  }
-
-  if (requestPath === "/auth/google/url" && req.method === "GET") {
-    const oAuth2Client = getOAuthClient(req);
-    if (!oAuth2Client) return sendJson(res, 500, { error: "OAuth not initialized" });
-
-    const authUrl = oAuth2Client.generateAuthUrl({
-      access_type: 'offline', // Crucial for getting refresh_token
-      scope: SCOPES,
-      prompt: 'consent', // Force consent to ensure refresh_token is returned
-    });
-    return sendJson(res, 200, { url: authUrl });
-  }
-
-  if (requestPath === "/auth/google/callback") {
-    const oAuth2Client = getOAuthClient(req);
-    if (!oAuth2Client) return sendNotFound(res);
-
-    const code = url.searchParams.get('code');
-    if (code) {
-      try {
-        const { tokens } = await oAuth2Client.getToken(code);
-        oAuth2Client.setCredentials(tokens);
-
-        // Extract email from ID token
-        let userEmail = null;
-        if (tokens.id_token) {
-          try {
-            const ticket = await oAuth2Client.verifyIdToken({
-              idToken: tokens.id_token,
-              audience: GOOGLE_CLIENT_ID
-            });
-            const payload = ticket.getPayload();
-            userEmail = payload.email;
-          } catch (e) {
-            console.warn('[OAuth] Could not decode ID token:', e.message);
+          // Always Try to Save to DB if possible
+          let savedToDb = false;
+          if (isConnected) {
+            try {
+              await TokenModel.findOneAndUpdate(
+                { userEmail },
+                { tokens: { ...tokens, email: userEmail }, userEmail, updatedAt: new Date() },
+                { upsert: true, new: true }
+              );
+              savedToDb = true;
+            } catch (e) {
+              console.error('[OAuth] Failed to save tokens to DB:', e);
+            }
           }
-        }
 
-        if (!userEmail) {
-          throw new Error("Could not identify user email from Google Login");
-        }
+          // GENERATE JWT SESSION
+          const token = jwt.sign({ email: userEmail }, JWT_SECRET, { expiresIn: '30d' });
 
-        // SAVE TOKENS TO DB for this User
-        if (!isConnected) await connectDB();
+          // Set Cookie
+          res.setHeader('Set-Cookie', cookie.serialize('auth_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production', // true in prod
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60, // 30 days
+            path: '/'
+          }));
 
-        // Always Try to Save to DB if possible
-        let savedToDb = false;
-        if (isConnected) {
-          try {
-            await TokenModel.findOneAndUpdate(
-              { userEmail },
-              { tokens: { ...tokens, email: userEmail }, userEmail, updatedAt: new Date() },
-              { upsert: true, new: true }
-            );
-            savedToDb = true;
-          } catch (e) {
-            console.error('[OAuth] Failed to save tokens to DB:', e);
-          }
-        }
+          res.writeHead(200, {
+            "Content-Type": "text/html",
+            "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
+          });
 
-        // GENERATE JWT SESSION
-        const token = jwt.sign({ email: userEmail }, JWT_SECRET, { expiresIn: '30d' });
+          const statusMessage = savedToDb
+            ? `<h1 style="color: green;">Welcome ${userEmail}!</h1><p>You are now logged in.</p>`
+            : '<h1 style="color: orange;">Connected (Local)</h1><p>Warning: Could not save to Database.</p>';
 
-        // Set Cookie
-        res.setHeader('Set-Cookie', cookie.serialize('auth_token', token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production', // true in prod
-          sameSite: 'lax',
-          maxAge: 30 * 24 * 60 * 60, // 30 days
-          path: '/'
-        }));
-
-        res.writeHead(200, {
-          "Content-Type": "text/html",
-          "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
-        });
-
-        const statusMessage = savedToDb
-          ? `<h1 style="color: green;">Welcome ${userEmail}!</h1><p>You are now logged in.</p>`
-          : '<h1 style="color: orange;">Connected (Local)</h1><p>Warning: Could not save to Database.</p>';
-
-        res.end(`
+          res.end(`
           <html>
             <body style="font-family: sans-serif; text-align: center; padding: 50px;">
               ${statusMessage}
@@ -763,462 +764,469 @@ const requestHandler = async (req, res) => {
             </body>
           </html>
         `);
-        return;
-      } catch (error) {
-        console.error("[OAuth] Error getting tokens:", error);
-        res.writeHead(500, { "Content-Type": "text/plain" });
-        return res.end("Authentication failed: " + error.message);
+          return;
+        } catch (error) {
+          console.error("[OAuth] Error getting tokens:", error);
+          res.writeHead(500, { "Content-Type": "text/plain" });
+          return res.end("Authentication failed: " + error.message);
+        }
       }
     }
+
+    // Check Auth Status (Replace 'status' with 'me')
+    if (requestPath === "/api/me" && req.method === "GET") {
+      const userEmail = await authenticateUser(req);
+      if (userEmail) {
+        return sendJson(res, 200, { authenticated: true, email: userEmail });
+      } else {
+        return sendJson(res, 200, { authenticated: false });
+      }
+    }
+
+    // Logout
+    if (requestPath === "/auth/logout" && req.method === "POST") {
+      res.setHeader('Set-Cookie', cookie.serialize('auth_token', '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        expires: new Date(0), // Expire immediately
+        path: '/'
+      }));
+      return sendJson(res, 200, { success: true });
+    }
+
+    if (requestPath === "/auth/google/status" && req.method === "GET") {
+      // Legacy support or just redirect to /api/me logic
+      const userEmail = await authenticateUser(req);
+      return sendJson(res, 200, { connected: !!userEmail, email: userEmail });
+    }
+
+    if (requestPath === "/auth/google/disconnect" && req.method === "POST") {
+      // Treat specific disconnect as Logout
+      const userEmail = await authenticateUser(req);
+      if (isConnected && userEmail) {
+        await TokenModel.deleteOne({ userEmail }); // Optional: Delete tokens on explicit disconnect
+      }
+      res.setHeader('Set-Cookie', cookie.serialize('auth_token', '', {
+        httpOnly: true,
+        path: '/',
+        expires: new Date(0)
+      }));
+      return sendJson(res, 200, { success: true });
+    }
+    // #endregion
+    // #endregion
+
+    // #region Invoice API Routes
+
+    // GET /api/invoices - Get all invoices for current user
+    if (requestPath === "/api/invoices" && req.method === "GET") {
+      const userEmail = await authenticateUser(req);
+      if (!userEmail) {
+        return sendJson(res, 401, { error: "Not authenticated. Please connect Google account." });
+      }
+      const invoices = await getUserInvoices(userEmail);
+      return sendJson(res, 200, { invoices });
+    }
+
+    // POST /api/invoices - Create or update invoice
+    if (requestPath === "/api/invoices" && req.method === "OPTIONS") {
+      return sendCors(res);
+    }
+    if (requestPath === "/api/invoices" && req.method === "POST") {
+      if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+
+      const userEmail = await authenticateUser(req);
+      if (!userEmail) {
+        return sendJson(res, 401, { error: "Not authenticated" });
+      }
+
+      const { invoice } = body;
+      if (!invoice || !invoice.id) {
+        return sendJson(res, 400, { error: "Invalid invoice data" });
+      }
+
+      let success = false;
+      if (isConnected) {
+        // MongoDB Single Save
+        success = await saveSingleInvoice(userEmail, invoice);
+      } else {
+        // FS Legacy Bulk Save
+        const invoices = await getUserInvoices(userEmail); // Fallback to FS
+        const existingIndex = invoices.findIndex(inv => inv.id === invoice.id);
+        if (existingIndex >= 0) invoices[existingIndex] = invoice;
+        else invoices.push(invoice);
+        success = saveUserInvoices_FS(userEmail, invoices);
+      }
+
+      if (success) {
+        console.log(`[Storage] Saved invoice ${invoice.invoiceNumber} for ${userEmail}`);
+        return sendJson(res, 200, { success: true, invoice });
+      } else {
+        return sendJson(res, 500, { error: "Failed to save invoice" });
+      }
+    });
   }
 
-  // Check Auth Status (Replace 'status' with 'me')
-  if (requestPath === "/api/me" && req.method === "GET") {
+// DELETE /api/invoices/:id - Delete invoice
+if (requestPath.startsWith("/api/invoices/") && req.method === "DELETE") {
+    const invoiceId = requestPath.split("/api/invoices/")[1];
     const userEmail = await authenticateUser(req);
-    if (userEmail) {
-      return sendJson(res, 200, { authenticated: true, email: userEmail });
+
+    if (!userEmail) {
+      return sendJson(res, 401, { error: "Not authenticated" });
+    }
+
+    if (isConnected) {
+      try {
+        await InvoiceModel.deleteOne({ userEmail, id: invoiceId });
+        return sendJson(res, 200, { success: true });
+      } catch (e) {
+        return sendJson(res, 500, { error: "Failed to delete" });
+      }
     } else {
-      return sendJson(res, 200, { authenticated: false });
+      const invoices = await getUserInvoices(userEmail);
+      const filteredInvoices = invoices.filter(inv => inv.id !== invoiceId);
+      if (filteredInvoices.length === invoices.length) {
+        return sendJson(res, 404, { error: "Invoice not found" });
+      }
+      const success = saveUserInvoices_FS(userEmail, filteredInvoices);
+      return success ? sendJson(res, 200, { success: true }) : sendJson(res, 500, { error: "Failed to delete" });
     }
   }
-
-  // Logout
-  if (requestPath === "/auth/logout" && req.method === "POST") {
-    res.setHeader('Set-Cookie', cookie.serialize('auth_token', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      expires: new Date(0), // Expire immediately
-      path: '/'
-    }));
-    return sendJson(res, 200, { success: true });
-  }
-
-  if (requestPath === "/auth/google/status" && req.method === "GET") {
-    // Legacy support or just redirect to /api/me logic
-    const userEmail = await authenticateUser(req);
-    return sendJson(res, 200, { connected: !!userEmail, email: userEmail });
-  }
-
-  if (requestPath === "/auth/google/disconnect" && req.method === "POST") {
-    // Treat specific disconnect as Logout
-    const userEmail = await authenticateUser(req);
-    if (isConnected && userEmail) {
-      await TokenModel.deleteOne({ userEmail }); // Optional: Delete tokens on explicit disconnect
-    }
-    res.setHeader('Set-Cookie', cookie.serialize('auth_token', '', {
-      httpOnly: true,
-      path: '/',
-      expires: new Date(0)
-    }));
-    return sendJson(res, 200, { success: true });
-  }
-  // #endregion
   // #endregion
 
-  // #region Invoice API Routes
+  // #region Items Database API Routes
 
-  // GET /api/invoices - Get all invoices for current user
-  if (requestPath === "/api/invoices" && req.method === "GET") {
+  // GET /api/items - Get all items for current user
+  if (requestPath === "/api/items" && req.method === "GET") {
     const userEmail = await authenticateUser(req);
     if (!userEmail) {
       return sendJson(res, 401, { error: "Not authenticated. Please connect Google account." });
     }
-    const invoices = await getUserInvoices(userEmail);
-    return sendJson(res, 200, { invoices });
+    const items = getUserItems(userEmail);
+    return sendJson(res, 200, { items });
   }
 
-  // POST /api/invoices - Create or update invoice
-  if (requestPath === "/api/invoices" && req.method === "OPTIONS") {
+  // POST /api/items - Save or update item
+  if (requestPath === "/api/items" && req.method === "OPTIONS") {
     return sendCors(res);
   }
-  if (requestPath === "/api/invoices" && req.method === "POST") {
-    if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+  if (requestPath === "/api/items" && req.method === "POST") {
+    return readJsonBody(req, (err, body) => {
+      if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
 
-    const userEmail = await authenticateUser(req);
-    if (!userEmail) {
-      return sendJson(res, 401, { error: "Not authenticated" });
-    }
-
-    const { invoice } = body;
-    if (!invoice || !invoice.id) {
-      return sendJson(res, 400, { error: "Invalid invoice data" });
-    }
-
-    let success = false;
-    if (isConnected) {
-      // MongoDB Single Save
-      success = await saveSingleInvoice(userEmail, invoice);
-    } else {
-      // FS Legacy Bulk Save
-      const invoices = await getUserInvoices(userEmail); // Fallback to FS
-      const existingIndex = invoices.findIndex(inv => inv.id === invoice.id);
-      if (existingIndex >= 0) invoices[existingIndex] = invoice;
-      else invoices.push(invoice);
-      success = saveUserInvoices_FS(userEmail, invoices);
-    }
-
-    if (success) {
-      console.log(`[Storage] Saved invoice ${invoice.invoiceNumber} for ${userEmail}`);
-      return sendJson(res, 200, { success: true, invoice });
-    } else {
-      return sendJson(res, 500, { error: "Failed to save invoice" });
-    }
-  });
-}
-
-// DELETE /api/invoices/:id - Delete invoice
-if (requestPath.startsWith("/api/invoices/") && req.method === "DELETE") {
-  const invoiceId = requestPath.split("/api/invoices/")[1];
-  const userEmail = await authenticateUser(req);
-
-  if (!userEmail) {
-    return sendJson(res, 401, { error: "Not authenticated" });
-  }
-
-  if (isConnected) {
-    try {
-      await InvoiceModel.deleteOne({ userEmail, id: invoiceId });
-      return sendJson(res, 200, { success: true });
-    } catch (e) {
-      return sendJson(res, 500, { error: "Failed to delete" });
-    }
-  } else {
-    const invoices = await getUserInvoices(userEmail);
-    const filteredInvoices = invoices.filter(inv => inv.id !== invoiceId);
-    if (filteredInvoices.length === invoices.length) {
-      return sendJson(res, 404, { error: "Invoice not found" });
-    }
-    const success = saveUserInvoices_FS(userEmail, filteredInvoices);
-    return success ? sendJson(res, 200, { success: true }) : sendJson(res, 500, { error: "Failed to delete" });
-  }
-}
-// #endregion
-
-// #region Items Database API Routes
-
-// GET /api/items - Get all items for current user
-if (requestPath === "/api/items" && req.method === "GET") {
-  const userEmail = await authenticateUser(req);
-  if (!userEmail) {
-    return sendJson(res, 401, { error: "Not authenticated. Please connect Google account." });
-  }
-  const items = getUserItems(userEmail);
-  return sendJson(res, 200, { items });
-}
-
-// POST /api/items - Save or update item
-if (requestPath === "/api/items" && req.method === "OPTIONS") {
-  return sendCors(res);
-}
-if (requestPath === "/api/items" && req.method === "POST") {
-  return readJsonBody(req, (err, body) => {
-    if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
-
-    const userEmail = await authenticateUser(req);
-    if (!userEmail) {
-      return sendJson(res, 401, { error: "Not authenticated" });
-    }
-
-    const { item } = body;
-    if (!item || !item.name) {
-      return sendJson(res, 400, { error: "Invalid item data" });
-    }
-
-    const success = saveUserItem(userEmail, item);
-    if (success) {
-      console.log(`[Storage] Saved item ${item.name} for ${userEmail}`);
-      return sendJson(res, 200, { success: true, item });
-    } else {
-      return sendJson(res, 500, { error: "Failed to save item" });
-    }
-  });
-}
-// #endregion
-
-// #region Settings Storage Helper Functions
-/**
- * Get the settings file path for a specific user
- */
-function getUserSettingsPath(userEmail) {
-  if (!userEmail) return null;
-  const safeEmail = userEmail.replace(/[^a-z0-9@._-]/gi, '_');
-  const userDir = path.join(dataDir, safeEmail);
-  if (!fs.existsSync(userDir)) {
-    fs.mkdirSync(userDir, { recursive: true });
-  }
-  return path.join(userDir, 'settings.json');
-}
-
-/**
- * Get settings for a user
- */
-/**
- * Get settings for a user
- */
-async function getUserSettings(userEmail) {
-  if (isConnected) {
-    try {
-      let doc = await SettingsModel.findOne({ userEmail }).lean();
-
-      // Auto-Migration: If DB is empty but FS has data, import it once.
-      if (!doc && userEmail) {
-        const filePath = getUserSettingsPath(userEmail);
-        if (filePath && fs.existsSync(filePath)) {
-          try {
-            const localData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-            if (localData && Object.keys(localData).length > 0) {
-              console.log(`[Storage] Migrating settings from FS to MongoDB for ${userEmail}`);
-              await SettingsModel.findOneAndUpdate(
-                { userEmail },
-                { ...localData, userEmail, updatedAt: new Date() },
-                { upsert: true, new: true }
-              );
-              doc = await SettingsModel.findOne({ userEmail }).lean();
-            }
-          } catch (fsErr) {
-            console.error('[Storage] Settings Migration failed:', fsErr);
-          }
-        }
+      const userEmail = await authenticateUser(req);
+      if (!userEmail) {
+        return sendJson(res, 401, { error: "Not authenticated" });
       }
 
-      return doc || {};
-    } catch (e) { return {}; }
-  }
+      const { item } = body;
+      if (!item || !item.name) {
+        return sendJson(res, 400, { error: "Invalid item data" });
+      }
 
-  const filePath = getUserSettingsPath(userEmail);
-  if (!filePath || !fs.existsSync(filePath)) {
-    return {};
-  }
-  try {
-    const data = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(data);
-  } catch (e) {
-    return {};
-  }
-}
-
-/**
- * Save settings for a user
- */
-async function saveUserSettings(userEmail, settings) {
-  if (isConnected) {
-    try {
-      await SettingsModel.findOneAndUpdate(
-        { userEmail },
-        { ...settings, userEmail, updatedAt: new Date() },
-        { upsert: true, new: true }
-      );
-      return true;
-    } catch (e) { return false; }
-  }
-
-  const filePath = getUserSettingsPath(userEmail);
-  if (!filePath) return false;
-  try {
-    fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf8');
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-// #endregion
-
-// #region Settings API Routes
-// GET /api/settings - Get settings for current user
-if (requestPath === "/api/settings" && req.method === "GET") {
-  const userEmail = await authenticateUser(req);
-  if (!userEmail) {
-    return sendJson(res, 401, { error: "Not authenticated" });
-  }
-  const settings = await getUserSettings(userEmail);
-  return sendJson(res, 200, { settings });
-}
-
-// POST /api/settings - Save settings
-if (requestPath === "/api/settings" && req.method === "OPTIONS") {
-  return sendCors(res);
-}
-if (requestPath === "/api/settings" && req.method === "POST") {
-  return readJsonBody(req, (err, body) => {
-    if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
-
-    const userEmail = await authenticateUser(req);
-    if (!userEmail) {
-      return sendJson(res, 401, { error: "Not authenticated" });
-    }
-
-    const { settings } = body;
-    if (!settings) {
-      return sendJson(res, 400, { error: "Invalid settings data" });
-    }
-
-    const success = saveUserSettings(userEmail, settings);
-    if (success) {
-      console.log(`[Storage] Saved settings for ${userEmail}`);
-      return sendJson(res, 200, { success: true, settings });
-    } else {
-      return sendJson(res, 500, { error: "Failed to save settings" });
-    }
-  });
-}
-// #endregion
-
-// #region Email Sending
-if (requestPath === "/api/email/send" && req.method === "OPTIONS") {
-  return sendCors(res);
-}
-if (requestPath === "/api/email/send" && req.method === "POST") {
-  return readJsonBody(req, async (err, body) => {
-    if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
-
-    const { to, cc, subject, text, pdfBase64, filename, useGoogle } = body;
-    console.log(`[Email] Request received to: ${to}, cc: ${cc}, subject: ${subject}, useGoogle: ${useGoogle}`);
-
-    try {
-      try {
-        let nodemailer;
-        try {
-          nodemailer = require("nodemailer");
-        } catch (e) {
-          console.error("[Email] Nodemailer missing");
-          return sendJson(res, 501, {
-            error: "nodemailer not installed",
-            message: "Run 'npm install nodemailer'"
-          });
-        }
-
-        const userEmail = await authenticateUser(req);
-        if (!userEmail) {
-          return sendJson(res, 401, { error: "Not authenticated. Please Login." });
-        }
-
-        if (!useGoogle) {
-          return sendJson(res, 501, { error: "Only Google SMTP is currently supported in this version." });
-        }
-
-        let userTokens = null;
-        if (isConnected) {
-          const tokenDoc = await TokenModel.findOne({ userEmail });
-          if (tokenDoc && tokenDoc.tokens) {
-            userTokens = tokenDoc.tokens;
-          }
-        }
-
-        if (!userTokens || !userTokens.refresh_token) {
-          return sendJson(res, 401, { error: "Missing Google Credentials for User. Please Re-Connect in Settings." });
-        }
-
-        const sendOAuthClient = getOAuthClient(req);
-        sendOAuthClient.setCredentials(userTokens);
-
-        try {
-          // Force token refresh if needed
-          const accessTokenResponse = await sendOAuthClient.getAccessToken();
-          const accessToken = accessTokenResponse.token;
-
-          if (!accessToken) {
-            throw new Error("Failed to generate access token");
-          }
-
-          console.log(`[Email] Sending as ${userEmail}`);
-
-          transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-              type: 'OAuth2',
-              user: userEmail,
-              clientId: GOOGLE_CLIENT_ID,
-              clientSecret: GOOGLE_CLIENT_SECRET,
-              refreshToken: userTokens.refresh_token,
-              accessToken: accessToken
-            }
-          });
-
-        } catch (oauthError) {
-          console.error("[Email] OAuth token refresh failed:", oauthError.message);
-          return sendJson(res, 401, { error: "Google Auth expired or invalid. Please reconnect in Settings." });
-        }
-
-        const info = await transporter.sendMail({
-          from: userEmail ? `"Invoice Maker" <${userEmail}>` : undefined,
-          to,
-          cc,
-          subject,
-          html: body.html || text, // Support html body if passed
-          attachments: [
-            {
-              filename: filename || "invoice.pdf",
-              content: pdfBase64.split("base64,")[1],
-              encoding: "base64"
-            }
-          ]
-        });
-
-        console.log("[Email] Sent: %s", info.messageId);
-        sendJson(res, 200, {
-          success: true,
-          message: "Email sent successfully"
-        });
-
-      } catch (error) {
-        console.error("[Email] Sending Error:", error);
-        // If it's an auth error from Gmail/Nodemailer, return 401 so frontend knows to re-auth
-        if (error.code === 'EAUTH' || error.response?.includes('Authentication')) {
-          return sendJson(res, 401, { error: "Authentication failed. Please reconnect Google account." });
-        }
-        sendJson(res, 500, { error: "Failed to send email", details: error.message });
+      const success = saveUserItem(userEmail, item);
+      if (success) {
+        console.log(`[Storage] Saved item ${item.name} for ${userEmail}`);
+        return sendJson(res, 200, { success: true, item });
+      } else {
+        return sendJson(res, 500, { error: "Failed to save item" });
       }
     });
-}
-// #endregion
+  }
+  // #endregion
 
-// Static file serving for React App (invoice-react/dist)
-const distDir = path.join(__dirname, "invoice-react", "dist");
-let filePath = path.join(distDir, requestPath);
-
-// Prevent directory traversal
-if (!filePath.startsWith(distDir)) {
-  return sendNotFound(res);
-}
-
-fs.stat(filePath, (err, stats) => {
-  if (err || !stats.isFile()) {
-    // SPA Fallback: Serve index.html for non-API routes
-    if (!requestPath.startsWith("/api")) {
-      const indexHtml = path.join(distDir, "index.html");
-      fs.readFile(indexHtml, (err, content) => {
-        if (err) {
-          return sendNotFound(res);
-        }
-        res.writeHead(200, { "Content-Type": "text/html" });
-        res.end(content);
-      });
-      return;
+  // #region Settings Storage Helper Functions
+  /**
+   * Get the settings file path for a specific user
+   */
+  function getUserSettingsPath(userEmail) {
+    if (!userEmail) return null;
+    const safeEmail = userEmail.replace(/[^a-z0-9@._-]/gi, '_');
+    const userDir = path.join(dataDir, safeEmail);
+    if (!fs.existsSync(userDir)) {
+      fs.mkdirSync(userDir, { recursive: true });
     }
-    // API 404
-    console.log(`[Server] 404 Not Found for API path: ${requestPath}`);
-    return sendJson(res, 404, { error: "Not Found", path: requestPath, note: "Handled by server.js fallback" });
+    return path.join(userDir, 'settings.json');
   }
 
-  const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes = {
-    ".html": "text/html",
-    ".js": "application/javascript",
-    ".css": "text/css",
-    ".json": "application/json",
-    ".png": "image/png",
-    ".jpg": "image/jpg",
-    ".svg": "image/svg+xml",
-    ".ico": "image/x-icon"
-  };
-  const contentType = mimeTypes[ext] || "application/octet-stream";
-  res.writeHead(200, {
-    "Content-Type": contentType,
-    "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
+  /**
+   * Get settings for a user
+   */
+  /**
+   * Get settings for a user
+   */
+  async function getUserSettings(userEmail) {
+    if (isConnected) {
+      try {
+        let doc = await SettingsModel.findOne({ userEmail }).lean();
+
+        // Auto-Migration: If DB is empty but FS has data, import it once.
+        if (!doc && userEmail) {
+          const filePath = getUserSettingsPath(userEmail);
+          if (filePath && fs.existsSync(filePath)) {
+            try {
+              const localData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+              if (localData && Object.keys(localData).length > 0) {
+                console.log(`[Storage] Migrating settings from FS to MongoDB for ${userEmail}`);
+                await SettingsModel.findOneAndUpdate(
+                  { userEmail },
+                  { ...localData, userEmail, updatedAt: new Date() },
+                  { upsert: true, new: true }
+                );
+                doc = await SettingsModel.findOne({ userEmail }).lean();
+              }
+            } catch (fsErr) {
+              console.error('[Storage] Settings Migration failed:', fsErr);
+            }
+          }
+        }
+
+        return doc || {};
+      } catch (e) { return {}; }
+    }
+
+    const filePath = getUserSettingsPath(userEmail);
+    if (!filePath || !fs.existsSync(filePath)) {
+      return {};
+    }
+    try {
+      const data = fs.readFileSync(filePath, 'utf8');
+      return JSON.parse(data);
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /**
+   * Save settings for a user
+   */
+  async function saveUserSettings(userEmail, settings) {
+    if (isConnected) {
+      try {
+        await SettingsModel.findOneAndUpdate(
+          { userEmail },
+          { ...settings, userEmail, updatedAt: new Date() },
+          { upsert: true, new: true }
+        );
+        return true;
+      } catch (e) { return false; }
+    }
+
+    const filePath = getUserSettingsPath(userEmail);
+    if (!filePath) return false;
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf8');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  // #endregion
+
+  // #region Settings API Routes
+  // GET /api/settings - Get settings for current user
+  if (requestPath === "/api/settings" && req.method === "GET") {
+    const userEmail = await authenticateUser(req);
+    if (!userEmail) {
+      return sendJson(res, 401, { error: "Not authenticated" });
+    }
+    const settings = await getUserSettings(userEmail);
+    return sendJson(res, 200, { settings });
+  }
+
+  // POST /api/settings - Save settings
+  if (requestPath === "/api/settings" && req.method === "OPTIONS") {
+    return sendCors(res);
+  }
+  if (requestPath === "/api/settings" && req.method === "POST") {
+    return readJsonBody(req, (err, body) => {
+      if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+
+      const userEmail = await authenticateUser(req);
+      if (!userEmail) {
+        return sendJson(res, 401, { error: "Not authenticated" });
+      }
+
+      const { settings } = body;
+      if (!settings) {
+        return sendJson(res, 400, { error: "Invalid settings data" });
+      }
+
+      const success = saveUserSettings(userEmail, settings);
+      if (success) {
+        console.log(`[Storage] Saved settings for ${userEmail}`);
+        return sendJson(res, 200, { success: true, settings });
+      } else {
+        return sendJson(res, 500, { error: "Failed to save settings" });
+      }
+    });
+  }
+  // #endregion
+
+  // #region Email Sending
+  if (requestPath === "/api/email/send" && req.method === "OPTIONS") {
+    return sendCors(res);
+  }
+  if (requestPath === "/api/email/send" && req.method === "POST") {
+    return readJsonBody(req, async (err, body) => {
+      if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+
+      const { to, cc, subject, text, pdfBase64, filename, useGoogle } = body;
+      console.log(`[Email] Request received to: ${to}, cc: ${cc}, subject: ${subject}, useGoogle: ${useGoogle}`);
+
+      try {
+        try {
+          let nodemailer;
+          try {
+            nodemailer = require("nodemailer");
+          } catch (e) {
+            console.error("[Email] Nodemailer missing");
+            return sendJson(res, 501, {
+              error: "nodemailer not installed",
+              message: "Run 'npm install nodemailer'"
+            });
+          }
+
+          const userEmail = await authenticateUser(req);
+          if (!userEmail) {
+            return sendJson(res, 401, { error: "Not authenticated. Please Login." });
+          }
+
+          if (!useGoogle) {
+            return sendJson(res, 501, { error: "Only Google SMTP is currently supported in this version." });
+          }
+
+          let userTokens = null;
+          if (isConnected) {
+            const tokenDoc = await TokenModel.findOne({ userEmail });
+            if (tokenDoc && tokenDoc.tokens) {
+              userTokens = tokenDoc.tokens;
+            }
+          }
+
+          if (!userTokens || !userTokens.refresh_token) {
+            return sendJson(res, 401, { error: "Missing Google Credentials for User. Please Re-Connect in Settings." });
+          }
+
+          const sendOAuthClient = getOAuthClient(req);
+          sendOAuthClient.setCredentials(userTokens);
+
+          try {
+            // Force token refresh if needed
+            const accessTokenResponse = await sendOAuthClient.getAccessToken();
+            const accessToken = accessTokenResponse.token;
+
+            if (!accessToken) {
+              throw new Error("Failed to generate access token");
+            }
+
+            console.log(`[Email] Sending as ${userEmail}`);
+
+            transporter = nodemailer.createTransport({
+              service: 'gmail',
+              auth: {
+                type: 'OAuth2',
+                user: userEmail,
+                clientId: GOOGLE_CLIENT_ID,
+                clientSecret: GOOGLE_CLIENT_SECRET,
+                refreshToken: userTokens.refresh_token,
+                accessToken: accessToken
+              }
+            });
+
+          } catch (oauthError) {
+            console.error("[Email] OAuth token refresh failed:", oauthError.message);
+            return sendJson(res, 401, { error: "Google Auth expired or invalid. Please reconnect in Settings." });
+          }
+
+          const info = await transporter.sendMail({
+            from: userEmail ? `"Invoice Maker" <${userEmail}>` : undefined,
+            to,
+            cc,
+            subject,
+            html: body.html || text, // Support html body if passed
+            attachments: [
+              {
+                filename: filename || "invoice.pdf",
+                content: pdfBase64.split("base64,")[1],
+                encoding: "base64"
+              }
+            ]
+          });
+
+          console.log("[Email] Sent: %s", info.messageId);
+          sendJson(res, 200, {
+            success: true,
+            message: "Email sent successfully"
+          });
+
+        } catch (error) {
+          console.error("[Email] Sending Error:", error);
+          // If it's an auth error from Gmail/Nodemailer, return 401 so frontend knows to re-auth
+          if (error.code === 'EAUTH' || error.response?.includes('Authentication')) {
+            return sendJson(res, 401, { error: "Authentication failed. Please reconnect Google account." });
+          }
+          sendJson(res, 500, { error: "Failed to send email", details: error.message });
+        }
+      });
+  }
+  // #endregion
+
+  // Static file serving for React App (invoice-react/dist)
+  const distDir = path.join(__dirname, "invoice-react", "dist");
+  let filePath = path.join(distDir, requestPath);
+
+  // Prevent directory traversal
+  if (!filePath.startsWith(distDir)) {
+    return sendNotFound(res);
+  }
+
+  fs.stat(filePath, (err, stats) => {
+    if (err || !stats.isFile()) {
+      // SPA Fallback: Serve index.html for non-API routes
+      if (!requestPath.startsWith("/api")) {
+        const indexHtml = path.join(distDir, "index.html");
+        fs.readFile(indexHtml, (err, content) => {
+          if (err) {
+            return sendNotFound(res);
+          }
+          res.writeHead(200, { "Content-Type": "text/html" });
+          res.end(content);
+        });
+        return;
+      }
+      // API 404
+      console.log(`[Server] 404 Not Found for API path: ${requestPath}`);
+      return sendJson(res, 404, { error: "Not Found", path: requestPath, note: "Handled by server.js fallback" });
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes = {
+      ".html": "text/html",
+      ".js": "application/javascript",
+      ".css": "text/css",
+      ".json": "application/json",
+      ".png": "image/png",
+      ".jpg": "image/jpg",
+      ".svg": "image/svg+xml",
+      ".ico": "image/x-icon"
+    };
+    const contentType = mimeTypes[ext] || "application/octet-stream";
+    res.writeHead(200, {
+      "Content-Type": contentType,
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
+    });
+    fs.createReadStream(filePath).pipe(res);
   });
-  fs.createReadStream(filePath).pipe(res);
-});
+} catch (globalError) {
+  console.error("Global Server Crash:", globalError);
+  if (!res.headersSent) {
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Critical Server Error", details: globalError.message, stack: globalError.stack }));
+  }
+}
 };
 
 // Start server if run directly (Local Dev)
