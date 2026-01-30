@@ -2,6 +2,9 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+// Load environment variables immediately
+require('dotenv').config();
+
 const zlib = require("zlib");
 
 const jwt = require('jsonwebtoken');
