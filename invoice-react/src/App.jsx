@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
+import LoginGate from './components/LoginGate'
 import Header from './components/Header'
 import InvoiceForm from './components/InvoiceForm'
 import InvoiceList from './components/InvoiceList'
 import Settings from './components/Settings'
-import LoginPage from './components/LoginPage'
 import { getNextInvoiceCounter, loadData, saveInvoice, deleteInvoice } from './utils/storage'
 import { languages } from './utils/i18n'
 
@@ -17,8 +17,6 @@ function App() {
     const [defaultSupplier, setDefaultSupplier] = useState(null)
     const [currentView, setCurrentView] = useState('invoices')
     const [isLoading, setIsLoading] = useState(true)
-    const [isAuthenticated, setIsAuthenticated] = useState(false)
-    const [isAuthChecking, setIsAuthChecking] = useState(true)
 
     const t = languages[lang]
 
@@ -52,85 +50,94 @@ function App() {
     }
 
     // Load invoices and settings from server on mount
-    // Check Auth and Load Data (but don't require it)
     useEffect(() => {
-        const checkAuthAndLoad = async () => {
-            setIsAuthChecking(true)
+        const loadInitialData = async () => {
+            await fetchInvoices()
+
+            // 2. Load Settings (Supplier Profile)
             try {
-                // 1. Check Session
-                const authRes = await fetch('/api/me')
-                const authData = await authRes.json()
-
-                if (authData.authenticated) {
-                    setIsAuthenticated(true)
-
-                    // 2. Load Invoices from server
-                    await fetchInvoices()
-
-                    // 3. Load Settings
-                    try {
-                        const res = await fetch('/api/settings')
-                        if (res.ok) {
-                            const { settings } = await res.json()
-                            if (settings && Object.keys(settings).length > 0) {
-                                setDefaultSupplier(settings)
-                            }
-                        }
-                    } catch (e) { console.error("Failed to load settings", e) }
-
-                } else {
-                    // Not authenticated - that's OK! User can still use the app locally
-                    setIsAuthenticated(false)
-                    // Load from localStorage for offline mode
-                    const localInvoices = localStorage.getItem('local_invoices')
-                    if (localInvoices) {
-                        try {
-                            const parsed = JSON.parse(localInvoices)
-                            setInvoices(parsed)
-                            const nextCounter = getNextInvoiceCounter(parsed)
-                            setInvoiceCounter(nextCounter)
-                        } catch (e) {
-                            console.error('Failed to load local invoices', e)
+                // Check for tokens first to avoid 401 spam if not logged in
+                const tokensStr = localStorage.getItem('google_tokens')
+                if (tokensStr) {
+                    const res = await fetch('/api/settings')
+                    if (res.ok) {
+                        const { settings } = await res.json()
+                        if (settings && Object.keys(settings).length > 0) {
+                            setDefaultSupplier(settings)
+                            console.log('Loaded settings from server', settings)
+                        } else {
+                            // Fallback to local storage if server is empty (first sync)
+                            const savedSupplier = localStorage.getItem('defaultSupplier')
+                            if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
                         }
                     }
+                } else {
+                    // Fallback to local storage if not logged in
+                    const savedSupplier = localStorage.getItem('defaultSupplier')
+                    if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
                 }
-            } catch (e) {
-                console.error("Auth check failed", e)
-                setIsAuthenticated(false)
-            } finally {
-                setIsAuthChecking(false)
+            } catch (err) {
+                console.error('Failed to load settings:', err)
+                // Fallback
+                const savedSupplier = localStorage.getItem('defaultSupplier')
+                if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
             }
         }
 
-        checkAuthAndLoad()
+        loadInitialData()
 
-        // Handle success from LoginPage
-        const handleLoginSuccess = async () => {
-            // Re-run the full check to load data
-            checkAuthAndLoad()
+        // Listen for Google Login to auto-fill email and reload data
+        const handleGoogleLogin = async () => {
+            const tokensStr = localStorage.getItem('google_tokens')
+
+            // Reload invoices regardless of login or logout (if logout, it fetches public/empty)
+            await fetchInvoices()
+
+            if (tokensStr) {
+                // Reload settings from server after login
+                fetch('/api/settings').then(res => {
+                    if (res.ok) return res.json()
+                }).then(data => {
+                    if (data?.settings) setDefaultSupplier(data.settings)
+                })
+
+                // Try to get email from localStorage (Settings.jsx saves it there now in smtpConfig)
+                const smtpConfig = localStorage.getItem('smtpConfig')
+                if (smtpConfig) {
+                    const { fromEmail } = JSON.parse(smtpConfig)
+                    if (fromEmail) {
+                        setDefaultSupplier(prev => {
+                            if (!prev || !prev.email) {
+                                return { ...prev, email: fromEmail }
+                            }
+                            return prev
+                        })
+                    }
+                }
+            } else {
+                // Explicit logout handling - clear sensitive data if needed, but fetchInvoices handles the list
+                setInvoices([])
+            }
         }
-
-        // Listen for global login events (e.g. from Settings reconnection or LoginPage)
-        window.addEventListener('google_login_update', handleLoginSuccess)
-        return () => window.removeEventListener('google_login_update', handleLoginSuccess)
+        window.addEventListener('google_login_update', handleGoogleLogin)
+        return () => window.removeEventListener('google_login_update', handleGoogleLogin)
     }, [])
 
-    // Save local settings to localStorage (only preferences)
+    // Save local settings to localStorage (not server)
     useEffect(() => {
         localStorage.setItem('lang', lang)
-        // localStorage.setItem('defaultSupplier', JSON.stringify(defaultSupplier)) // Don't cache supplier locally for security? Or maybe ok.
-        // Let's keep caching for offline fallback visual consistency?
-        // Actually, for multi-user, local storage shared is BAD.
-        // We should clear supplier from local storage or namespace it?
-        // For now, let's NOT save defaultSupplier to global localStorage to avoid leaking to other users on same PC
+        localStorage.setItem('defaultSupplier', JSON.stringify(defaultSupplier))
         localStorage.setItem('categories', JSON.stringify(categories))
-    }, [lang, categories])
+        // invoiceCounter is now dynamic, no need to save to localStorage
+    }, [lang, defaultSupplier, categories])
 
     const selectedInvoice = invoices.find(inv => inv.id === selectedId)
 
     const handleSaveInvoice = async (invoice) => {
         try {
-            // Update local state first
+            await saveInvoice(invoice)
+
+            // Update local state
             const existingIndex = invoices.findIndex(inv => inv.id === invoice.id)
             let updatedInvoices = [...invoices]
 
@@ -143,15 +150,6 @@ function App() {
 
             setInvoices(updatedInvoices)
 
-            // Save based on authentication status
-            if (isAuthenticated) {
-                // Save to server if logged in
-                await saveInvoice(invoice)
-            } else {
-                // Save to localStorage if not logged in
-                localStorage.setItem('local_invoices', JSON.stringify(updatedInvoices))
-            }
-
             // Recalculate counter
             setInvoiceCounter(getNextInvoiceCounter(updatedInvoices))
 
@@ -162,12 +160,7 @@ function App() {
                 setCategories([...categories, invoice.category].sort())
             }
         } catch (error) {
-            // Only show error if we were trying to save to server
-            if (isAuthenticated) {
-                alert(t.alertError || 'Failed to save invoice to server')
-            } else {
-                console.error('Local save error:', error)
-            }
+            alert(t.alertError || 'Failed to save invoice')
         }
     }
 
@@ -175,24 +168,13 @@ function App() {
         if (!window.confirm(lang === 'cs' ? 'Smazat fakturu?' : 'Delete invoice?')) return
 
         try {
-            const updatedInvoices = invoices.filter(inv => inv.id !== id)
-            setInvoices(updatedInvoices)
-
-            if (isAuthenticated) {
-                // Delete from server if logged in
-                await deleteInvoice(id)
-            } else {
-                // Update localStorage if not logged in
-                localStorage.setItem('local_invoices', JSON.stringify(updatedInvoices))
-            }
-
+            await deleteInvoice(id)
+            setInvoices(invoices.filter(inv => inv.id !== id))
             if (selectedId === id) {
                 setSelectedId(null)
             }
         } catch (error) {
-            if (isAuthenticated) {
-                alert(t.alertError || 'Failed to delete invoice')
-            }
+            alert(t.alertError || 'Failed to delete invoice')
         }
     }
 
@@ -207,16 +189,8 @@ function App() {
         }
     }
 
-    if (isAuthChecking) {
-        return (
-            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '100px' }}>
-                Loading...
-            </div>
-        )
-    }
-
     return (
-        <>
+        <LoginGate>
             <Header
                 onNewInvoice={handleNewInvoice}
                 lang={lang}
@@ -247,7 +221,6 @@ function App() {
                             t={t}
                             defaultSupplier={defaultSupplier}
                             setDefaultSupplier={setDefaultSupplier}
-                            isAuthenticated={isAuthenticated}
                         />
                         <div>
                             <InvoiceList
@@ -263,7 +236,7 @@ function App() {
                     </>
                 )}
             </main>
-        </>
+        </LoginGate>
     )
 }
 

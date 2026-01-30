@@ -1,0 +1,8 @@
+git add server.js
+git commit -m "fix: resolve async/await syntax errors causing 500 server errors
+
+- Added 'async' keyword to POST /api/items callback
+- Added 'await' to getUserItems() call in GET /api/items  
+- Removed redundant try block in email send handler
+- Fixed nested try/catch syntax causing deployment crash"
+git push origin main

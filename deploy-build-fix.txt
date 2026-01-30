@@ -1,0 +1,8 @@
+git add vercel.json
+git commit -m "fix: add build command to vercel.json to compile React app
+
+Root cause: Vercel was serving raw .jsx source files instead of compiled bundle
+- Added buildCommand to install dependencies and build React app
+- Fixes 'Unexpected token export' syntax errors
+- Resolves 500 errors caused by unbundled frontend code"
+git push origin main

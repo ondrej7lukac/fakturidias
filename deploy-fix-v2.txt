@@ -1,0 +1,7 @@
+git add vercel.json
+git commit -m "fix: simplify vercel.json to use root package.json build script
+
+- Removed custom installCommand and buildCommand
+- Vercel will now use the 'npm run build' from root package.json
+- Root build script already configured to build React app in subdirectory"
+git push origin main
