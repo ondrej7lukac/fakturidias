@@ -202,16 +202,16 @@ const SCOPES = [
 
 let googleAuthAvailable = false;
 try {
-  require('googleapis');
+  require('google-auth-library');
   googleAuthAvailable = true;
 } catch (e) {
-  console.warn("googleapis not installed or failed to load");
+  console.warn("google-auth-library not installed or failed to load");
 }
 
 const getOAuthClient = (req) => {
   if (!googleAuthAvailable) return null;
-  const { google } = require('googleapis');
-  return new google.auth.OAuth2(
+  const { OAuth2Client } = require('google-auth-library');
+  return new OAuth2Client(
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
     getRedirectUri(req)
