@@ -708,14 +708,24 @@ const requestHandler = async (req, res) => {
           ? '<h1 style="color: green;">Successfully Connected!</h1><p>Tokens saved to database.</p>'
           : '<h1 style="color: orange;">Connected (Local Only)</h1><p>Warning: Could not save to Database. You may need to whitelist Vercel IPs in MongoDB Atlas.</p>';
 
+        // Pass minimal info to client to update UI state
+        const clientData = JSON.stringify({
+          type: 'GOOGLE_LOGIN_SUCCESS',
+          email: userEmail,
+          tokens: { connected: true, note: "managed_by_server" }
+        });
+
         res.end(`
           <html>
             <body style="font-family: sans-serif; text-align: center; padding: 50px;">
               ${statusMessage}
               <p>Closing window...</p>
               <script>
+                // Notify the opener (React App)
+                if (window.opener) {
+                  window.opener.postMessage(${clientData}, '*');
+                }
                 setTimeout(() => window.close(), 3000);
-                setTimeout(() => window.location.href = '/', 4000);
               </script>
             </body>
           </html>
@@ -730,6 +740,9 @@ const requestHandler = async (req, res) => {
   }
 
   if (requestPath === "/auth/google/status" && req.method === "GET") {
+    if (!oAuth2Client?.credentials?.refresh_token) {
+      await getCurrentUserEmail(); // Try to restore
+    }
     const isConnected = !!(oAuth2Client?.credentials?.refresh_token);
     return sendJson(res, 200, { connected: isConnected });
   }
@@ -1035,6 +1048,12 @@ const requestHandler = async (req, res) => {
           } catch (e) {
             console.warn("[Email] Failed to reload tokens from disk:", e);
           }
+        }
+
+        // 2. If no tokens in Memory/FS, Try restore from DB (Robustness for Serverless)
+        if (!oAuth2Client.credentials || !oAuth2Client.credentials.refresh_token) {
+          console.log("[Email] Tokens missing in memory/FS, attempting DB restore...");
+          await getCurrentUserEmail();
         }
 
         if (!useGoogle || !oAuth2Client.credentials || !oAuth2Client.credentials.refresh_token) {

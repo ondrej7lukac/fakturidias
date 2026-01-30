@@ -18,9 +18,31 @@ export default function Header({ onNewInvoice, lang, setLang, t, currentView, on
         }
     }, [])
 
-    const checkGoogleStatus = () => {
+    const checkGoogleStatus = async () => {
+        // 1. Check Local (Fast DB)
         const tokens = localStorage.getItem('google_tokens')
-        setIsGoogleConnected(!!tokens)
+        if (tokens) {
+            setIsGoogleConnected(true)
+        }
+
+        // 2. data Source of Truth (Server)
+        try {
+            const res = await fetch('/auth/google/status')
+            if (res.ok) {
+                const data = await res.json()
+                setIsGoogleConnected(data.connected)
+
+                // Sync Local Storage state if server says connected but local differs
+                if (data.connected && !tokens) {
+                    localStorage.setItem('google_tokens', JSON.stringify({ connected: true, note: 'synced_from_server' }))
+                } else if (!data.connected && tokens) {
+                    // Server lost auth -> Clear local
+                    localStorage.removeItem('google_tokens')
+                }
+            }
+        } catch (e) {
+            console.error('Failed to check google status', e)
+        }
     }
 
     const handleGoogleLogin = async () => {

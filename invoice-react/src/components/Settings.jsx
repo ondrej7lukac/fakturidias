@@ -26,6 +26,33 @@ export default function Settings({
         if (savedSmtp) {
             setSmtpConfig(JSON.parse(savedSmtp))
         }
+
+        // Sync with Server Status (Source of Truth)
+        fetch('/auth/google/status')
+            .then(res => res.json())
+            .then(data => {
+                setSmtpConfig(prev => {
+                    const shouldBeConnected = data.connected;
+                    // Only update if changed prevents unnecessary renders/writes
+                    if (prev.useGoogle !== shouldBeConnected) {
+                        const newConfig = { ...prev, useGoogle: shouldBeConnected };
+                        localStorage.setItem('smtpConfig', JSON.stringify(newConfig));
+
+                        if (shouldBeConnected) {
+                            localStorage.setItem('google_tokens', JSON.stringify({ connected: true, source: 'server' }));
+                        } else {
+                            localStorage.removeItem('google_tokens');
+                        }
+
+                        // Notify other tabs/components
+                        window.dispatchEvent(new Event('google_login_update'));
+
+                        return newConfig;
+                    }
+                    return prev;
+                });
+            })
+            .catch(e => console.error("Failed to sync auth status in Settings", e));
     }, [])
 
     // Initialize bank details from loaded profile
