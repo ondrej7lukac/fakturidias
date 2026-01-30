@@ -181,7 +181,12 @@ function readJsonBody(req, callback) {
   req.on("end", () => {
     try {
       const parsed = JSON.parse(data || "{}");
-      callback(null, parsed);
+      // Handle both synchronous and asynchronous callbacks safely
+      Promise.resolve(callback(null, parsed)).catch(asyncErr => {
+        console.error("Route Handler Async Error:", asyncErr);
+        // We cannot easily send a response here as 'res' is not passed to readJsonBody,
+        // but preventing the Crash allows the process to stay alive.
+      });
     } catch (error) {
       callback(new Error("Invalid JSON body"));
     }
