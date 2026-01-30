@@ -295,6 +295,41 @@ const connectDB = async () => {
 };
 // #endregion
 
+// #region Session Middleware Setup (CRITICAL FOR MULTI-USER)
+let sessionMiddleware = null;
+
+// Initialize session middleware (async safe)
+if (SESSION_SECRET && MONGODB_URI) {
+  try {
+    sessionMiddleware = session({
+      secret: SESSION_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      store: MongoStore.create({
+        mongoUrl: MONGODB_URI,
+        touchAfter: 24 * 3600, // lazy session update (seconds)
+        crypto: {
+          secret: SESSION_SECRET
+        }
+      }),
+      cookie: {
+        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+        httpOnly: true, // XSS protection
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        sameSite: 'lax' // CSRF protection
+      },
+      name: 'fakturidias.sid' // Custom cookie name
+    });
+    console.log('[Session] Middleware initialized with MongoDB store');
+  } catch (error) {
+    console.error('[Session] Failed to initialize middleware:', error);
+  }
+} else {
+  console.warn('[Session] Middleware NOT initialized - missing SESSION_SECRET or MONGODB_URI');
+  console.warn('[Session] Multi-user authentication will NOT work!');
+}
+// #endregion
+
 // Load saved tokens if exist (Local FS Fallback)
 if (oAuth2Client && fs.existsSync(TOKENS_PATH)) {
   try {
