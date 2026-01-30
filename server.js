@@ -1372,32 +1372,7 @@ const requestHandler = async (req, res) => {
   });
 };
 
-// #region Session Middleware Setup
-// Create session middleware instance
-let sessionMiddleware;
-if (MONGODB_URI && SESSION_SECRET) {
-  sessionMiddleware = session({
-    secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    store: MongoStore.create({
-      mongoUrl: MONGODB_URI,
-      touchAfter: 24 * 3600, // Lazy session update (once per day unless changed)
-      crypto: { secret: SESSION_SECRET }
-    }),
-    cookie: {
-      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-      httpOnly: true, // Prevents XSS attacks
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: 'lax'
-    },
-    name: 'fakturidias.sid' // Custom cookie name
-  });
-  console.log('[Session] Session middleware initialized with MongoDB store');
-} else {
-  console.warn('[Session] Session middleware NOT initialized - missing MONGODB_URI or SESSION_SECRET');
-}
-
+// #region Session Wrapper
 // Wrapper to apply session middleware to request handler
 const requestHandlerWithSession = (req, res) => {
   if (sessionMiddleware) {
