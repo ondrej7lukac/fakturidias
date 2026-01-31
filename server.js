@@ -328,14 +328,12 @@ if (SESSION_SECRET && MONGODB_URI) {
       }),
       cookie: {
         secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-        cookie: {
-          secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-          httpOnly: true, // XSS protection
-          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-          sameSite: 'lax' // Robust for same-domain (Vercel), doesn't fail hard if Secure flag is flaky
-        },
-        name: 'fakturidias.sid' // Custom cookie name
-      });
+        httpOnly: true, // XSS protection
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        sameSite: 'lax' // Robust for same-domain (Vercel), doesn't fail hard if Secure flag is flaky
+      },
+      name: 'fakturidias.sid' // Custom cookie name
+    });
     console.log('[Session Init] ✅ Session middleware initialized successfully');
     console.log('[Session Init] sessionMiddleware is:', typeof sessionMiddleware);
   } catch (error) {
