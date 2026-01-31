@@ -328,12 +328,14 @@ if (SESSION_SECRET && MONGODB_URI) {
       }),
       cookie: {
         secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-        httpOnly: true, // XSS protection
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // 'none' is crucial if frontend/backend are on different subdomains, but 'lax' usually fine for same domain. Sticking to 'none' + secure for max compatibility on Vercel.
-      },
-      name: 'fakturidias.sid' // Custom cookie name
-    });
+        cookie: {
+          secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+          httpOnly: true, // XSS protection
+          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          sameSite: 'lax' // Robust for same-domain (Vercel), doesn't fail hard if Secure flag is flaky
+        },
+        name: 'fakturidias.sid' // Custom cookie name
+      });
     console.log('[Session Init] ✅ Session middleware initialized successfully');
     console.log('[Session Init] sessionMiddleware is:', typeof sessionMiddleware);
   } catch (error) {
