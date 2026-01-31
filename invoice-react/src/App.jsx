@@ -234,8 +234,14 @@ function App() {
                 onLogout={() => {
                     // Call backend to disconnect/clear session
                     fetch('/auth/google/disconnect', { method: 'POST' }).finally(() => {
+                        localStorage.clear() // Explicitly clear local storage as requested
                         setUser(null)
-                        onViewChange('invoices')
+                        setInvoices([])
+                        setDefaultSupplier(null)
+                        setCategories([])
+                        setCurrentView('invoices') // Fixed ReferenceError (was onViewChange)
+                        // Trigger reload of local data (which will be empty now)
+                        setInvoiceCounter(1)
                     })
                 }}
             />
