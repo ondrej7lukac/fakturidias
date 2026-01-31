@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
-import LoginGate from './components/LoginGate'
 import Header from './components/Header'
 import InvoiceForm from './components/InvoiceForm'
 import InvoiceList from './components/InvoiceList'
 import Settings from './components/Settings'
-import { getNextInvoiceCounter, loadData, saveInvoice, deleteInvoice } from './utils/storage'
+import { getNextInvoiceCounter, loadApiData, loadLocalData, saveApiInvoice, saveLocalInvoice, deleteApiInvoice, deleteLocalInvoice } from './utils/storage'
 import { languages } from './utils/i18n'
 
 function App() {
+    const [user, setUser] = useState(null) // Auth state lifted to App
     const [invoices, setInvoices] = useState([])
     const [selectedId, setSelectedId] = useState(null)
     const [categories, setCategories] = useState([])
@@ -19,6 +19,28 @@ function App() {
     const [isLoading, setIsLoading] = useState(true)
 
     const t = languages[lang]
+
+    // Check Auth Status on Mount
+    useEffect(() => {
+        checkAuthStatus()
+    }, [])
+
+    const checkAuthStatus = async () => {
+        try {
+            const res = await fetch('/auth/google/status')
+            if (res.ok) {
+                const data = await res.json()
+                if (data.connected && data.user) {
+                    setUser({ email: data.user })
+                } else {
+                    setUser(null)
+                }
+            }
+        } catch (e) {
+            console.warn("Auth check failed", e)
+            setUser(null)
+        }
+    }
 
     // Load local settings from localStorage (not invoices)
     useEffect(() => {
@@ -35,8 +57,18 @@ function App() {
     const fetchInvoices = async () => {
         setIsLoading(true)
         try {
-            const invoiceData = await loadData() // internal fetch to /api/invoices
-            const loadedInvoices = invoiceData.invoices || []
+            let loadedInvoices = []
+
+            if (user) {
+                // Authenticated: Load from API
+                const data = await loadApiData()
+                if (data) loadedInvoices = data.invoices
+            } else {
+                // Guest: Load from Local Storage
+                const data = loadLocalData()
+                loadedInvoices = data.invoices
+            }
+
             setInvoices(loadedInvoices)
 
             // Calculate next counter based on loaded invoices
@@ -48,6 +80,11 @@ function App() {
             setIsLoading(false)
         }
     }
+
+    // Reload data when user changes (Login/Logout)
+    useEffect(() => {
+        if (!isLoading) fetchInvoices()
+    }, [user])
 
     // Load invoices and settings from server on mount
     useEffect(() => {
@@ -84,40 +121,18 @@ function App() {
             }
         }
 
-        loadInitialData()
+        // Initial load is triggered by user state change or mount
+        // We just need to load settings if user is present
 
-        // Listen for Google Login to auto-fill email and reload data
+        const loadSettings = async () => {
+            // ... logic to load settings
+        }
+
+        // Listen for Google Login updates from Header popup
         const handleGoogleLogin = async () => {
-            const tokensStr = localStorage.getItem('google_tokens')
-
-            // Reload invoices regardless of login or logout (if logout, it fetches public/empty)
-            await fetchInvoices()
-
-            if (tokensStr) {
-                // Reload settings from server after login
-                fetch('/api/settings').then(res => {
-                    if (res.ok) return res.json()
-                }).then(data => {
-                    if (data?.settings) setDefaultSupplier(data.settings)
-                })
-
-                // Try to get email from localStorage (Settings.jsx saves it there now in smtpConfig)
-                const smtpConfig = localStorage.getItem('smtpConfig')
-                if (smtpConfig) {
-                    const { fromEmail } = JSON.parse(smtpConfig)
-                    if (fromEmail) {
-                        setDefaultSupplier(prev => {
-                            if (!prev || !prev.email) {
-                                return { ...prev, email: fromEmail }
-                            }
-                            return prev
-                        })
-                    }
-                }
-            } else {
-                // Explicit logout handling - clear sensitive data if needed, but fetchInvoices handles the list
-                setInvoices([])
-            }
+            console.log("Login detected, refreshing auth...")
+            await checkAuthStatus()
+            // checkAuthStatus sets 'user', which triggers useEffect -> fetchInvoices
         }
         window.addEventListener('google_login_update', handleGoogleLogin)
         return () => window.removeEventListener('google_login_update', handleGoogleLogin)
@@ -135,7 +150,20 @@ function App() {
 
     const handleSaveInvoice = async (invoice) => {
         try {
-            await saveInvoice(invoice)
+
+            // Guest Mode Restriction
+            if (!user) {
+                const isNew = !invoices.find(inv => inv.id === invoice.id)
+                if (isNew && invoices.length >= 1) {
+                    alert(lang === 'cs'
+                        ? 'V režimu hosta můžete mít pouze 1 fakturu. Přihlašte se pro neomezený počet.'
+                        : 'Guest mode is limited to 1 invoice. Please log in for unlimited invoices.')
+                    return
+                }
+                saveLocalInvoice(invoice)
+            } else {
+                await saveApiInvoice(invoice)
+            }
 
             // Update local state
             const existingIndex = invoices.findIndex(inv => inv.id === invoice.id)
@@ -168,7 +196,11 @@ function App() {
         if (!window.confirm(lang === 'cs' ? 'Smazat fakturu?' : 'Delete invoice?')) return
 
         try {
-            await deleteInvoice(id)
+            if (user) {
+                await deleteApiInvoice(id)
+            } else {
+                deleteLocalInvoice(id)
+            }
             setInvoices(invoices.filter(inv => inv.id !== id))
             if (selectedId === id) {
                 setSelectedId(null)
@@ -190,7 +222,7 @@ function App() {
     }
 
     return (
-        <LoginGate>
+        <>
             <Header
                 onNewInvoice={handleNewInvoice}
                 lang={lang}
@@ -198,6 +230,14 @@ function App() {
                 t={t}
                 currentView={currentView}
                 onViewChange={setCurrentView}
+                user={user}
+                onLogout={() => {
+                    // Call backend to disconnect/clear session
+                    fetch('/auth/google/disconnect', { method: 'POST' }).finally(() => {
+                        setUser(null)
+                        onViewChange('invoices')
+                    })
+                }}
             />
             <main>
                 {currentView === 'settings' ? (
@@ -236,7 +276,7 @@ function App() {
                     </>
                 )}
             </main>
-        </LoginGate>
+        </>
     )
 }
 

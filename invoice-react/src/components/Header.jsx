@@ -1,32 +1,19 @@
 import { useState, useEffect } from 'react'
 
-export default function Header({ onNewInvoice, lang, setLang, t, currentView, onViewChange }) {
-    const [isAuthenticated, setIsAuthenticated] = useState(false)
-    const [userEmail, setUserEmail] = useState(null)
+export default function Header({ onNewInvoice, lang, setLang, t, currentView, onViewChange, user, onLogout }) {
 
-    useEffect(() => {
-        checkAuthStatus()
-        const handleAuthUpdate = () => checkAuthStatus()
-        window.addEventListener('google_login_update', handleAuthUpdate)
-        return () => window.removeEventListener('google_login_update', handleAuthUpdate)
-    }, [])
-
-    const checkAuthStatus = async () => {
-        try {
-            const res = await fetch('/api/me')
-            if (res.ok) {
-                const data = await res.json()
-                setIsAuthenticated(data.authenticated)
-                setUserEmail(data.user)
-            }
-        } catch (e) {
-            setIsAuthenticated(false)
-        }
-    }
+    // Auth state is now managed by parent (App.jsx) via 'user' prop
 
     const handleLogin = async () => {
-        if (isAuthenticated) {
-            onViewChange('settings')
+        if (user) {
+            // If logged in, button acts as "Settings" or "Logout"?
+            // Current UI design: The button shows username. Clicking it usually toggles a dropdown or goes to profile.
+            // For now, let's make it toggle Settings view or just do nothing if we add a separate Logout button.
+            // Wait, the design has a separate "Settings" button.
+            // Let's make the User button ask to Logout.
+            if (window.confirm(lang === 'cs' ? 'Odhlásit se?' : 'Log out?')) {
+                onLogout && onLogout()
+            }
             return
         }
 
@@ -42,13 +29,7 @@ export default function Header({ onNewInvoice, lang, setLang, t, currentView, on
                 const top = window.screen.height / 2 - height / 2
                 window.open(data.url, 'Google Login', `width=${width},height=${height},top=${top},left=${left}`)
 
-                const handleMessage = (event) => {
-                    if (event.data && event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
-                        window.removeEventListener('message', handleMessage)
-                        window.dispatchEvent(new Event('google_login_update'))
-                    }
-                }
-                window.addEventListener('message', handleMessage)
+                // App.jsx listens for 'google_login_update'
             }
         } catch (e) {
             alert('Failed to connect to login server.')
@@ -83,15 +64,15 @@ export default function Header({ onNewInvoice, lang, setLang, t, currentView, on
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        background: isAuthenticated ? 'var(--success-bg, #d4edda)' : undefined,
-                        borderColor: isAuthenticated ? 'var(--success-border, #28a745)' : undefined,
-                        color: isAuthenticated ? 'var(--success-text, #155724)' : undefined
+                        background: user ? 'var(--success-bg, #d4edda)' : undefined,
+                        borderColor: user ? 'var(--success-border, #28a745)' : undefined,
+                        color: user ? 'var(--success-text, #155724)' : undefined
                     }}
-                    title={isAuthenticated ? (userEmail || 'Logged in') : (lang === 'cs' ? 'Přihlásit se' : 'Log in')}
+                    title={user ? (user.email || 'Logged in') : (lang === 'cs' ? 'Přihlásit se' : 'Log in')}
                 >
                     <span style={{ fontWeight: 'bold', fontSize: '16px' }}>G</span>
-                    <span>{isAuthenticated ? (userEmail?.split('@')[0] || 'Account') : (lang === 'cs' ? 'Přihlášení' : 'Login')}</span>
-                    {isAuthenticated && <span>✓</span>}
+                    <span>{user ? (user.email?.split('@')[0] || 'Account') : (lang === 'cs' ? 'Přihlášení' : 'Login')}</span>
+                    {user && <span>✓</span>}
                 </button>
             </div>
         </header>

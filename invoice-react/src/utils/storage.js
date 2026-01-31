@@ -11,62 +11,96 @@ export function getUserId() {
 }
 
 // Server-based storage functions
-export async function loadData() {
+// Helper to get current user ID (Legacy/SMTP fallback)
+export function getUserId() {
     try {
-        const response = await fetch('/api/invoices', {
-            headers: { 'x-user-id': getUserId() }
-        })
+        const config = localStorage.getItem('smtpConfig');
+        if (config) {
+            const { fromEmail } = JSON.parse(config);
+            return fromEmail || 'default';
+        }
+    } catch (e) { }
+    return 'default';
+}
+
+// --- API Storage (Authenticated) ---
+
+export async function loadApiData() {
+    try {
+        const response = await fetch('/api/invoices')
         if (!response.ok) {
-            if (response.status === 401) {
-                console.warn('Not authenticated - returning empty data')
-                return {}
-            }
+            if (response.status === 401) return null; // Signal not authenticated
             throw new Error('Failed to load invoices')
         }
         const data = await response.json()
         return { invoices: data.invoices || [] }
     } catch (error) {
-        console.error('Failed to load data:', error)
+        console.error('Failed to load API data:', error)
+        return null
+    }
+}
+
+export async function saveApiInvoice(invoice) {
+    const response = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ invoice })
+    })
+    if (!response.ok) throw new Error('Failed to save invoice to API')
+    const data = await response.json()
+    return data.invoice
+}
+
+export async function deleteApiInvoice(invoiceId) {
+    const response = await fetch(`/api/invoices/${invoiceId}`, {
+        method: 'DELETE'
+    })
+    if (!response.ok) throw new Error('Failed to delete invoice from API')
+    return true
+}
+
+// --- Local Storage (Guest Mode) ---
+
+const LOCAL_STORAGE_KEY = 'invoices_guest';
+
+export function loadLocalData() {
+    try {
+        const data = localStorage.getItem(LOCAL_STORAGE_KEY)
+        return { invoices: data ? JSON.parse(data) : [] }
+    } catch (e) {
+        console.error("Failed to load local data", e)
         return { invoices: [] }
     }
 }
 
-export async function saveInvoice(invoice) {
-    try {
-        const response = await fetch('/api/invoices', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-user-id': getUserId()
-            },
-            body: JSON.stringify({ invoice })
-        })
-        if (!response.ok) {
-            throw new Error('Failed to save invoice')
-        }
-        const data = await response.json()
-        return data.invoice
-    } catch (error) {
-        console.error('Failed to save invoice:', error)
-        throw error
+export function saveLocalInvoice(invoice) {
+    // Guest Validations are handled in App.jsx (e.g. max count)
+    const { invoices } = loadLocalData();
+    const existingIndex = invoices.findIndex(inv => inv.id === invoice.id);
+
+    if (existingIndex >= 0) {
+        invoices[existingIndex] = invoice;
+    } else {
+        invoices.unshift(invoice);
     }
+
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(invoices));
+    return invoice;
 }
 
-export async function deleteInvoice(invoiceId) {
-    try {
-        const response = await fetch(`/api/invoices/${invoiceId}`, {
-            method: 'DELETE',
-            headers: { 'x-user-id': getUserId() }
-        })
-        if (!response.ok) {
-            throw new Error('Failed to delete invoice')
-        }
-        return true
-    } catch (error) {
-        console.error('Failed to delete invoice:', error)
-        throw error
-    }
+export function deleteLocalInvoice(invoiceId) {
+    const { invoices } = loadLocalData();
+    const newInvoices = invoices.filter(inv => inv.id !== invoiceId);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newInvoices));
+    return true;
 }
+
+// Legacy export compatibility (defaults to API but warns, or we can remove if we refactor App.jsx completely)
+export async function loadData() { return loadApiData(); }
+export async function saveInvoice(inv) { return saveApiInvoice(inv); }
+export async function deleteInvoice(id) { return deleteApiInvoice(id); }
 
 export function formatInvoiceNumber(counter) {
     const year = new Date().getFullYear()

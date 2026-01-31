@@ -1,6 +1,5 @@
 {
     "version": 2,
-    "buildCommand": "cd invoice-react && npm install && npm run build",
     "outputDirectory": "invoice-react/dist",
     "rewrites": [
         {
