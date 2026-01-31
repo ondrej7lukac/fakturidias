@@ -1492,8 +1492,12 @@ const requestHandlerWithSession = (req, res) => {
     console.log('[Session Wrapper] Applying session middleware...');
     // Shim for 'req.secure' which is required for secure cookies
     // formatting: off
+    console.log('[Session Debug] NODE_ENV:', process.env.NODE_ENV);
+    console.log('[Session Debug] x-forwarded-proto:', req.headers['x-forwarded-proto']);
+
     if (process.env.NODE_ENV === 'production' && req.headers['x-forwarded-proto'] === 'https') {
       req.secure = true;
+      console.log('[Session Debug] Manually set req.secure = true');
     }
     // formatting: on
 
