@@ -36,86 +36,8 @@ export default function LoginGate({ children }) {
             const res = await fetch('/auth/google/url');
             const data = await res.json();
             if (data.url) {
-                const popup = window.open(data.url, 'Google Auth', 'width=600,height=700');
-
-                // Helper to perform the actual session creation
-                const createSession = async (code) => {
-                    try {
-                        console.log('[LoginGate] performLogin: Calling /auth/login with code');
-                        const loginRes = await fetch('/auth/login', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ code: code })
-                        });
-
-                        console.log('[LoginGate] /auth/login response status:', loginRes.status);
-
-                        if (loginRes.ok) {
-                            console.log('[LoginGate] Session created! Reloading...');
-                            window.location.reload();
-                            return true;
-                        } else {
-                            const errorText = await loginRes.text();
-                            console.error('[LoginGate] Failed to create session:', errorText);
-                            alert('Login failed. Please try again.');
-                            return false;
-                        }
-                    } catch (e) {
-                        console.error('[LoginGate] Login error:', e);
-                        alert('Login failed. Please try again.');
-                        return false;
-                    }
-                };
-
-                // 1. Listen for postMessage (Primary)
-                const handleMessage = async (event) => {
-                    if (event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
-                        console.log('[LoginGate] OAuth success via postMessage! Code received.');
-                        window.removeEventListener('message', handleMessage);
-                        // Clean up poller
-                        if (poller) clearInterval(poller);
-
-                        popup?.close();
-                        createSession(event.data.code);
-                    }
-                };
-                window.addEventListener('message', handleMessage);
-
-                // 2. Poll LocalStorage (Fallback for when window.opener is broken)
-                const poller = setInterval(() => {
-                    try {
-                        const stored = localStorage.getItem('google_handoff_code');
-                        if (stored) {
-                            const { code, timestamp } = JSON.parse(stored);
-
-                            // Only accept if very recent (prevent loops)
-                            if (Date.now() - timestamp < 10000) {
-                                console.log('[LoginGate] OAuth success via LocalStorage! Code found.');
-
-                                // Consumed - remove it immediately
-                                localStorage.removeItem('google_handoff_code');
-
-                                clearInterval(poller);
-                                window.removeEventListener('message', handleMessage);
-                                popup?.close();
-
-                                createSession(code);
-                            } else {
-                                // Stale token, clear it
-                                localStorage.removeItem('google_handoff_code');
-                            }
-                        }
-
-                        if (popup.closed) {
-                            // Give it a moment to write to LS if it just closed
-                            setTimeout(() => {
-                                clearInterval(poller);
-                            }, 5000);
-                        }
-                    } catch (e) {
-                        console.error('[LoginGate] Poller error:', e);
-                    }
-                }, 1000);
+                // Simple Redirect Flow (No Popups)
+                window.location.href = data.url;
             }
         } catch (e) {
             alert('Failed to start authentication');

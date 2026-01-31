@@ -852,59 +852,11 @@ const requestHandler = async (req, res) => {
           await new Promise((resolve) => req.session.save(resolve));
         }
 
-        // Return the HTML with the HANDOFF CODE (not email)
-        res.writeHead(200, {
-          "Content-Type": "text/html",
-          "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
+        // Return a simple HTML page that closes itself or redirects back to app
+        res.writeHead(302, {
+          "Location": "/"
         });
-
-        const statusMessage = savedToDb
-          ? '<h1 style="color: green;">Successfully Connected!</h1><p>Returning to app...</p>'
-          : '<h1 style="color: orange;">Connected (Local Only)</h1><p>Warning: Could not save to Database.</p>';
-
-        // Pass CODE instead of EMAIL
-        const clientData = JSON.stringify({
-          type: 'GOOGLE_LOGIN_SUCCESS',
-          code: handoffCode // Send code, not email
-        });
-
-        res.end(`
-          <html>
-            <body style="font-family: sans-serif; text-align: center; padding: 40px;">
-              ${statusMessage}
-              <p>Closing window...</p>
-              <script>
-                // Notify the opener (React App)
-                const data = ${clientData};
-                
-                // Method 1: IDB/LocalStorage (Same Origin Fallback)
-                try {
-                  // Save CODE to localStorage
-                  localStorage.setItem('google_handoff_code', JSON.stringify({
-                    code: data.code,
-                    timestamp: Date.now()
-                  }));
-                  document.body.insertAdjacentHTML('beforeend', '<p style="color:blue">Saved Handoff Code to LocalStorage</p>');
-                } catch (e) {
-                  console.error('LocalStorage error:', e);
-                }
-
-                // Method 2: window.opener (Primary)
-                try {
-                  if (window.opener) {
-                    window.opener.postMessage(data, '*');
-                    document.body.insertAdjacentHTML('beforeend', '<p style="color:green">Code sent to main window!</p>');
-                  }
-                } catch (e) {
-                  // Ignore opener errors
-                }
-                
-                // Close shortly
-                setTimeout(() => window.close(), 1500);
-              </script>
-            </body>
-          </html>
-        `);
+        res.end();
         return;
       } catch (error) {
         console.error("[OAuth] Error getting tokens:", error);
