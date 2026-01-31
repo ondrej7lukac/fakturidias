@@ -11,17 +11,7 @@ export function getUserId() {
 }
 
 // Server-based storage functions
-// Helper to get current user ID (Legacy/SMTP fallback)
-export function getUserId() {
-    try {
-        const config = localStorage.getItem('smtpConfig');
-        if (config) {
-            const { fromEmail } = JSON.parse(config);
-            return fromEmail || 'default';
-        }
-    } catch (e) { }
-    return 'default';
-}
+
 
 // --- API Storage (Authenticated) ---
 
