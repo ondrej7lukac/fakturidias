@@ -96,7 +96,12 @@ export default function Settings({
 
     const handleBankChange = (e) => {
         const { name, value } = e.target
-        setBankDetails(prev => ({ ...prev, [name]: value }))
+        setBankDetails(prev => {
+            const updated = { ...prev, [name]: value }
+            // Sync to defaultSupplier immediately so it's ready to save
+            setDefaultSupplier(ds => ({ ...ds, ...updated }))
+            return updated
+        })
     }
 
     const handlePasteBank = (e) => {
@@ -127,6 +132,7 @@ export default function Settings({
             const bankCode = czechMatch[3]
 
             setBankDetails({ prefix, accountNumber, bankCode })
+            setDefaultSupplier(prev => ({ ...prev, prefix, accountNumber, bankCode }))
         }
     }
 

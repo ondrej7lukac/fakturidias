@@ -124,6 +124,13 @@ export default function InvoiceForm({
             const newDraftNumber = draftNumber || formatInvoiceNumber(invoiceCounter)
             if (!draftNumber) setDraftNumber(newDraftNumber)
 
+            // Try to parse IBAN from default supplier if available
+            let bankFields = { accountNumber: '', bankCode: '', prefix: '' }
+            if (defaultSupplier?.iban) {
+                const parsed = parseIban(defaultSupplier.iban)
+                if (parsed) bankFields = parsed
+            }
+
             setFormData({
                 invoiceNumber: newDraftNumber,
                 issueDate: formatDate(today),
@@ -143,9 +150,9 @@ export default function InvoiceForm({
                 iban: defaultSupplier?.iban || '',
                 bic: '',
                 paymentNote: '',
-                accountNumber: '',
-                bankCode: '',
-                prefix: '',
+                accountNumber: defaultSupplier?.accountNumber || bankFields.accountNumber,
+                bankCode: defaultSupplier?.bankCode || bankFields.bankCode,
+                prefix: defaultSupplier?.prefix || bankFields.prefix,
                 variableSymbol: newDraftNumber.replace(/\D/g, ''),
                 supplierName: defaultSupplier?.name || '',
                 supplierIco: defaultSupplier?.ico || '',
