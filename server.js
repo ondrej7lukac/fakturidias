@@ -213,6 +213,7 @@ try {
     // Redirect URI will be set dynamically per request
     "http://localhost:5500/auth/google/callback"
   );
+  console.log("[OAuth] Configuration loaded. Client ID starts with:", GOOGLE_CLIENT_ID ? GOOGLE_CLIENT_ID.substring(0, 10) + "..." : "MISSING");
 } catch (e) {
   console.warn("googleapis not installed or failed to load");
 }
@@ -288,6 +289,7 @@ const connectDB = async () => {
     console.warn("[MongoDB] Missing MONGODB_URI, falling back to file system (Ephemeral on Vercel!)");
     return;
   }
+  console.log("[MongoDB] Attempting connection with URI starting:", MONGODB_URI.substring(0, 15) + "...");
   try {
     await mongoose.connect(MONGODB_URI);
     isConnected = true;
