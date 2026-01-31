@@ -1493,7 +1493,12 @@ const requestHandlerWithSession = (req, res) => {
     // Apply session middleware first
     sessionMiddleware(req, res, () => {
       // After session is processed, call main request handler
-      console.log('[Session Wrapper] Session middleware applied, calling main handler');
+      console.log('[Session Wrapper] Session middleware applied');
+      console.log('[Session Debug] Session ID:', req.session?.id);
+      console.log('[Session Debug] Cookie Header:', req.headers.cookie);
+      console.log('[Session Debug] User Authenticated:', req.session?.authenticated);
+      console.log('[Session Debug] User Email:', req.session?.userEmail);
+
       requestHandler(req, res);
     });
   } else {
