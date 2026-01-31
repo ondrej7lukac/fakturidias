@@ -557,6 +557,7 @@ async function saveUserItem(userEmail, item) {
 
     fs.writeFileSync(filePath, JSON.stringify(items, null, 2), 'utf8');
     return true;
+  } catch (e) {
   }
 }
 // #endregion
