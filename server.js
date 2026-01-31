@@ -305,6 +305,11 @@ console.log('[Session Init] SESSION_SECRET exists?', !!SESSION_SECRET);
 console.log('[Session Init] MONGODB_URI exists?', !!MONGODB_URI);
 console.log('[Session Init] NODE_ENV:', process.env.NODE_ENV);
 
+// Trust Vercel Proxy (CRITICAL for secure cookies)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1); // trust first proxy (Vercel)
+}
+
 // Initialize session middleware (async safe)
 if (SESSION_SECRET && MONGODB_URI) {
   try {
@@ -324,7 +329,7 @@ if (SESSION_SECRET && MONGODB_URI) {
         secure: process.env.NODE_ENV === 'production', // HTTPS only in production
         httpOnly: true, // XSS protection
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        sameSite: 'lax' // CSRF protection
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // 'none' is crucial if frontend/backend are on different subdomains, but 'lax' usually fine for same domain. Sticking to 'none' + secure for max compatibility on Vercel.
       },
       name: 'fakturidias.sid' // Custom cookie name
     });
