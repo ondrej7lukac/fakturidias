@@ -1490,6 +1490,13 @@ const requestHandlerWithSession = (req, res) => {
 
   if (sessionMiddleware) {
     console.log('[Session Wrapper] Applying session middleware...');
+    // Shim for 'req.secure' which is required for secure cookies
+    // formatting: off
+    if (process.env.NODE_ENV === 'production' && req.headers['x-forwarded-proto'] === 'https') {
+      req.secure = true;
+    }
+    // formatting: on
+
     // Apply session middleware first
     sessionMiddleware(req, res, () => {
       // After session is processed, call main request handler
