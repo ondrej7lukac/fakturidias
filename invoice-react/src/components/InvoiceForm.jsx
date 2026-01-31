@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { formatInvoiceNumber, addDays, formatDate, money, getUserId } from '../utils/storage'
-import AresSearch from './AresSearch'
+import { searchAres, parseAresItem } from '../utils/ares'
+
 import ItemsTable from './ItemsTable'
 import InvoicePreview from './InvoicePreview'
 import { generateInvoicePDF } from '../utils/pdf'
 import { BANK_CODES, calculateIban, parseIban, getCzechQrPayload } from '../utils/bank'
 import { QRCodeCanvas } from 'qrcode.react'
 import QRCode from 'qrcode'
+
 
 export default function InvoiceForm({
     invoice,
@@ -27,12 +29,13 @@ export default function InvoiceForm({
         invoiceNumber: '',
         issueDate: formatDate(new Date()),
         dueDate: formatDate(addDays(new Date(), 7)),
-        taxableSupplyDate: '', // DUZP - Datum uskutečnění zdanitelného plnění
+        taxableSupplyDate: '',
         status: 'draft',
         category: '',
         clientName: '',
         clientEmail: '',
         clientEmailCopy: '',
+        clientPhone: '',
         clientArea: 'Prague',
         clientIco: '',
         clientVat: '',
@@ -50,35 +53,34 @@ export default function InvoiceForm({
         supplierIco: '',
         supplierVat: '',
         supplierAddress: '',
-        supplierRegistry: '', // Zápis v rejstříku
+        supplierRegistry: '',
         supplierPhone: '',
         supplierEmail: '',
         supplierWebsite: '',
-        // Tax fields for VAT payers
         isVatPayer: false,
-        taxBase: '0.00', // Základ daně
-        taxRate: '21', // Sazba daně (21%, 15%, 12%)
-        taxAmount: '0.00' // Výše daně
+        taxBase: '0.00',
+        taxRate: '21',
+        taxAmount: '0.00'
     })
 
     const [items, setItems] = useState([])
-    // Ref to access latest state in setTimeout
     const stateRef = useRef({ formData, items })
 
     useEffect(() => {
         stateRef.current = { formData, items }
     }, [formData, items])
 
-    const [itemInput, setItemInput] = useState({ name: '', qty: 1, price: '', taxRate: '21', discount: 0 })
+    const [itemInput, setItemInput] = useState({ name: '', qty: 1, price: '', taxRate: '21', discount: 0, total: '' })
     const [categoryInput, setCategoryInput] = useState('')
     const [isGenerating, setIsGenerating] = useState(false)
     const [emailStatus, setEmailStatus] = useState('')
-    const [previewMode, setPreviewMode] = useState(false) // Toggle between edit/preview
-    const [savedItems, setSavedItems] = useState([]) // Items database
-    const [itemSuggestions, setItemSuggestions] = useState([]) // Autocomplete suggestions
-    const [saveTimer, setSaveTimer] = useState(null) // Debounce timer for auto-save
+    const [previewMode, setPreviewMode] = useState(false)
+    const [savedItems, setSavedItems] = useState([])
+    const [savedCustomers, setSavedCustomers] = useState([])
+    const [itemSuggestions, setItemSuggestions] = useState([])
+    const [customerSuggestions, setCustomerSuggestions] = useState([])
+    const [saveTimer, setSaveTimer] = useState(null)
 
-    // Load invoice data when selected
     useEffect(() => {
         if (invoice) {
             const ibanData = parseIban(invoice.payment.iban || '')
@@ -92,6 +94,7 @@ export default function InvoiceForm({
                 clientName: invoice.client.name,
                 clientEmail: invoice.client.email || '',
                 clientEmailCopy: invoice.client.emailCopy || '',
+                clientPhone: invoice.client.phone || '',
                 clientArea: invoice.client.area || '',
                 clientIco: invoice.client.ico || '',
                 clientVat: invoice.client.vat || '',
@@ -124,7 +127,6 @@ export default function InvoiceForm({
             const newDraftNumber = draftNumber || formatInvoiceNumber(invoiceCounter)
             if (!draftNumber) setDraftNumber(newDraftNumber)
 
-            // Try to parse IBAN from default supplier if available
             let bankFields = { accountNumber: '', bankCode: '', prefix: '' }
             if (defaultSupplier?.iban) {
                 const parsed = parseIban(defaultSupplier.iban)
@@ -141,6 +143,7 @@ export default function InvoiceForm({
                 clientName: '',
                 clientEmail: '',
                 clientEmailCopy: '',
+                clientPhone: '',
                 clientArea: '',
                 clientIco: '',
                 clientVat: '',
@@ -171,28 +174,21 @@ export default function InvoiceForm({
         }
     }, [invoice, invoiceCounter, draftNumber, setDraftNumber, defaultSupplier])
 
-    // Update amount when items change
     useEffect(() => {
         const total = items.reduce((sum, item) => sum + item.total, 0)
         setFormData(prev => ({ ...prev, amount: money(total) }))
     }, [items])
 
-    // Automatically calculate IBAN and BIC in real-time as user types
     useEffect(() => {
         let updates = {}
-
-        // Update BIC immediately when bank code is entered (even without account number)
         if (formData.bankCode) {
             const bankInfo = BANK_CODES[formData.bankCode]
             if (bankInfo?.bic && bankInfo.bic !== formData.bic) {
                 updates.bic = bankInfo.bic
             }
         }
-
-        // Calculate IBAN when we have account number and bank code
         if (formData.accountNumber && formData.bankCode) {
             const newIban = calculateIban(formData.accountNumber, formData.bankCode, formData.prefix)
-            // Fix: Only update if newIban is valid AND different from current (ignoring spaces)
             if (newIban && newIban !== formData.iban) {
                 const currentClean = (formData.iban || '').replace(/\s/g, '')
                 const newClean = newIban.replace(/\s/g, '')
@@ -201,50 +197,49 @@ export default function InvoiceForm({
                 }
             }
         }
-
-        // Apply updates if there are any
         if (Object.keys(updates).length > 0) {
             setFormData(prev => ({ ...prev, ...updates }))
         }
     }, [formData.accountNumber, formData.bankCode, formData.prefix])
 
-    // Auto-save on blur (when leaving a field) - with debouncing
     const handleBlurSave = () => {
-        // Clear any existing timer
-        if (saveTimer) {
-            clearTimeout(saveTimer)
-        }
-
-        // Set new timer - save after 1 second of inactivity
-        // Use stateRef to get the LATEST data when the timer fires
+        if (saveTimer) clearTimeout(saveTimer)
         const timer = setTimeout(() => {
             const currentData = stateRef.current
             const invoiceData = getCurrentInvoiceData(currentData.formData, currentData.items)
             onSave(invoiceData)
+
+            if (invoiceData.client && invoiceData.client.name) {
+                fetch('/api/customers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-user-id': getUserId() },
+                    body: JSON.stringify({ customer: invoiceData.client })
+                }).catch(e => console.error(e))
+            }
             console.log('[Auto-Save] Invoice saved:', invoiceData.invoiceNumber)
         }, 1000)
-
         setSaveTimer(timer)
     }
 
-    // Load saved items from database
     useEffect(() => {
-        const loadSavedItems = async () => {
+        const loadSavedData = async () => {
             try {
-                const response = await fetch('/api/items', {
-                    headers: { 'x-user-id': getUserId() }
-                })
-                if (response.ok) {
-                    const data = await response.json()
+                const resItems = await fetch('/api/items', { headers: { 'x-user-id': getUserId() } })
+                if (resItems.ok) {
+                    const data = await resItems.json()
                     setSavedItems(data.items || [])
                 }
+                const resCust = await fetch('/api/customers', { headers: { 'x-user-id': getUserId() } })
+                if (resCust.ok) {
+                    const data = await resCust.json()
+                    setSavedCustomers(data.customers || [])
+                }
             } catch (e) {
-                console.error('[Items] Failed to load items database:', e)
+                console.error('[DB] Failed to load data:', e)
             }
         }
-        loadSavedItems()
+        loadSavedData()
     }, [])
-
 
     const getCurrentInvoiceData = (currentFormData = formData, currentItems = items) => {
         return {
@@ -252,13 +247,14 @@ export default function InvoiceForm({
             invoiceNumber: currentFormData.invoiceNumber.trim(),
             issueDate: currentFormData.issueDate,
             dueDate: currentFormData.dueDate,
-            taxableSupplyDate: currentFormData.taxableSupplyDate || currentFormData.issueDate, // DUZP
+            taxableSupplyDate: currentFormData.taxableSupplyDate || currentFormData.issueDate,
             status: currentFormData.status,
             category: currentFormData.category,
             client: {
                 name: currentFormData.clientName.trim(),
                 email: currentFormData.clientEmail.trim(),
                 emailCopy: (currentFormData.clientEmailCopy || '').trim(),
+                phone: (currentFormData.clientPhone || '').trim(),
                 area: currentFormData.clientArea.trim(),
                 ico: currentFormData.clientIco.trim(),
                 vat: currentFormData.clientVat.trim(),
@@ -285,7 +281,6 @@ export default function InvoiceForm({
                 email: currentFormData.supplierEmail.trim(),
                 website: currentFormData.supplierWebsite.trim()
             },
-            // VAT fields
             isVatPayer: currentFormData.isVatPayer,
             taxBase: currentFormData.taxBase,
             taxRate: currentFormData.taxRate,
@@ -296,14 +291,11 @@ export default function InvoiceForm({
     const handlePasteBank = (e) => {
         const text = e.clipboardData.getData('text').trim()
         if (!text) return
-
-        // 1. Try parsing IBAN
         const cleanIban = text.replace(/\s/g, '').toUpperCase()
         if (/^[A-Z]{2}\d{10,}/.test(cleanIban)) {
             e.preventDefault()
             const parsed = parseIban(cleanIban)
             const bankInfo = BANK_CODES[parsed.bankCode]
-
             setFormData(prev => ({
                 ...prev,
                 iban: cleanIban,
@@ -314,16 +306,12 @@ export default function InvoiceForm({
             }))
             return
         }
-
-        // 2. Try parsing Czech format (prefix-number/code)
         const czechMatch = text.match(/^(\d{0,6}-)?(\d{1,10})\/(\d{4})$/)
         if (czechMatch) {
             e.preventDefault()
             const prefix = czechMatch[1] ? czechMatch[1].replace('-', '') : ''
             const accountNumber = czechMatch[2]
             const bankCode = czechMatch[3]
-
-            // Set fields and let useEffect calculate IBAN
             setFormData(prev => ({
                 ...prev,
                 prefix,
@@ -331,7 +319,6 @@ export default function InvoiceForm({
                 bankCode
             }))
         }
-        // If not recognized, allow normal paste behavior
     }
 
     const handleChange = (e) => {
@@ -339,26 +326,73 @@ export default function InvoiceForm({
         setFormData(prev => ({ ...prev, [name]: value }))
     }
 
+    // Debounce reference for ARES
+    const aresDebounceRef = useRef(null)
+
+    const handleClientNameChange = (e) => {
+        const value = e.target.value
+        setFormData(prev => ({ ...prev, clientName: value }))
+
+        if (value.trim().length > 0) {
+            // 1. Saved Customers (Instant)
+            const matches = savedCustomers.filter(c =>
+                c.name.toLowerCase().includes(value.toLowerCase())
+            ).slice(0, 5).map(c => ({ ...c, source: 'saved' }))
+            setCustomerSuggestions(matches)
+
+            // 2. ARES Search (Debounced)
+            if (value.trim().length >= 3) {
+                if (aresDebounceRef.current) clearTimeout(aresDebounceRef.current)
+                aresDebounceRef.current = setTimeout(() => {
+                    searchAres(value).then(aresResults => {
+                        const aresMatches = aresResults.map(item => {
+                            const parsed = parseAresItem(item)
+                            return { ...parsed, source: 'ares' }
+                        })
+                        setCustomerSuggestions(prev => {
+                            // Deduplicate by name
+                            const existingNames = new Set(prev.map(p => p.name))
+                            const newAres = aresMatches.filter(a => !existingNames.has(a.name)).slice(0, 3)
+                            return [...prev, ...newAres]
+                        })
+                    })
+                }, 500)
+            }
+        } else {
+            setCustomerSuggestions([])
+        }
+    }
+
+    const handleSelectCustomer = (customer) => {
+        setFormData(prev => ({
+            ...prev,
+            clientName: customer.name,
+            clientEmail: customer.email || '',
+            clientEmailCopy: customer.emailCopy || '',
+            clientPhone: customer.phone || '',
+            clientIco: customer.ico || '',
+            clientVat: customer.vat || '',
+            clientAddress: customer.address || '',
+            clientArea: customer.city || customer.area || ''
+        }))
+        setCustomerSuggestions([])
+    }
+
     const handleInputBlur = () => {
-        // Save on blur for all invoices (including new drafts)
         handleBlurSave()
     }
 
     const handleAddItem = async () => {
         if (!itemInput.name.trim() || itemInput.qty <= 0) return
 
-        const basePrice = Number(itemInput.price)
+        const basePrice = Number(itemInput.price) || 0
         const qty = Number(itemInput.qty)
         const discount = Number(itemInput.discount) || 0
-        const taxRate = Number(itemInput.taxRate) || 0
+        const taxRate = formData.isVatPayer ? (Number(itemInput.taxRate) || 0) : 0
 
-        // Calculate price after discount
         const priceAfterDiscount = basePrice - discount
-        // Calculate total before tax
         const subtotal = qty * priceAfterDiscount
-        // Calculate tax amount
         const taxAmount = subtotal * (taxRate / 100)
-        // Calculate final total
         const total = subtotal + taxAmount
 
         const newItem = {
@@ -376,7 +410,6 @@ export default function InvoiceForm({
         console.log('[InvoiceForm] Adding item:', newItem)
         setItems([...items, newItem])
 
-        // Save item to database
         try {
             await fetch('/api/items', {
                 method: 'POST',
@@ -392,10 +425,7 @@ export default function InvoiceForm({
                     }
                 })
             })
-            // Reload items database
-            const response = await fetch('/api/items', {
-                headers: { 'x-user-id': getUserId() }
-            })
+            const response = await fetch('/api/items', { headers: { 'x-user-id': getUserId() } })
             if (response.ok) {
                 const data = await response.json()
                 setSavedItems(data.items || [])
@@ -404,7 +434,7 @@ export default function InvoiceForm({
             console.error('[Items] Failed to save item:', e)
         }
 
-        setItemInput({ name: '', qty: 1, price: '', taxRate: '21', discount: 0 })
+        setItemInput({ name: '', qty: 1, price: '', taxRate: '21', discount: 0, total: '' })
         setItemSuggestions([])
     }
 
@@ -412,8 +442,6 @@ export default function InvoiceForm({
 
     const handleItemNameChange = (value) => {
         setItemInput(prev => ({ ...prev, name: value }))
-
-        // Show suggestions if typing
         if (value.trim().length > 0) {
             const itemsToFilter = Array.isArray(savedItems) ? savedItems : [];
             const matches = itemsToFilter.filter(item =>
@@ -437,7 +465,6 @@ export default function InvoiceForm({
 
     const handleDeleteRow = (index) => {
         if (window.confirm(lang === 'cs' ? 'Smazat položku?' : 'Delete item?')) {
-            console.log('[InvoiceForm] Deleting item at index:', index)
             const newItems = [...items]
             newItems.splice(index, 1)
             setItems(newItems)
@@ -446,39 +473,25 @@ export default function InvoiceForm({
     }
 
     const handleItemTotalChange = (e) => {
-        const newTotal = Number(e.target.value)
-        console.log('[InvoiceForm] Total changed manually:', newTotal)
-        // Calculate Unit Price from Total:
-        // Total = (Price - Discount) * Qty * (1 + TaxMultiplier)
-        // Price - Discount = Total / (Qty * TaxMultiplier)
-        // Price = (Total / (Qty * TaxMultiplier)) + Discount
+        const newTotalStr = e.target.value
+        const newTotal = Number(newTotalStr)
 
-        const qty = itemInput.qty || 1
-        const taxRate = Number(itemInput.taxRate) || 0
+        const qty = Number(itemInput.qty) || 1
+        const taxRate = formData.isVatPayer ? (Number(itemInput.taxRate) || 0) : 0
         const discount = Number(itemInput.discount) || 0
-
         const taxMultiplier = 1 + (taxRate / 100)
 
+        // Price = (Total / (Qty * TaxMultiplier)) + Discount
         if (qty > 0 && taxMultiplier > 0) {
             const price = (newTotal / (qty * taxMultiplier)) + discount
-            console.log('[InvoiceForm] Calculated unit price:', price)
             setItemInput(prev => ({
                 ...prev,
-                price: Number(price.toFixed(2))
+                price: price.toFixed(2), // Keep a few decimals, don't round too early
+                total: newTotalStr
             }))
+        } else {
+            setItemInput(prev => ({ ...prev, total: newTotalStr }))
         }
-    }
-
-    // Helper to show current total in the input
-    const currentItemTotal = () => {
-        const qty = itemInput.qty || 0
-        const price = itemInput.price || 0
-        const discount = itemInput.discount || 0
-        const taxRate = Number(itemInput.taxRate) || 0
-
-        const sub = (price - discount) * qty
-        const total = sub * (1 + taxRate / 100)
-        return total > 0 ? total.toFixed(2) : ''
     }
 
     const handleAddCategory = () => {
@@ -494,8 +507,6 @@ export default function InvoiceForm({
         e.preventDefault()
         const invoiceData = getCurrentInvoiceData()
         onSave(invoiceData)
-
-        // Save as default supplier
         setDefaultSupplier(invoiceData.supplier)
     }
 
@@ -512,17 +523,10 @@ export default function InvoiceForm({
         }))
     }
 
-    const getQrDataUrl = () => {
-        if (!qrCanvasRef.current) return null
-        const canvas = qrCanvasRef.current.querySelector('canvas')
-        return canvas ? canvas.toDataURL('image/png') : null
-    }
-
     const handleDownloadPDF = async () => {
         const currentData = getCurrentInvoiceData()
         setIsGenerating(true)
         try {
-            // Generate QR code directly using the library
             let qrDataUrl = null
             try {
                 const qrPayload = getCzechQrPayload(currentData)
@@ -533,21 +537,17 @@ export default function InvoiceForm({
                         width: 256
                     })
                 }
-            } catch (err) {
-                console.error('QR Generation Error:', err)
-            }
+            } catch (err) { }
 
             const pdf = await generateInvoicePDF(currentData, t, qrDataUrl)
             pdf.save(`${currentData.invoiceNumber}.pdf`)
         } catch (error) {
-            console.error('PDF Error:', error)
             alert('Failed to generate PDF')
         }
         setIsGenerating(false)
     }
 
     const handleEmailPDF = async () => {
-        // Check authentication first
         if (!isAuthenticated) {
             return alert(
                 lang === 'cs'
@@ -555,10 +555,8 @@ export default function InvoiceForm({
                     : 'You must be logged in to send emails. Click the "Login" button in the header.'
             )
         }
-
         const currentData = getCurrentInvoiceData()
         if (!currentData.client.email) return alert(t.alertEmailMissing)
-
         setIsGenerating(true)
         setEmailStatus(t.alertGenerating)
         try {
@@ -572,9 +570,7 @@ export default function InvoiceForm({
                         width: 256
                     })
                 }
-            } catch (err) {
-                console.error('QR Gen Error:', err)
-            }
+            } catch (err) { }
 
             const pdf = await generateInvoicePDF(currentData, t, qrDataUrl)
             const pdfBase64 = pdf.output('datauristring')
@@ -594,8 +590,6 @@ export default function InvoiceForm({
                 })
             })
             if (response.ok) {
-                const result = await response.json()
-                // Auto-mark as sent after successful email
                 setFormData(prev => ({ ...prev, status: 'sent' }))
                 alert(t.alertEmailSuccess)
             } else {
@@ -603,16 +597,13 @@ export default function InvoiceForm({
                 alert(`${t.alertEmailFailed} ${result.message || result.error}`)
             }
         } catch (error) {
-            console.error('Email Error:', error)
             alert(t.alertError)
         }
         setIsGenerating(false)
         setEmailStatus('')
     }
 
-    const togglePreview = () => {
-        setPreviewMode(!previewMode)
-    }
+    const togglePreview = () => setPreviewMode(!previewMode)
 
     return (
         <section className="card" style={{ position: 'relative' }}>
@@ -634,8 +625,6 @@ export default function InvoiceForm({
             {previewMode ? (
                 <>
                     <InvoicePreview invoice={getCurrentInvoiceData()} t={t} lang={lang} />
-
-                    {/* Action buttons in preview mode */}
                     <div className="actions" style={{ marginTop: '30px' }}>
                         <button type="button" onClick={togglePreview} className="secondary">
                             ✏️ {lang === 'cs' ? 'Upravit' : 'Edit'}
@@ -670,11 +659,8 @@ export default function InvoiceForm({
                             <input name="dueDate" type="date" value={formData.dueDate} onChange={handleChange} />
                         </div>
                         <div>
-                            <label>{lang === 'cs' ? 'DUZP (Datum uskutečnění zdanitelného plnění)' : 'Date of Taxable Supply (DUZP)'}</label>
+                            <label>{lang === 'cs' ? 'DUZP' : 'DUZP'}</label>
                             <input name="taxableSupplyDate" type="date" value={formData.taxableSupplyDate || formData.issueDate} onChange={handleChange} />
-                            <small style={{ fontSize: '11px', color: 'var(--muted)' }}>
-                                {lang === 'cs' ? 'Pokud je stejné jako datum vystavení, nemusíte vyplňovat' : 'Leave empty if same as issue date'}
-                            </small>
                         </div>
                     </div>
 
@@ -705,7 +691,6 @@ export default function InvoiceForm({
                         </div>
                     </div>
 
-
                     <h3>{t.issuer}</h3>
                     <div className="grid two">
                         <div>
@@ -727,26 +712,24 @@ export default function InvoiceForm({
                             <input name="supplierAddress" value={formData.supplierAddress} onChange={handleChange} placeholder="Ulice 123, Praha" />
                         </div>
                     </div>
-
                     <div>
-                        <label>{lang === 'cs' ? 'Zápis v rejstříku (pro s.r.o.)' : 'Registry Entry (for Ltd.)'}</label>
-                        <input name="supplierRegistry" value={formData.supplierRegistry} onChange={handleChange} placeholder={lang === 'cs' ? 'OR vedený u KS v Praze, oddíl C, vložka 12345' : 'Commercial Register...'} />
+                        <label>{lang === 'cs' ? 'Zápis v rejstříku' : 'Registry Entry'}</label>
+                        <input name="supplierRegistry" value={formData.supplierRegistry} onChange={handleChange} />
                     </div>
 
                     <div className="grid two">
                         <div>
                             <label>{lang === 'cs' ? 'Telefon' : 'Phone'}</label>
-                            <input name="supplierPhone" value={formData.supplierPhone} onChange={handleChange} placeholder="+420 123 456 789" />
+                            <input name="supplierPhone" value={formData.supplierPhone} onChange={handleChange} />
                         </div>
                         <div>
                             <label>Email</label>
-                            <input name="supplierEmail" type="email" value={formData.supplierEmail} onChange={handleChange} placeholder="info@firma.cz" />
+                            <input name="supplierEmail" type="email" value={formData.supplierEmail} onChange={handleChange} />
                         </div>
                     </div>
-
                     <div>
                         <label>Web</label>
-                        <input name="supplierWebsite" value={formData.supplierWebsite} onChange={handleChange} placeholder="www.firma.cz" />
+                        <input name="supplierWebsite" value={formData.supplierWebsite} onChange={handleChange} />
                     </div>
 
                     <div style={{ marginBottom: '20px', padding: '15px', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--border)' }}>
@@ -768,14 +751,7 @@ export default function InvoiceForm({
                             <div className="grid three">
                                 <div>
                                     <label>{lang === 'cs' ? 'Základ daně' : 'Tax Base'}</label>
-                                    <input
-                                        name="taxBase"
-                                        type="number"
-                                        step="0.01"
-                                        value={formData.taxBase}
-                                        onChange={handleChange}
-                                        placeholder="0.00"
-                                    />
+                                    <input name="taxBase" type="number" step="0.01" value={formData.taxBase} onChange={handleChange} />
                                 </div>
                                 <div>
                                     <label>{lang === 'cs' ? 'Sazba DPH (%)' : 'VAT Rate (%)'}</label>
@@ -787,272 +763,239 @@ export default function InvoiceForm({
                                 </div>
                                 <div>
                                     <label>{lang === 'cs' ? 'Výše daně' : 'Tax Amount'}</label>
-                                    <input
-                                        name="taxAmount"
-                                        type="number"
-                                        step="0.01"
-                                        value={formData.taxAmount}
-                                        onChange={handleChange}
-                                        placeholder="0.00"
-                                    />
+                                    <input name="taxAmount" type="number" step="0.01" value={formData.taxAmount} onChange={handleChange} />
                                 </div>
                             </div>
                         )}
                     </div>
 
                     <h3>{t.client}</h3>
-                    <AresSearch
-                        clientName={formData.clientName}
-                        clientIco={formData.clientIco}
-                        onClientNameChange={(v) => setFormData(p => ({ ...p, clientName: v }))}
-                        onClientIcoChange={(v) => setFormData(p => ({ ...p, clientIco: v }))}
-                        onAresData={handleAresData}
-                        t={t}
-                    />
-
-                    <div className="grid three">
-                        <div>
-                            <label>{t.email}</label>
-                            <input name="clientEmail" type="email" value={formData.clientEmail} onChange={handleChange} />
-                        </div>
-                        <div>
-                            <label>CC Email</label>
-                            <input name="clientEmailCopy" type="email" value={formData.clientEmailCopy} onChange={handleChange} placeholder="copy@email.com" />
-                        </div>
-                        <div>
-                            <label>{t.area}</label>
-                            <input name="clientArea" value={formData.clientArea} onChange={handleChange} />
-                        </div>
-                    </div>
-
                     <div className="grid two">
                         <div>
-                            <label>{t.ico}</label>
-                            <input name="clientIco" value={formData.clientIco} onChange={handleChange} placeholder="12345678" />
-                        </div>
-                        <div>
-                            <label>{t.vat}</label>
-                            <input name="clientVat" value={formData.clientVat} onChange={handleChange} />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label>{t.address}</label>
-                        <textarea name="clientAddress" value={formData.clientAddress} onChange={handleChange} />
-                    </div>
-
-                    <h3>{t.items}</h3>
-                    <div style={{ position: 'relative' }}>
-                        <div className="grid" style={{ gridTemplateColumns: '2fr 0.7fr 1fr 0.8fr 1fr 1fr', gap: '10px', alignItems: 'end' }}>
+                            <label>{t.clientName}</label>
                             <div style={{ position: 'relative' }}>
-                                <label>{t.item}</label>
                                 <input
-                                    value={itemInput.name}
-                                    onChange={(e) => handleItemNameChange(e.target.value)}
-                                    placeholder={lang === 'cs' ? 'Začněte psát...' : 'Start typing...'}
+                                    name="clientName"
+                                    value={formData.clientName}
+                                    onChange={handleClientNameChange}
+                                    onBlur={handleInputBlur}
+                                    placeholder="Firma ABC s.r.o."
+                                    autoComplete="off"
                                 />
-                                {itemSuggestions.length > 0 && (
-                                    <div style={{
+                                {customerSuggestions.length > 0 && (
+                                    <ul className="suggestions" style={{
                                         position: 'absolute',
                                         top: '100%',
                                         left: 0,
                                         right: 0,
-                                        background: 'var(--card)',
+                                        background: 'var(--card-bg)',
                                         border: '1px solid var(--border)',
-                                        borderRadius: '4px',
-                                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                        zIndex: 1000,
+                                        zIndex: 10,
+                                        listStyle: 'none',
+                                        padding: 0,
+                                        margin: 0,
                                         maxHeight: '200px',
                                         overflowY: 'auto'
                                     }}>
-                                        {itemSuggestions.map((item, idx) => (
-                                            <div
-                                                key={idx}
-                                                onClick={() => handleSelectSuggestion(item)}
-                                                style={{
-                                                    padding: '10px',
-                                                    cursor: 'pointer',
-                                                    borderBottom: idx < itemSuggestions.length - 1 ? '1px solid var(--border)' : 'none',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between'
-                                                }}
-                                                onMouseEnter={(e) => e.target.style.background = 'var(--bg)'}
-                                                onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                                        {customerSuggestions.map((c, i) => (
+                                            <li
+                                                key={i}
+                                                onClick={() => handleSelectCustomer(c)}
+                                                style={{ padding: '8px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
                                             >
-                                                <span>{item.name}</span>
-                                                <span style={{ color: 'var(--muted)', fontSize: '13px' }}>
-                                                    {item.price} CZK | {item.taxRate}% DPH
-                                                </span>
-                                            </div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                    <b>{c.name}</b>
+                                                    <small style={{ color: 'var(--muted)' }}>{c.source === 'ares' ? 'ARES' : 'Saved'}</small>
+                                                </div>
+                                                <small>{c.ico && `IČO: ${c.ico}`} {c.email && `| ${c.email}`}</small>
+                                            </li>
                                         ))}
-                                    </div>
+                                    </ul>
                                 )}
                             </div>
-                            <div>
-                                <label>{t.qty}</label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    value={itemInput.qty}
-                                    onChange={(e) => setItemInput(p => ({ ...p, qty: Number(e.target.value) }))}
-                                    onFocus={(e) => e.target.select()}
-                                />
-                            </div>
-                            <div>
-                                <label>{t.unitPrice}</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={itemInput.price}
-                                    onChange={(e) => setItemInput(p => ({ ...p, price: e.target.value }))}
-                                    onFocus={(e) => e.target.select()}
-                                    placeholder={lang === 'cs' ? 'bez daně' : 'excl. tax'}
-                                />
-                            </div>
-                            <div>
-                                <label>{lang === 'cs' ? 'DPH %' : 'Tax %'}</label>
-                                <select value={itemInput.taxRate} onChange={(e) => setItemInput(p => ({ ...p, taxRate: e.target.value }))}>
-                                    <option value="0">0%</option>
-                                    <option value="12">12%</option>
-                                    <option value="15">15%</option>
-                                    <option value="21">21%</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label>{lang === 'cs' ? 'Sleva' : 'Discount'}</label>
-                                <select value={itemInput.discount} onChange={(e) => setItemInput(p => ({ ...p, discount: Number(e.target.value) }))}>
-                                    {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(val => (
-                                        <option key={val} value={val}>{val === 0 ? '-' : `-${val}%`}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label>{t.total}</label>
-                                <input
-                                    value={currentItemTotal()}
-                                    readOnly
-                                    placeholder={formData.currency}
-                                    style={{
-                                        fontWeight: 'bold',
-                                        background: 'var(--bg)',
-                                        color: 'var(--text)',
-                                        cursor: 'default'
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="actions">
-                        <button type="button" onClick={handleAddItem} className="secondary">{t.addItem}</button>
-                        <button type="button" onClick={handleClearItems} className="secondary">{t.clearItems}</button>
-                    </div>
-
-                    <ItemsTable items={items} lang={lang} t={t} onDelete={handleDeleteRow} />
-
-                    {/* Tax Breakdown Summary */}
-                    {formData.isVatPayer && items.length > 0 && (
-                        <div style={{
-                            marginTop: '1rem',
-                            padding: '1rem',
-                            background: 'var(--card)',
-                            border: '1px solid var(--border)',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'flex-end',
-                            gap: '0.5rem'
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
-                                <span style={{ color: 'var(--muted)' }}>{lang === 'cs' ? 'Mezisoučet (bez DPH):' : 'Subtotal (excl. VAT):'}</span>
-                                <span>{money(items.reduce((sum, item) => sum + item.subtotal, 0))} {formData.currency}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
-                                <span style={{ color: 'var(--muted)' }}>{lang === 'cs' ? 'DPH:' : 'Tax:'}</span>
-                                <span>{money(items.reduce((sum, item) => sum + (item.taxAmount || 0), 0))} {formData.currency}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '250px', fontWeight: 'bold', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
-                                <span>{lang === 'cs' ? 'Celkem k úhradě:' : 'Total due:'}</span>
-                                <span style={{ color: 'var(--accent)' }}>{money(items.reduce((sum, item) => sum + item.total, 0))} {formData.currency}</span>
-                            </div>
-                        </div>
-                    )}
-
-                    <h3>{t.payment}</h3>
-                    <div className="grid two">
-                        <div>
-                            <label>{t.currency}</label>
-                            <select name="currency" value={formData.currency} onChange={handleChange}>
-                                <option value="CZK">CZK</option>
-                                <option value="EUR">EUR</option>
-                                <option value="USD">USD</option>
-                            </select>
+                            {/* AresSearch component removed, integrated above */}
                         </div>
                         <div>
-                            <label>{t.amount}</label>
-                            <input name="amount" type="number" value={formData.amount} onChange={handleChange} />
+                            <label>{t.clientAddress}</label>
+                            <input name="clientAddress" value={formData.clientAddress} onChange={handleChange} />
                         </div>
                     </div>
 
                     <div className="grid three">
                         <div>
-                            <label>{t.prefix}</label>
-                            <input name="prefix" value={formData.prefix} onChange={handleChange} placeholder="000000" />
+                            <label>{t.clientIco}</label>
+                            <input name="clientIco" value={formData.clientIco} onChange={handleChange} />
                         </div>
                         <div>
-                            <label>{t.bankAccount}</label>
-                            <input name="accountNumber" value={formData.accountNumber} onChange={handleChange} onPaste={handlePasteBank} placeholder="1234567890" />
+                            <label>{t.clientVat}</label>
+                            <input name="clientVat" value={formData.clientVat} onChange={handleChange} />
                         </div>
                         <div>
-                            <label>{t.bankCode}</label>
-                            <input name="bankCode" value={formData.bankCode} onChange={handleChange} onPaste={handlePasteBank} list="bankCodesList" placeholder="0100" />
-                            <datalist id="bankCodesList">
-                                {Object.entries(BANK_CODES).map(([code, info]) => (
-                                    <option key={code} value={code}>{info.name}</option>
-                                ))}
-                            </datalist>
+                            <label>{t.clientArea}</label>
+                            <input name="clientArea" value={formData.clientArea} onChange={handleChange} />
                         </div>
+                    </div>
+
+                    <div className="grid three">
+                        <div>
+                            <label>Email</label>
+                            <input name="clientEmail" type="email" value={formData.clientEmail} onChange={handleChange} />
+                        </div>
+                        <div>
+                            <label>Email (Kopie/CC)</label>
+                            <input name="clientEmailCopy" type="email" value={formData.clientEmailCopy} onChange={handleChange} />
+                        </div>
+                        <div>
+                            <label>{lang === 'cs' ? 'Telefon' : 'Phone'}</label>
+                            <input name="clientPhone" value={formData.clientPhone} onChange={handleChange} placeholder="+420..." />
+                        </div>
+                    </div>
+
+                    <h3>{t.items}</h3>
+                    <ItemsTable items={items} lang={lang} t={t} onDelete={handleDeleteRow} />
+
+                    <div className="add-item-form grid" style={{ gridTemplateColumns: '2fr 0.8fr 1fr 0.8fr 0.8fr 1fr 0.5fr', gap: '5px', alignItems: 'end' }}>
+                        <div style={{ position: 'relative' }}>
+                            <label>{t.item}</label>
+                            <input
+                                value={itemInput.name}
+                                onChange={(e) => handleItemNameChange(e.target.value)}
+                                placeholder={t.itemPlaceholder}
+                            />
+                            {itemSuggestions.length > 0 && (
+                                <ul className="suggestions" style={{
+                                    position: 'absolute', top: '100%', left: 0, right: 0,
+                                    background: 'var(--card-bg)', border: '1px solid var(--border)', zIndex: 10,
+                                    listStyle: 'none', padding: 0, margin: 0
+                                }}>
+                                    {itemSuggestions.map((s, i) => (
+                                        <li key={i} onClick={() => handleSelectSuggestion(s)} style={{ padding: '8px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
+                                            {s.name} <small>({s.price} {formData.currency})</small>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                        <div>
+                            <label>{t.qty}</label>
+                            <input
+                                type="number"
+                                value={itemInput.qty}
+                                onChange={(e) => {
+                                    const qty = Number(e.target.value);
+                                    setItemInput(prev => ({ ...prev, qty }));
+                                    const sub = (Number(itemInput.price) - Number(itemInput.discount || 0)) * qty
+                                    const total = sub * (1 + (formData.isVatPayer ? Number(itemInput.taxRate || 0) : 0) / 100)
+                                    if (itemInput.price) setItemInput(prev => ({ ...prev, qty, total: total.toFixed(2) }))
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <label>{lang === 'cs' ? 'Cena/ks' : 'Price/unit'}</label>
+                            <input
+                                type="number"
+                                placeholder="0.00"
+                                value={itemInput.price}
+                                onChange={(e) => {
+                                    const price = e.target.value
+                                    const qty = Number(itemInput.qty) || 1
+                                    const taxRate = formData.isVatPayer ? (Number(itemInput.taxRate) || 0) : 0
+                                    const discount = Number(itemInput.discount) || 0
+                                    const sub = (Number(price) - discount) * qty
+                                    const total = sub * (1 + taxRate / 100)
+                                    setItemInput(prev => ({ ...prev, price, total: total.toFixed(2) }))
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <label>{lang === 'cs' ? 'DPH %' : 'Tax %'}</label>
+                            <select
+                                value={itemInput.taxRate}
+                                onChange={(e) => {
+                                    const taxRate = e.target.value
+                                    const qty = Number(itemInput.qty) || 1
+                                    const price = Number(itemInput.price) || 0
+                                    const discount = Number(itemInput.discount) || 0
+                                    const sub = (price - discount) * qty
+                                    const total = sub * (1 + (formData.isVatPayer ? Number(taxRate) : 0) / 100)
+                                    setItemInput(prev => ({ ...prev, taxRate, total: total.toFixed(2) }))
+                                }}
+                                disabled={!formData.isVatPayer}
+                                style={!formData.isVatPayer ? { opacity: 0.5 } : {}}
+                            >
+                                <option value="21">21%</option>
+                                <option value="15">15%</option>
+                                <option value="12">12%</option>
+                                <option value="0">0%</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>{lang === 'cs' ? 'Sleva' : 'Discount'}</label>
+                            <input
+                                type="number"
+                                placeholder="0"
+                                value={itemInput.discount}
+                                onChange={(e) => {
+                                    const discount = Number(e.target.value)
+                                    const qty = Number(itemInput.qty) || 1
+                                    const price = Number(itemInput.price) || 0
+                                    const taxRate = formData.isVatPayer ? (Number(itemInput.taxRate) || 0) : 0
+                                    const sub = (price - discount) * qty
+                                    const total = sub * (1 + taxRate / 100)
+                                    setItemInput(prev => ({ ...prev, discount, total: total.toFixed(2) }))
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <label>{lang === 'cs' ? 'Celkem' : 'Total'}</label>
+                            <input
+                                type="number"
+                                placeholder="0.00"
+                                value={itemInput.total}
+                                onChange={handleItemTotalChange}
+                            />
+                        </div>
+                        <button type="button" onClick={handleAddItem} className="primary" style={{ marginBottom: '10px' }}>
+                            +
+                        </button>
                     </div>
 
                     <div className="grid two">
                         <div>
-                            <label>{t.iban}</label>
-                            <input name="iban" value={formData.iban} onChange={handleChange} onPaste={handlePasteBank} />
+                            <h3>{t.payment}</h3>
+                            <label>IBAN</label>
+                            <input name="iban" value={formData.iban} onChange={handleChange} onPaste={handlePasteBank} placeholder="CZ..." />
                         </div>
                         <div>
-                            <label>{t.bic}</label>
+                            <h3>&nbsp;</h3>
+                            <label>BIC (SWIFT)</label>
                             <input name="bic" value={formData.bic} onChange={handleChange} />
                         </div>
                     </div>
-
+                    <div className="grid three">
+                        <div>
+                            <label>{lang === 'cs' ? 'Číslo účtu' : 'Account Number'}</label>
+                            <input name="accountNumber" value={formData.accountNumber} onChange={handleChange} />
+                        </div>
+                        <div>
+                            <label>{lang === 'cs' ? 'Kód banky' : 'Bank Code'}</label>
+                            <input name="bankCode" value={formData.bankCode} onChange={handleChange} />
+                        </div>
+                        <div>
+                            <label>{t.variableSymbol}</label>
+                            <input name="variableSymbol" value={formData.variableSymbol} onChange={handleChange} />
+                        </div>
+                    </div>
                     <div>
-                        <label>{lang === 'cs' ? 'Variabilní symbol' : 'Variable Symbol'}</label>
-                        <input name="variableSymbol" value={formData.variableSymbol} onChange={handleChange} />
+                        <label>{lang === 'cs' ? 'Poznámka' : 'Note'}</label>
+                        <textarea name="paymentNote" value={formData.paymentNote} onChange={handleChange} rows="2" />
                     </div>
 
-                    <div>
-                        <label>{t.paymentNote}</label>
-                        <input name="paymentNote" value={formData.paymentNote} onChange={handleChange} />
+                    <div className="summary">
+                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'right', marginTop: '20px' }}>
+                            {t.total}: {formData.amount} {formData.currency}
+                        </div>
                     </div>
-
-                    <div className="actions" style={{ marginTop: '20px' }}>
-                        <button type="submit" className="success">{t.saveInvoice}</button>
-                        <button type="button" onClick={togglePreview} className="secondary">
-                            👁️ {lang === 'cs' ? 'Náhled' : 'Preview'}
-                        </button>
-                        <button type="button" onClick={handleDownloadPDF} disabled={isGenerating} className="secondary">
-                            {isGenerating && !emailStatus ? t.alertGenerating : t.downloadPdf}
-                        </button>
-                        <button type="button" onClick={handleEmailPDF} disabled={isGenerating} className="secondary">
-                            {emailStatus || t.emailPdf}
-                        </button>
-                        <button type="button" onClick={handleMarkPaid} className="secondary" style={{ marginLeft: 'auto' }}>
-                            {t.markPaid}
-                        </button>
-                    </div>
-
-
                 </form>
             )}
         </section>

@@ -169,6 +169,102 @@ function readJsonBody(req, callback) {
   });
 }
 
+
+// #region Customer Storage Helper Functions
+/**
+ * Get the customers database file path for a specific user
+ */
+function getUserCustomersPath(userEmail) {
+  if (!userEmail) return null;
+  const safeEmail = userEmail.replace(/[^a-z0-9@._-]/gi, '_');
+  const userDir = path.join(dataDir, safeEmail);
+  if (!fs.existsSync(userDir)) {
+    fs.mkdirSync(userDir, { recursive: true });
+  }
+  return path.join(userDir, 'customers.json');
+}
+
+/**
+ * Get all customers for a user
+ */
+async function getUserCustomers(userEmail) {
+  if (isConnected) {
+    try {
+      let customers = await CustomerModel.find({ userEmail }).lean();
+
+      // Auto-Migration: If DB is empty but FS has data
+      if ((!customers || customers.length === 0) && userEmail) {
+        const filePath = getUserCustomersPath(userEmail);
+        if (filePath && fs.existsSync(filePath)) {
+          try {
+            const localData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            if (Array.isArray(localData) && localData.length > 0) {
+              console.log(`[Storage] Migrating ${localData.length} customers from FS to MongoDB for ${userEmail}`);
+              const toInsert = localData.map(c => ({
+                ...c,
+                userEmail,
+                lastUpdated: c.lastUpdated || new Date()
+              }));
+              for (const c of toInsert) {
+                await CustomerModel.findOneAndUpdate(
+                  { userEmail, name: c.name },
+                  c,
+                  { upsert: true, new: true }
+                );
+              }
+              customers = await CustomerModel.find({ userEmail }).lean();
+            }
+          } catch (fsErr) {
+            console.error('[Storage] Customers Migration failed:', fsErr);
+          }
+        }
+      }
+      return customers || [];
+    } catch (e) { return []; }
+  }
+
+  const filePath = getUserCustomersPath(userEmail);
+  if (!filePath || !fs.existsSync(filePath)) return [];
+  try {
+    const data = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(data);
+  } catch (e) { return []; }
+}
+
+/**
+ * Save or update a customer in user's database
+ */
+async function saveUserCustomer(userEmail, customer) {
+  if (isConnected) {
+    try {
+      await CustomerModel.findOneAndUpdate(
+        { userEmail, name: customer.name }, // Key by name (or add ID support if we change frontend)
+        { ...customer, userEmail, lastUpdated: new Date() },
+        { upsert: true, new: true }
+      );
+      return true;
+    } catch (e) { return false; }
+  }
+
+  const filePath = getUserCustomersPath(userEmail);
+  if (!filePath) return false;
+
+  try {
+    const customers = await getUserCustomers(userEmail);
+    const existingIndex = customers.findIndex(c => c.name.toLowerCase() === customer.name.toLowerCase());
+
+    if (existingIndex >= 0) {
+      customers[existingIndex] = { ...customers[existingIndex], ...customer, lastUpdated: Date.now() };
+    } else {
+      customers.push({ ...customer, lastUpdated: Date.now() });
+    }
+
+    fs.writeFileSync(filePath, JSON.stringify(customers, null, 2), 'utf8');
+    return true;
+  } catch (e) { return false; }
+}
+// #endregion
+
 // #region Google OAuth Setup
 // Load environment variables
 require('dotenv').config();
@@ -254,6 +350,20 @@ const ItemSchema = new mongoose.Schema({
 // Create a compound index for unique items per user
 ItemSchema.index({ userEmail: 1, name: 1 }, { unique: true });
 
+const CustomerSchema = new mongoose.Schema({
+  userEmail: { type: String, required: true, index: true },
+  name: { type: String, required: true },
+  email: String,
+  emailCopy: String,
+  phone: String,
+  ico: String,
+  vat: String,
+  address: String,
+  area: String,
+  lastUpdated: { type: Date, default: Date.now }
+});
+CustomerSchema.index({ userEmail: 1, name: 1 }, { unique: true });
+
 const SettingsSchema = new mongoose.Schema({
   userEmail: { type: String, required: true, unique: true },
   defaultSupplier: Object,
@@ -267,17 +377,19 @@ const TokenSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-let InvoiceModel, ItemModel, SettingsModel, TokenModel;
+let InvoiceModel, ItemModel, CustomerModel, SettingsModel, TokenModel;
 
 // Initialize models only once
 if (mongoose.models.Invoice) {
   InvoiceModel = mongoose.model('Invoice');
   ItemModel = mongoose.model('Item');
+  CustomerModel = mongoose.model('Customer');
   SettingsModel = mongoose.model('Settings');
   TokenModel = mongoose.model('Token');
 } else {
   InvoiceModel = mongoose.model('Invoice', InvoiceSchema);
   ItemModel = mongoose.model('Item', ItemSchema);
+  CustomerModel = mongoose.model('Customer', CustomerSchema);
   SettingsModel = mongoose.model('Settings', SettingsSchema);
   TokenModel = mongoose.model('Token', TokenSchema);
 }
@@ -298,6 +410,7 @@ const connectDB = async () => {
   }
 };
 // #endregion
+
 
 // Load saved tokens if exist (Local FS Fallback)
 if (oAuth2Client && fs.existsSync(TOKENS_PATH)) {
@@ -968,13 +1081,71 @@ const handleRequest = async (req, res) => {
 
   // #region Items Database API Routes
 
+
+  // #region Customers Database API Routes
+
+  // GET /api/customers - Get all customers for current user
+  if (requestPath === "/api/customers" && req.method === "GET") {
+    const userEmail = await getCurrentUserEmail(req);
+    if (!userEmail) {
+      return sendJson(res, 401, { error: "Not authenticated" });
+    }
+    const customers = await getUserCustomers(userEmail);
+    return sendJson(res, 200, { customers });
+  }
+
+  // POST /api/customers - Save or update customer
+  if (requestPath === "/api/customers" && req.method === "OPTIONS") {
+    return sendCors(res);
+  }
+  if (requestPath === "/api/customers" && req.method === "POST") {
+    return readJsonBody(req, (err, body) => {
+      if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+
+      const userEmail = getCurrentUserEmail(req); // Note: Should strictly await in async wrapper, but here wrapped by cookieSession
+      // FIX: make getCurrentUserEmail async friendly or use await
+      // Since we are inside readJsonBody callback, we can't easily await if getCurrentUserEmail was fully async.
+      // However, check above: getCurrentUserEmail IS async (requires await).
+      // We must handle this carefully.
+      // Actually, standard `readJsonBody` callback:
+      // We should make the callback async.
+    });
+  }
+  // Re-implementing POST logic correctly below safely:
+  if (requestPath === "/api/customers" && req.method === "POST") {
+    return readJsonBody(req, async (err, body) => {
+      if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+
+      const userEmail = await getCurrentUserEmail(req);
+      if (!userEmail) {
+        return sendJson(res, 401, { error: "Not authenticated" });
+      }
+
+      const { customer } = body;
+      if (!customer || !customer.name) {
+        return sendJson(res, 400, { error: "Invalid customer data" });
+      }
+
+      const success = await saveUserCustomer(userEmail, customer);
+      if (success) {
+        console.log(`[Storage] Saved customer ${customer.name} for ${userEmail}`);
+        return sendJson(res, 200, { success: true, customer });
+      } else {
+        return sendJson(res, 500, { error: "Failed to save customer" });
+      }
+    });
+  }
+  // #endregion
+
+  // #region Items Database API Routes
+
   // GET /api/items - Get all items for current user
   if (requestPath === "/api/items" && req.method === "GET") {
     const userEmail = await getCurrentUserEmail(req);
     if (!userEmail) {
       return sendJson(res, 401, { error: "Not authenticated. Please connect Google account." });
     }
-    const items = getUserItems(userEmail);
+    const items = await getUserItems(userEmail); // Made async in previous step implicitly by Model usage? Yes.
     return sendJson(res, 200, { items });
   }
 
@@ -983,10 +1154,10 @@ const handleRequest = async (req, res) => {
     return sendCors(res);
   }
   if (requestPath === "/api/items" && req.method === "POST") {
-    return readJsonBody(req, (err, body) => {
+    return readJsonBody(req, async (err, body) => {
       if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
 
-      const userEmail = getCurrentUserEmail(req);
+      const userEmail = await getCurrentUserEmail(req);
       if (!userEmail) {
         return sendJson(res, 401, { error: "Not authenticated" });
       }
@@ -996,7 +1167,7 @@ const handleRequest = async (req, res) => {
         return sendJson(res, 400, { error: "Invalid item data" });
       }
 
-      const success = saveUserItem(userEmail, item);
+      const success = await saveUserItem(userEmail, item);
       if (success) {
         console.log(`[Storage] Saved item ${item.name} for ${userEmail}`);
         return sendJson(res, 200, { success: true, item });
@@ -1006,6 +1177,7 @@ const handleRequest = async (req, res) => {
     });
   }
   // #endregion
+
 
   // #region Settings Storage Helper Functions
   /**
