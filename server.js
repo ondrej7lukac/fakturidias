@@ -754,12 +754,14 @@ const handleRequest = async (req, res) => {
 
         const tokensToSave = { ...tokens, email: userEmail };
 
-        // SAVE TOKENS LOCALLY (FS)
-        try {
-          fs.writeFileSync(TOKENS_PATH, JSON.stringify(tokensToSave));
-          console.log(`[OAuth] Tokens acquired${userEmail ? ' for ' + userEmail : ''}`);
-        } catch (e) {
-          console.error("[OAuth] Failed to save tokens to disk:", e.message);
+        // SAVE TOKENS LOCALLY (FS) - Skip on Vercel or catch EROFS silently
+        if (!process.env.VERCEL) {
+          try {
+            fs.writeFileSync(TOKENS_PATH, JSON.stringify(tokensToSave));
+            console.log(`[OAuth] Tokens acquired${userEmail ? ' for ' + userEmail : ''}`);
+          } catch (e) {
+            console.warn("[OAuth] Could not save tokens to disk (likely read-only FS):", e.message);
+          }
         }
 
         // Ensure DB is connected before trying to save

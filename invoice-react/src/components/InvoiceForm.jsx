@@ -408,7 +408,8 @@ export default function InvoiceForm({
 
         // Show suggestions if typing
         if (value.trim().length > 0) {
-            const matches = savedItems.filter(item =>
+            const itemsToFilter = Array.isArray(savedItems) ? savedItems : [];
+            const matches = itemsToFilter.filter(item =>
                 item.name.toLowerCase().includes(value.toLowerCase())
             ).slice(0, 5)
             setItemSuggestions(matches)
