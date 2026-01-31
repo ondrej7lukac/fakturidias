@@ -305,10 +305,10 @@ console.log('[Session Init] SESSION_SECRET exists?', !!SESSION_SECRET);
 console.log('[Session Init] MONGODB_URI exists?', !!MONGODB_URI);
 console.log('[Session Init] NODE_ENV:', process.env.NODE_ENV);
 
-// Trust Vercel Proxy (CRITICAL for secure cookies)
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1); // trust first proxy (Vercel)
-}
+
+// Note: This is a pure Node.js server (http.createServer), not Express.
+// We cannot use app.set('trust proxy', 1).
+// However, express-session with proxy: true option handles this!
 
 // Initialize session middleware (async safe)
 if (SESSION_SECRET && MONGODB_URI) {
@@ -318,6 +318,7 @@ if (SESSION_SECRET && MONGODB_URI) {
       secret: SESSION_SECRET,
       resave: false,
       saveUninitialized: false,
+      proxy: true, // Trusted proxy for secure cookies (Essential for Vercel)
       store: MongoStore.create({
         mongoUrl: MONGODB_URI,
         touchAfter: 24 * 3600, // lazy session update (seconds)
