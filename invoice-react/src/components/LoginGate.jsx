@@ -46,29 +46,30 @@ export default function LoginGate({ children }) {
 
     if (authState.loading) {
         return (
-            <div style={{
-                Sign in with Google
-                    </button>
-
-                <p style={{
-                    marginTop: '30px',
-                    fontSize: '13px',
-                    color: '#999'
-                }}>
-                    Secure authentication via Google OAuth2
-                </p>
-                </ div>
-
-                <style>{`
-          @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
+            <div className="flex items-center justify-center min-h-screen bg-gray-50">
+                <div className="text-center">
+                    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading...</p>
+                </div>
             </div>
         );
     }
 
-    // User is authenticated - render the main app
-    return <>{children}</>;
+    return (
+        <>
+            {children}
+
+            {!authState.authenticated && (
+                <div className="fixed bottom-6 right-6 z-50">
+                    <button
+                        onClick={handleLogin}
+                        className="bg-white text-gray-800 font-semibold py-3 px-6 rounded-full shadow-xl border border-gray-200 flex items-center gap-3 hover:bg-gray-50 hover:scale-105 transition-all duration-200"
+                    >
+                        <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
+                        <span>Sign in to Save</span>
+                    </button>
+                </div>
+            )}
+        </>
+    );
 }
