@@ -868,10 +868,22 @@ const requestHandler = async (req, res) => {
               <p>Closing window...</p>
               <script>
                 // Notify the opener (React App)
+                console.log('Popup loaded, checking opener...');
                 if (window.opener) {
-                  window.opener.postMessage(${clientData}, '*');
+                  console.log('Opener found, posting message...');
+                  try {
+                    window.opener.postMessage(${clientData}, '*');
+                    document.body.insertAdjacentHTML('beforeend', '<p style="color:green">Message sent to main window!</p>');
+                  } catch (e) {
+                    console.error('Failed to post message:', e);
+                    document.body.insertAdjacentHTML('beforeend', '<p style="color:red">Error sending message: ' + e.message + '</p>');
+                  }
+                } else {
+                  console.error('No window.opener found!');
+                  document.body.insertAdjacentHTML('beforeend', '<p style="color:red; font-weight:bold;">ERROR: connection to main window lost. Please reloading the main page manually.</p>');
+                  alert('Error: Connection to main window lost. Please reload the app manually.');
                 }
-                setTimeout(() => window.close(), 3000);
+                setTimeout(() => window.close(), 4000);
               </script>
             </body>
           </html>
