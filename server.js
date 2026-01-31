@@ -261,6 +261,8 @@ const SettingsSchema = new mongoose.Schema({
 const TokenSchema = new mongoose.Schema({
   userEmail: { type: String, required: true, unique: true },
   tokens: Object,
+  handoffCode: { type: String, index: true }, // One-time use code for session transfer
+  handoffExpires: Date,
   updatedAt: { type: Date, default: Date.now }
 });
 
@@ -811,79 +813,88 @@ const requestHandler = async (req, res) => {
         if (!isConnected) await connectDB();
 
         let savedToDb = false;
-        // SAVE TOKENS TO DB
-        if (isConnected && userEmail) {
+        // Generate a secure one-time handoff code
+        const crypto = await import('crypto');
+        const handoffCode = crypto.randomBytes(32).toString('hex');
+
+        // Save to DB with expiration (2 minutes)
+        if (isConnected) {
           try {
             await TokenModel.findOneAndUpdate(
               { userEmail },
-              { tokens: tokensToSave, userEmail, updatedAt: new Date() },
+              {
+                $set: {
+                  tokens,
+                  updatedAt: new Date(),
+                  handoffCode: handoffCode,
+                  handoffExpires: new Date(Date.now() + 2 * 60 * 1000) // 2 mins
+                }
+              },
               { upsert: true, new: true }
             );
-            console.log('[OAuth] Tokens saved to MongoDB');
             savedToDb = true;
-          } catch (e) {
-            console.error('[OAuth] Failed to save tokens to DB:', e);
+            console.log(`[OAuth Callback] ✅ Tokens and Handoff Code saved for user: ${userEmail}`);
+          } catch (dbError) {
+            console.error('[OAuth Callback] ❌ Database error:', dbError);
           }
         }
 
-        // CREATE USER SESSION (CRITICAL FOR MULTI-USER)
-        console.log('[OAuth Callback] About to create session...');
-        console.log('[OAuth Callback] userEmail:', userEmail);
-        console.log('[OAuth Callback] req.session exists?', !!req.session);
-        console.log('[OAuth Callback] req.session:', req.session);
-
-        if (userEmail && req.session) {
-          console.log('[OAuth Callback] ✅ Both userEmail and req.session exist - creating session...');
+        // Create session in callback (for reliability, though main window will create its own)
+        if (req.session) {
           req.session.authenticated = true;
           req.session.userEmail = userEmail;
           await new Promise((resolve) => req.session.save(resolve));
-          console.log(`[OAuth Callback] ✅ Session created for user: ${userEmail}`);
-        } else {
-          console.error('[OAuth Callback] ❌ Could not create session!');
-          console.error('[OAuth Callback] userEmail:', userEmail);
-          console.error('[OAuth Callback] req.session:', req.session);
         }
 
-        // Return a simple HTML page that closes itself or redirects back to app
+        // Return the HTML with the HANDOFF CODE (not email)
         res.writeHead(200, {
           "Content-Type": "text/html",
           "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
         });
 
         const statusMessage = savedToDb
-          ? '<h1 style="color: green;">Successfully Connected!</h1><p>Tokens saved to database.</p>'
-          : '<h1 style="color: orange;">Connected (Local Only)</h1><p>Warning: Could not save to Database. You may need to whitelist Vercel IPs in MongoDB Atlas.</p>';
+          ? '<h1 style="color: green;">Successfully Connected!</h1><p>Returning to app...</p>'
+          : '<h1 style="color: orange;">Connected (Local Only)</h1><p>Warning: Could not save to Database.</p>';
 
-        // Pass minimal info to client to update UI state
+        // Pass CODE instead of EMAIL
         const clientData = JSON.stringify({
           type: 'GOOGLE_LOGIN_SUCCESS',
-          email: userEmail,
-          tokens: { connected: true, note: "managed_by_server" }
+          code: handoffCode // Send code, not email
         });
 
         res.end(`
           <html>
-            <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+            <body style="font-family: sans-serif; text-align: center; padding: 40px;">
               ${statusMessage}
               <p>Closing window...</p>
               <script>
                 // Notify the opener (React App)
-                console.log('Popup loaded, checking opener...');
-                if (window.opener) {
-                  console.log('Opener found, posting message...');
-                  try {
-                    window.opener.postMessage(${clientData}, '*');
-                    document.body.insertAdjacentHTML('beforeend', '<p style="color:green">Message sent to main window!</p>');
-                  } catch (e) {
-                    console.error('Failed to post message:', e);
-                    document.body.insertAdjacentHTML('beforeend', '<p style="color:red">Error sending message: ' + e.message + '</p>');
-                  }
-                } else {
-                  console.error('No window.opener found!');
-                  document.body.insertAdjacentHTML('beforeend', '<p style="color:red; font-weight:bold;">ERROR: connection to main window lost. Please reloading the main page manually.</p>');
-                  alert('Error: Connection to main window lost. Please reload the app manually.');
+                const data = ${clientData};
+                
+                // Method 1: IDB/LocalStorage (Same Origin Fallback)
+                try {
+                  // Save CODE to localStorage
+                  localStorage.setItem('google_handoff_code', JSON.stringify({
+                    code: data.code,
+                    timestamp: Date.now()
+                  }));
+                  document.body.insertAdjacentHTML('beforeend', '<p style="color:blue">Saved Handoff Code to LocalStorage</p>');
+                } catch (e) {
+                  console.error('LocalStorage error:', e);
                 }
-                setTimeout(() => window.close(), 4000);
+
+                // Method 2: window.opener (Primary)
+                try {
+                  if (window.opener) {
+                    window.opener.postMessage(data, '*');
+                    document.body.insertAdjacentHTML('beforeend', '<p style="color:green">Code sent to main window!</p>');
+                  }
+                } catch (e) {
+                  // Ignore opener errors
+                }
+                
+                // Close shortly
+                setTimeout(() => window.close(), 1500);
               </script>
             </body>
           </html>
@@ -897,29 +908,41 @@ const requestHandler = async (req, res) => {
     }
   }
 
-  // Login Endpoint - Creates session for main window after OAuth popup success
+  // Login Endpoint - SECURE HANDOFF
   if (requestPath === "/auth/login" && req.method === "POST") {
     return readJsonBody(req, async (err, body) => {
       if (err) return sendJson(res, 400, { error: "Invalid JSON" });
 
-      const { email } = body;
-      console.log('[Auth Login] Login request for email:', email);
+      const { code } = body;
+      console.log('[Auth Login] Login request with code');
 
-      if (!email) {
-        console.error('[Auth Login] No email provided');
-        return sendJson(res, 400, { error: "Email required" });
+      if (!code) {
+        return sendJson(res, 400, { error: "Code required" });
       }
 
-      // Verify this user exists in MongoDB (has completed OAuth)
       if (!isConnected) await connectDB();
 
       if (isConnected) {
         try {
-          const tokenDoc = await TokenModel.findOne({ userEmail: email });
+          // Find user by valid handoff code
+          const tokenDoc = await TokenModel.findOne({
+            handoffCode: code,
+            handoffExpires: { $gt: new Date() } // Must not be expired
+          });
+
           if (!tokenDoc) {
-            console.error('[Auth Login] No tokens found for email:', email);
-            return sendJson(res, 401, { error: "User not authenticated with Google" });
+            console.error('[Auth Login] Invalid or expired code');
+            return sendJson(res, 401, { error: "Invalid login code. Please try again." });
           }
+
+          const email = tokenDoc.userEmail;
+
+          // INVALIDATE CODE IMMEDIATELY (One-time use)
+          tokenDoc.handoffCode = undefined;
+          tokenDoc.handoffExpires = undefined;
+          await tokenDoc.save();
+
+          console.log(`[Auth Login] Code validated for user: ${email}`);
 
           // Create session for this user
           if (req.session) {

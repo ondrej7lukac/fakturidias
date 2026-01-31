@@ -38,42 +38,84 @@ export default function LoginGate({ children }) {
             if (data.url) {
                 const popup = window.open(data.url, 'Google Auth', 'width=600,height=700');
 
-                // Listen for success message from popup
-                const handleMessage = async (event) => {
-                    console.log('[LoginGate] Received postMessage:', event.data);
+                // Helper to perform the actual session creation
+                const createSession = async (code) => {
+                    try {
+                        console.log('[LoginGate] performLogin: Calling /auth/login with code');
+                        const loginRes = await fetch('/auth/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ code: code })
+                        });
 
-                    if (event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
-                        console.log('[LoginGate] OAuth success! Email:', event.data.email);
-                        window.removeEventListener('message', handleMessage);
-                        popup?.close();
+                        console.log('[LoginGate] /auth/login response status:', loginRes.status);
 
-                        // Create session in main window context
-                        try {
-                            console.log('[LoginGate] Calling /auth/login with email:', event.data.email);
-                            const loginRes = await fetch('/auth/login', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ email: event.data.email })
-                            });
-
-                            console.log('[LoginGate] /auth/login response status:', loginRes.status);
-
-                            if (loginRes.ok) {
-                                console.log('[LoginGate] Session created! Reloading...');
-                                // Session created successfully - reload to show app
-                                window.location.reload();
-                            } else {
-                                const errorText = await loginRes.text();
-                                console.error('[LoginGate] Failed to create session:', errorText);
-                                alert('Login failed. Please try again.');
-                            }
-                        } catch (e) {
-                            console.error('[LoginGate] Login error:', e);
+                        if (loginRes.ok) {
+                            console.log('[LoginGate] Session created! Reloading...');
+                            window.location.reload();
+                            return true;
+                        } else {
+                            const errorText = await loginRes.text();
+                            console.error('[LoginGate] Failed to create session:', errorText);
                             alert('Login failed. Please try again.');
+                            return false;
                         }
+                    } catch (e) {
+                        console.error('[LoginGate] Login error:', e);
+                        alert('Login failed. Please try again.');
+                        return false;
+                    }
+                };
+
+                // 1. Listen for postMessage (Primary)
+                const handleMessage = async (event) => {
+                    if (event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
+                        console.log('[LoginGate] OAuth success via postMessage! Code received.');
+                        window.removeEventListener('message', handleMessage);
+                        // Clean up poller
+                        if (poller) clearInterval(poller);
+
+                        popup?.close();
+                        createSession(event.data.code);
                     }
                 };
                 window.addEventListener('message', handleMessage);
+
+                // 2. Poll LocalStorage (Fallback for when window.opener is broken)
+                const poller = setInterval(() => {
+                    try {
+                        const stored = localStorage.getItem('google_handoff_code');
+                        if (stored) {
+                            const { code, timestamp } = JSON.parse(stored);
+
+                            // Only accept if very recent (prevent loops)
+                            if (Date.now() - timestamp < 10000) {
+                                console.log('[LoginGate] OAuth success via LocalStorage! Code found.');
+
+                                // Consumed - remove it immediately
+                                localStorage.removeItem('google_handoff_code');
+
+                                clearInterval(poller);
+                                window.removeEventListener('message', handleMessage);
+                                popup?.close();
+
+                                createSession(code);
+                            } else {
+                                // Stale token, clear it
+                                localStorage.removeItem('google_handoff_code');
+                            }
+                        }
+
+                        if (popup.closed) {
+                            // Give it a moment to write to LS if it just closed
+                            setTimeout(() => {
+                                clearInterval(poller);
+                            }, 5000);
+                        }
+                    } catch (e) {
+                        console.error('[LoginGate] Poller error:', e);
+                    }
+                }, 1000);
             }
         } catch (e) {
             alert('Failed to start authentication');
