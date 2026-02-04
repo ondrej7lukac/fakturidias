@@ -70,7 +70,7 @@ export default function InvoiceForm({
         stateRef.current = { formData, items }
     }, [formData, items])
 
-    const [itemInput, setItemInput] = useState({ name: '', qty: 1, price: '', taxRate: '21', discount: 0, total: '' })
+    const [itemInput, setItemInput] = useState({ name: '', qty: 1, price: '', taxRate: formData.isVatPayer ? '21' : '0', discount: 0, total: '' })
     const [categoryInput, setCategoryInput] = useState('')
     const [isGenerating, setIsGenerating] = useState(false)
     const [emailStatus, setEmailStatus] = useState('')
@@ -201,6 +201,14 @@ export default function InvoiceForm({
             setFormData(prev => ({ ...prev, ...updates }))
         }
     }, [formData.accountNumber, formData.bankCode, formData.prefix])
+
+    // Update item input tax rate when VAT payer status changes
+    useEffect(() => {
+        setItemInput(prev => ({
+            ...prev,
+            taxRate: formData.isVatPayer ? '21' : '0'
+        }))
+    }, [formData.isVatPayer])
 
     const handleBlurSave = () => {
         if (saveTimer) clearTimeout(saveTimer)
@@ -434,7 +442,8 @@ export default function InvoiceForm({
             console.error('[Items] Failed to save item:', e)
         }
 
-        setItemInput({ name: '', qty: 1, price: '', taxRate: '21', discount: 0, total: '' })
+        // Reset with default tax rate based on VAT payer status
+        setItemInput({ name: '', qty: 1, price: '', taxRate: formData.isVatPayer ? '21' : '0', discount: 0, total: '' })
         setItemSuggestions([])
     }
 
@@ -478,20 +487,21 @@ export default function InvoiceForm({
 
         const qty = Number(itemInput.qty) || 1
         const taxRate = formData.isVatPayer ? (Number(itemInput.taxRate) || 0) : 0
-        const discount = Number(itemInput.discount) || 0
+        const discountPct = Number(itemInput.discount) || 0
         const taxMultiplier = 1 + (taxRate / 100)
+        const discountMultiplier = 1 - (discountPct / 100)
 
-        // Price = (Total / (Qty * TaxMultiplier)) + Discount
-        if (qty > 0 && taxMultiplier > 0) {
-            const price = (newTotal / (qty * taxMultiplier)) + discount
+        // Working backwards: Total = (Price * DiscountMultiplier * Qty) * TaxMultiplier
+        // So: Price = Total / (Qty * TaxMultiplier * DiscountMultiplier)
+        if (qty > 0 && taxMultiplier > 0 && discountMultiplier > 0) {
+            const price = newTotal / (qty * taxMultiplier * discountMultiplier)
             setItemInput(prev => ({
                 ...prev,
-                price: price.toFixed(2), // Keep a few decimals, don't round too early
+                price: price.toFixed(2),
                 total: newTotalStr
             }))
-        } else {
-            setItemInput(prev => ({ ...prev, total: newTotalStr }))
         }
+        setItemInput(prev => ({ ...prev, total: newTotalStr }))
     }
 
     const handleAddCategory = () => {
@@ -622,11 +632,25 @@ export default function InvoiceForm({
                 </button>
             </div>
 
+            <style>{`
+                input[type="number"]::-webkit-inner-spin-button,
+                input[type="number"]::-webkit-outer-spin-button {
+                    -webkit-appearance: none;
+                    margin: 0;
+                }
+                input[type="number"] {
+                    -moz-appearance: textfield;
+                }
+            `}</style>
+
             {previewMode ? (
                 <>
                     <InvoicePreview invoice={getCurrentInvoiceData()} t={t} lang={lang} />
                     <div className="actions" style={{ marginTop: '30px' }}>
-                        <button type="button" onClick={togglePreview} className="secondary">
+                        <button type="button" onClick={(e) => { e.preventDefault(); onSave(getCurrentInvoiceData()); }} className="primary">
+                            {t.saveInvoice}
+                        </button>
+                        <button type="button" onClick={(e) => { e.preventDefault(); setPreviewMode(false); }} className="secondary">
                             ✏️ {lang === 'cs' ? 'Upravit' : 'Edit'}
                         </button>
                         <button type="button" onClick={handleDownloadPDF} disabled={isGenerating} className="secondary">
@@ -779,7 +803,7 @@ export default function InvoiceForm({
                                     value={formData.clientName}
                                     onChange={handleClientNameChange}
                                     onBlur={handleInputBlur}
-                                    placeholder="Firma ABC s.r.o."
+                                    placeholder={lang === 'cs' ? 'Zadej název firmy nebo IČO pro vyhledávání...' : 'Enter company name or ID...'}
                                     autoComplete="off"
                                 />
                                 {customerSuggestions.length > 0 && (
@@ -788,8 +812,9 @@ export default function InvoiceForm({
                                         top: '100%',
                                         left: 0,
                                         right: 0,
-                                        background: 'var(--card-bg)',
+                                        background: '#1a1d2e',
                                         border: '1px solid var(--border)',
+                                        borderRadius: '8px',
                                         zIndex: 10,
                                         listStyle: 'none',
                                         padding: 0,
@@ -813,7 +838,6 @@ export default function InvoiceForm({
                                     </ul>
                                 )}
                             </div>
-                            {/* AresSearch component removed, integrated above */}
                         </div>
                         <div>
                             <label>{t.clientAddress}</label>
@@ -852,10 +876,9 @@ export default function InvoiceForm({
                     </div>
 
                     <h3>{t.items}</h3>
-                    <ItemsTable items={items} lang={lang} t={t} onDelete={handleDeleteRow} />
 
-                    <div className="add-item-form grid" style={{ gridTemplateColumns: '2fr 0.8fr 1fr 0.8fr 0.8fr 1fr 0.5fr', gap: '5px', alignItems: 'end' }}>
-                        <div style={{ position: 'relative' }}>
+                    <div className="add-item-form grid" style={{ gridTemplateColumns: '2.5fr 1fr 0.6fr 0.6fr 1fr', gap: '5px', alignItems: 'end' }}>
+                        <div>
                             <label>{t.item}</label>
                             <input
                                 value={itemInput.name}
@@ -865,7 +888,8 @@ export default function InvoiceForm({
                             {itemSuggestions.length > 0 && (
                                 <ul className="suggestions" style={{
                                     position: 'absolute', top: '100%', left: 0, right: 0,
-                                    background: 'var(--card-bg)', border: '1px solid var(--border)', zIndex: 10,
+                                    background: '#1a1d2e', border: '1px solid var(--border)',
+                                    borderRadius: '8px', zIndex: 10,
                                     listStyle: 'none', padding: 0, margin: 0
                                 }}>
                                     {itemSuggestions.map((s, i) => (
@@ -877,31 +901,18 @@ export default function InvoiceForm({
                             )}
                         </div>
                         <div>
-                            <label>{t.qty}</label>
+                            <label>{lang === 'cs' ? 'Cena (bez dane)' : 'Price (ex. tax)'}</label>
                             <input
                                 type="number"
-                                value={itemInput.qty}
-                                onChange={(e) => {
-                                    const qty = Number(e.target.value);
-                                    setItemInput(prev => ({ ...prev, qty }));
-                                    const sub = (Number(itemInput.price) - Number(itemInput.discount || 0)) * qty
-                                    const total = sub * (1 + (formData.isVatPayer ? Number(itemInput.taxRate || 0) : 0) / 100)
-                                    if (itemInput.price) setItemInput(prev => ({ ...prev, qty, total: total.toFixed(2) }))
-                                }}
-                            />
-                        </div>
-                        <div>
-                            <label>{lang === 'cs' ? 'Cena/ks' : 'Price/unit'}</label>
-                            <input
-                                type="number"
-                                placeholder="0.00"
+                                placeholder="0"
                                 value={itemInput.price}
                                 onChange={(e) => {
                                     const price = e.target.value
                                     const qty = Number(itemInput.qty) || 1
                                     const taxRate = formData.isVatPayer ? (Number(itemInput.taxRate) || 0) : 0
-                                    const discount = Number(itemInput.discount) || 0
-                                    const sub = (Number(price) - discount) * qty
+                                    const discountPct = Number(itemInput.discount) || 0
+                                    const priceAfterDiscount = Number(price) * (1 - discountPct / 100)
+                                    const sub = priceAfterDiscount * qty
                                     const total = sub * (1 + taxRate / 100)
                                     setItemInput(prev => ({ ...prev, price, total: total.toFixed(2) }))
                                 }}
@@ -915,50 +926,136 @@ export default function InvoiceForm({
                                     const taxRate = e.target.value
                                     const qty = Number(itemInput.qty) || 1
                                     const price = Number(itemInput.price) || 0
-                                    const discount = Number(itemInput.discount) || 0
-                                    const sub = (price - discount) * qty
-                                    const total = sub * (1 + (formData.isVatPayer ? Number(taxRate) : 0) / 100)
+                                    const discountPct = Number(itemInput.discount) || 0
+                                    const priceAfterDiscount = price * (1 - discountPct / 100)
+                                    const sub = priceAfterDiscount * qty
+                                    const total = sub * (1 + Number(taxRate) / 100)
                                     setItemInput(prev => ({ ...prev, taxRate, total: total.toFixed(2) }))
                                 }}
-                                disabled={!formData.isVatPayer}
-                                style={!formData.isVatPayer ? { opacity: 0.5 } : {}}
                             >
-                                <option value="21">21%</option>
-                                <option value="15">15%</option>
-                                <option value="12">12%</option>
-                                <option value="0">0%</option>
+                                {!formData.isVatPayer ? (
+                                    <>
+                                        <option value="0">0%</option>
+                                        <option value="21">21%</option>
+                                        <option value="15">15%</option>
+                                        <option value="12">12%</option>
+                                    </>
+                                ) : (
+                                    <>
+                                        <option value="21">21%</option>
+                                        <option value="15">15%</option>
+                                        <option value="12">12%</option>
+                                        <option value="0">0%</option>
+                                    </>
+                                )}
                             </select>
                         </div>
                         <div>
-                            <label>{lang === 'cs' ? 'Sleva' : 'Discount'}</label>
+                            <label>{lang === 'cs' ? 'Sleva %' : 'Discount %'}</label>
+                            <select
+                                value={itemInput.discount}
+                                onChange={(e) => {
+                                    const discountPct = e.target.value
+                                    const qty = Number(itemInput.qty) || 1
+                                    const price = Number(itemInput.price) || 0
+                                    const taxRate = Number(itemInput.taxRate) || 0
+                                    const priceAfterDiscount = price * (1 - Number(discountPct) / 100)
+                                    const sub = priceAfterDiscount * qty
+                                    const total = sub * (1 + taxRate / 100)
+                                    setItemInput(prev => ({ ...prev, discount: discountPct, total: total.toFixed(2) }))
+                                }}
+                            >
+                                <option value="0">0%</option>
+                                <option value="5">5%</option>
+                                <option value="10">10%</option>
+                                <option value="15">15%</option>
+                                <option value="20">20%</option>
+                                <option value="25">25%</option>
+                                <option value="50">50%</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>{lang === 'cs' ? 'Celkem (s dani)' : 'Total (incl. tax)'}</label>
                             <input
                                 type="number"
                                 placeholder="0"
-                                value={itemInput.discount}
-                                onChange={(e) => {
-                                    const discount = Number(e.target.value)
-                                    const qty = Number(itemInput.qty) || 1
-                                    const price = Number(itemInput.price) || 0
-                                    const taxRate = formData.isVatPayer ? (Number(itemInput.taxRate) || 0) : 0
-                                    const sub = (price - discount) * qty
-                                    const total = sub * (1 + taxRate / 100)
-                                    setItemInput(prev => ({ ...prev, discount, total: total.toFixed(2) }))
-                                }}
-                            />
-                        </div>
-                        <div>
-                            <label>{lang === 'cs' ? 'Celkem' : 'Total'}</label>
-                            <input
-                                type="number"
-                                placeholder="0.00"
                                 value={itemInput.total}
                                 onChange={handleItemTotalChange}
                             />
                         </div>
-                        <button type="button" onClick={handleAddItem} className="primary" style={{ marginBottom: '10px' }}>
-                            +
+                    </div>
+
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        marginTop: '15px',
+                    }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0',
+                            background: 'rgba(255,255,255,0.05)',
+                            borderRadius: '12px',
+                            padding: '4px',
+                            height: '40px'
+                        }}>
+                            <button
+                                type="button"
+                                onClick={() => setItemInput(prev => ({ ...prev, qty: Math.max(1, prev.qty - 1) }))}
+                                style={{
+                                    padding: '0 11px',
+                                    height: '28px',
+                                    fontSize: '0.85rem',
+                                    background: 'rgba(100, 150, 200, 0.3)',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    color: '#6495ed',
+                                    fontWeight: 'bold',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(100, 150, 200, 0.5)'}
+                                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(100, 150, 200, 0.3)'}
+                            >
+                                −
+                            </button>
+                            <span style={{
+                                padding: '0 17px',
+                                fontSize: '0.85rem',
+                                fontWeight: '600',
+                                minWidth: '42px',
+                                textAlign: 'center'
+                            }}>
+                                {itemInput.qty}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setItemInput(prev => ({ ...prev, qty: prev.qty + 1 }))}
+                                style={{
+                                    padding: '0 11px',
+                                    height: '28px',
+                                    fontSize: '0.85rem',
+                                    background: 'rgba(100, 150, 200, 0.3)',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    color: '#6495ed',
+                                    fontWeight: 'bold',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(100, 150, 200, 0.5)'}
+                                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(100, 150, 200, 0.3)'}
+                            >
+                                +
+                            </button>
+                        </div>
+                        <button type="button" onClick={handleAddItem} className="secondary">
+                            {t.addItem}
                         </button>
                     </div>
+
+                    <ItemsTable items={items} lang={lang} t={t} onDelete={handleDeleteRow} />
 
                     <div className="grid two">
                         <div>
@@ -972,7 +1069,11 @@ export default function InvoiceForm({
                             <input name="bic" value={formData.bic} onChange={handleChange} />
                         </div>
                     </div>
-                    <div className="grid three">
+                    <div className="grid" style={{ gridTemplateColumns: '0.5fr 1.5fr 1fr' }}>
+                        <div>
+                            <label>{lang === 'cs' ? 'Předčíslí' : 'Prefix'}</label>
+                            <input name="prefix" value={formData.prefix} onChange={handleChange} placeholder="000" />
+                        </div>
                         <div>
                             <label>{lang === 'cs' ? 'Číslo účtu' : 'Account Number'}</label>
                             <input name="accountNumber" value={formData.accountNumber} onChange={handleChange} />
@@ -981,10 +1082,10 @@ export default function InvoiceForm({
                             <label>{lang === 'cs' ? 'Kód banky' : 'Bank Code'}</label>
                             <input name="bankCode" value={formData.bankCode} onChange={handleChange} />
                         </div>
-                        <div>
-                            <label>{t.variableSymbol}</label>
-                            <input name="variableSymbol" value={formData.variableSymbol} onChange={handleChange} />
-                        </div>
+                    </div>
+                    <div>
+                        <label>{t.variableSymbol}</label>
+                        <input name="variableSymbol" value={formData.variableSymbol} onChange={handleChange} />
                     </div>
                     <div>
                         <label>{lang === 'cs' ? 'Poznámka' : 'Note'}</label>
@@ -992,12 +1093,31 @@ export default function InvoiceForm({
                     </div>
 
                     <div className="summary">
-                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'right', marginTop: '20px' }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'left', marginTop: '20px' }}>
                             {t.total}: {formData.amount} {formData.currency}
                         </div>
                     </div>
+
+                    <div className="actions" style={{ marginTop: '30px' }}>
+                        <button type="submit" className="primary">
+                            {t.saveInvoice}
+                        </button>
+                        <button type="button" onClick={(e) => { e.preventDefault(); setPreviewMode(!previewMode); }} className="secondary">
+                            👁️ {lang === 'cs' ? 'Náhled' : 'Preview'}
+                        </button>
+                        <button type="button" onClick={handleDownloadPDF} disabled={isGenerating} className="secondary">
+                            {isGenerating && !emailStatus ? t.alertGenerating : t.downloadPdf}
+                        </button>
+                        <button type="button" onClick={handleEmailPDF} disabled={isGenerating} className="secondary">
+                            {emailStatus || t.emailPdf}
+                        </button>
+                        <button type="button" onClick={handleMarkPaid} className="secondary" style={{ marginLeft: 'auto' }}>
+                            {t.markPaid}
+                        </button>
+                    </div>
                 </form>
-            )}
-        </section>
+            )
+            }
+        </section >
     )
 }
