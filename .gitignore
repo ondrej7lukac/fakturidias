@@ -51,3 +51,5 @@ GIT_SETUP_COMPLETE.md
 create-env.bat
 push.bat
 start.bat
+.vercel
+.env*.local

@@ -65,10 +65,22 @@ export default function InvoiceForm({
 
     const [items, setItems] = useState([])
     const stateRef = useRef({ formData, items })
+    const itemSuggestionsRef = useRef(null)
 
     useEffect(() => {
         stateRef.current = { formData, items }
     }, [formData, items])
+
+    // Close item suggestions when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (itemSuggestionsRef.current && !itemSuggestionsRef.current.contains(event.target)) {
+                setItemSuggestions([])
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
 
     const [itemInput, setItemInput] = useState({ name: '', qty: 1, price: '', taxRate: formData.isVatPayer ? '21' : '0', discount: 0, total: '' })
     const [categoryInput, setCategoryInput] = useState('')
@@ -396,7 +408,8 @@ export default function InvoiceForm({
         const basePrice = Number(itemInput.price) || 0
         const qty = Number(itemInput.qty)
         const discount = Number(itemInput.discount) || 0
-        const taxRate = formData.isVatPayer ? (Number(itemInput.taxRate) || 0) : 0
+        // Use the selected tax rate directly, don't force it to 0
+        const taxRate = Number(itemInput.taxRate) || 0
 
         const priceAfterDiscount = basePrice - discount
         const subtotal = qty * priceAfterDiscount
@@ -878,7 +891,7 @@ export default function InvoiceForm({
                     <h3>{t.items}</h3>
 
                     <div className="add-item-form grid" style={{ gridTemplateColumns: '2.5fr 1fr 0.6fr 0.6fr 1fr', gap: '5px', alignItems: 'end' }}>
-                        <div>
+                        <div style={{ position: 'relative' }} ref={itemSuggestionsRef}>
                             <label>{t.item}</label>
                             <input
                                 value={itemInput.name}
@@ -888,13 +901,14 @@ export default function InvoiceForm({
                             {itemSuggestions.length > 0 && (
                                 <ul className="suggestions" style={{
                                     position: 'absolute', top: '100%', left: 0, right: 0,
-                                    background: '#1a1d2e', border: '1px solid var(--border)',
-                                    borderRadius: '8px', zIndex: 10,
-                                    listStyle: 'none', padding: 0, margin: 0
+                                    background: 'var(--card)', border: '1px solid var(--border)',
+                                    borderRadius: '8px', zIndex: 1000,
+                                    listStyle: 'none', padding: '4px', margin: '2px 0 0 0',
+                                    maxHeight: '200px', overflowY: 'auto'
                                 }}>
                                     {itemSuggestions.map((s, i) => (
-                                        <li key={i} onClick={() => handleSelectSuggestion(s)} style={{ padding: '8px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
-                                            {s.name} <small>({s.price} {formData.currency})</small>
+                                        <li key={i} onClick={() => handleSelectSuggestion(s)} style={{ padding: '8px', cursor: 'pointer', borderRadius: '6px', marginBottom: '2px' }} onMouseOver={(e) => e.currentTarget.style.background = 'rgba(37, 99, 235, 0.1)'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
+                                            {s.name} <small style={{ color: 'var(--muted)' }}>({s.price} {formData.currency})</small>
                                         </li>
                                     ))}
                                 </ul>

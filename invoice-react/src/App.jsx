@@ -83,7 +83,7 @@ function App() {
 
     // Reload data when user changes (Login/Logout)
     useEffect(() => {
-        if (!isLoading) fetchInvoices()
+        fetchInvoices()
     }, [user])
 
     // Load invoices and settings from server on mount
@@ -128,23 +128,39 @@ function App() {
             // ... logic to load settings
         }
 
-        // Listen for Google Login updates from Header popup
-        const handleGoogleLogin = async () => {
-            console.log("Login detected, refreshing auth...")
-            await checkAuthStatus()
-            // checkAuthStatus sets 'user', which triggers useEffect -> fetchInvoices
+        // Listen for Google Login updates from OAuth popup via postMessage
+        const handleMessage = async (event) => {
+            // Security: Validate origin if needed (for now accept all for localhost + production)
+            if (event.data && event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
+                console.log("Login detected via postMessage, refreshing auth...")
+                await checkAuthStatus()
+                // Force reload invoices after auth status updates
+                await fetchInvoices()
+            }
         }
-        window.addEventListener('google_login_update', handleGoogleLogin)
-        return () => window.removeEventListener('google_login_update', handleGoogleLogin)
+        window.addEventListener('message', handleMessage)
+        return () => window.removeEventListener('message', handleMessage)
     }, [])
 
-    // Save local settings to localStorage (not server)
+    // Save local settings to localStorage and sync to server if authenticated
     useEffect(() => {
         localStorage.setItem('lang', lang)
-        localStorage.setItem('defaultSupplier', JSON.stringify(defaultSupplier))
-        localStorage.setItem('categories', JSON.stringify(categories))
-        // invoiceCounter is now dynamic, no need to save to localStorage
-    }, [lang, defaultSupplier, categories])
+        if (defaultSupplier) {
+            localStorage.setItem('defaultSupplier', JSON.stringify(defaultSupplier))
+
+            // Sync to server if logged in
+            if (user) {
+                fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ settings: defaultSupplier })
+                }).catch(err => console.error('Failed to sync settings to server:', err))
+            }
+        }
+        if (categories.length > 0) {
+            localStorage.setItem('categories', JSON.stringify(categories))
+        }
+    }, [lang, defaultSupplier, categories, user])
 
     const selectedInvoice = invoices.find(inv => inv.id === selectedId)
 
@@ -233,16 +249,24 @@ function App() {
                 user={user}
                 onLogout={() => {
                     // Call backend to disconnect/clear session
-                    fetch('/auth/google/disconnect', { method: 'POST' }).finally(() => {
-                        localStorage.clear() // Explicitly clear local storage as requested
-                        setUser(null)
-                        setInvoices([])
-                        setDefaultSupplier(null)
-                        setCategories([])
-                        setCurrentView('invoices') // Fixed ReferenceError (was onViewChange)
-                        // Trigger reload of local data (which will be empty now)
-                        setInvoiceCounter(1)
-                    })
+                    fetch('/auth/google/disconnect', { method: 'POST' })
+                        .then(() => {
+                            // Clear local storage
+                            localStorage.clear()
+                            // Reload page to ensure clean state
+                            window.location.reload()
+                        })
+                        .catch((err) => {
+                            console.error('Logout error:', err)
+                            // Still clear local data even if server call fails
+                            localStorage.clear()
+                            setUser(null)
+                            setInvoices([])
+                            setDefaultSupplier(null)
+                            setCategories([])
+                            setCurrentView('invoices')
+                            setInvoiceCounter(1)
+                        })
                 }}
             />
             <main>
@@ -269,15 +293,22 @@ function App() {
                             setDefaultSupplier={setDefaultSupplier}
                         />
                         <div>
-                            <InvoiceList
-                                invoices={invoices}
-                                categories={categories}
-                                onSelect={setSelectedId}
-                                onDelete={handleDeleteInvoice}
-                                selectedId={selectedId}
-                                lang={lang}
-                                t={t}
-                            />
+                            {isLoading ? (
+                                <section className="card" style={{ marginBottom: '20px', textAlign: 'center', padding: '3rem' }}>
+                                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+                                    <h2>{lang === 'cs' ? 'Načítání faktur...' : 'Loading invoices...'}</h2>
+                                </section>
+                            ) : (
+                                <InvoiceList
+                                    invoices={invoices}
+                                    categories={categories}
+                                    onSelect={setSelectedId}
+                                    onDelete={handleDeleteInvoice}
+                                    selectedId={selectedId}
+                                    lang={lang}
+                                    t={t}
+                                />
+                            )}
                         </div>
                     </>
                 )}

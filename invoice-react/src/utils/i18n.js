@@ -20,6 +20,11 @@ export const languages = {
         ico: 'IČO',
         vat: 'DIČ',
         address: 'Adresa',
+        clientName: 'Název firmy',
+        clientAddress: 'Adresa',
+        clientIco: 'IČO',
+        clientVat: 'DIČ',
+        clientArea: 'Oblast / Region',
         items: 'Položky',
         item: 'Položka',
         qty: 'Mn.',
@@ -78,7 +83,9 @@ export const languages = {
         supplierName: 'Vaše jméno / Název',
         supplierIco: 'Vaše IČO',
         supplierVat: 'Vaše DIČ',
-        supplierAddress: 'Vaše Adresa'
+        supplierAddress: 'Vaše Adresa',
+        supplierRegistry: 'Zápis v rejstříku',
+        itemPlaceholder: 'Název položky...'
     },
     en: {
         appTitle: 'Invoice Maker',
@@ -101,6 +108,11 @@ export const languages = {
         ico: 'IČO',
         vat: 'VAT / Tax ID',
         address: 'Address',
+        clientName: 'Company Name',
+        clientAddress: 'Address',
+        clientIco: 'IČO',
+        clientVat: 'VAT / Tax ID',
+        clientArea: 'Area / Region',
         items: 'Items',
         item: 'Item',
         qty: 'Qty',
@@ -159,6 +171,8 @@ export const languages = {
         supplierName: 'Your Name / Company',
         supplierIco: 'Your IČO',
         supplierVat: 'Your VAT ID',
-        supplierAddress: 'Your Address'
+        supplierAddress: 'Your Address',
+        supplierRegistry: 'Registry Entry',
+        itemPlaceholder: 'Item name...'
     }
 }
