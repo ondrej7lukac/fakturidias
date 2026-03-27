@@ -1277,7 +1277,23 @@ header {
   main {
     grid-template-columns: 1fr;
     padding: 1rem;
+    padding-top: calc(var(--headerH) + 1rem); /* Avoid header overlap */
     gap: 1rem;
+    width: 100%;
+    max-width: 100vw;
+  }
+
+  .invoice-form-container,
+  .invoice-list-container {
+    width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .card {
+     border-radius: 0; /* Full width feel on mobile */
+     border-left: none;
+     border-right: none;
+     padding: 1.5rem 1rem;
   }
 
   /* Welcome Screen Mobile Adjustments */
@@ -1323,6 +1339,22 @@ header {
   .header-left {
     flex: 1;
   }
+
+  /* Responsive Grid for Add Item Form */
+  .form-item-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+  
+  .form-item-grid > div {
+    width: 100%;
+  }
+
+  /* Compact Payment Grid */
+  .payment-grid-mobile {
+     grid-template-columns: 1fr !important;
+  }
 }
 
 /* Fix horizontal overflow */
@@ -1337,10 +1369,21 @@ body {
   max-width: 100%;
 }
 
-/* Ensure cards don't overflow */
+/* Ensure cards and tables don't overflow */
 .card {
   width: 100%;
+  max-width: 100%;
+}
+
+.table-container {
+  width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
+table {
+  min-width: 600px; /* Force scroll on very narrow screens if columns are many */
 }
 
 /* Mobile overlay for dropdown menu */
@@ -1594,3 +1637,57 @@ button.pill {
   font-family: inherit;
   line-height: 1;
 }
+
+/* FINAL MOBILE OVERRIDES - FORCE STACKING & WIDTH */
+@media (max-width: 768px) {
+  .invoice-form-container,
+  .invoice-list-container,
+  .invoice-dashboard,
+  main {
+    width: 100% !important;
+    max-width: 100vw !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .add-item-form.form-item-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 1.25rem !important;
+  }
+
+  .add-item-form.form-item-grid > div {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .add-item-form.form-item-grid label {
+    font-size: 0.75rem !important;
+    margin-bottom: 4px !important;
+  }
+  
+  .add-item-form.form-item-grid input,
+  .add-item-form.form-item-grid select {
+    width: 100% !important;
+    height: 48px !important; /* Touch friendly */
+  }
+
+  .grid.two, .grid.three, .grid.four {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  /* Fix the 3.5px overflow by making sure body is tight */
+  html, body {
+    overflow-x: hidden !important;
+    position: relative;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+}

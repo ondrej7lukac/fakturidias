@@ -968,7 +968,7 @@ export default function InvoiceForm({
 
                     <h3>{t.items}</h3>
 
-                    <div className="add-item-form grid" style={{ gridTemplateColumns: '2.5fr 1fr 0.6fr 0.6fr 1fr', gap: '5px', alignItems: 'end' }}>
+                    <div className="add-item-form grid form-item-grid" style={{ gap: '5px', alignItems: 'end' }}>
                         <div style={{ position: 'relative' }} ref={itemSuggestionsRef}>
                             <label>{t.item}</label>
                             <input
@@ -1161,7 +1161,7 @@ export default function InvoiceForm({
                             <input name="bic" value={formData.bic} onChange={handleChange} />
                         </div>
                     </div>
-                    <div className="grid" style={{ gridTemplateColumns: '0.5fr 1.5fr 1fr' }}>
+                    <div className="grid payment-grid-mobile" style={{ gridTemplateColumns: '0.5fr 1.5fr 1fr' }}>
                         <div>
                             <label>{lang === 'cs' ? 'Předčíslí' : 'Prefix'}</label>
                             <input name="prefix" value={formData.prefix} onChange={handleChange} placeholder="000" />
