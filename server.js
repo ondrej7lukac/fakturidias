@@ -33,7 +33,8 @@ const {
     handleAuthUrl,
     handleAuthCallback,
     handleAuthStatus,
-    handleAuthDisconnect
+    handleAuthDisconnect,
+    getAuthClient
 } = require('./lib/auth');
 
 const {
@@ -48,6 +49,7 @@ const port = process.env.PORT || 5500;
 // Session Middleware Wrapper
 const requestHandler = async (req, res) => {
     const isProd = process.env.NODE_ENV === 'production';
+    req.protocol = (req.headers['x-forwarded-proto'] || 'http').split(',')[0];
     const sessionMiddleware = cookieSession({
         name: 'session',
         keys: [
@@ -229,6 +231,7 @@ const handleRequest = async (req, res) => {
             if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
             const { invoice, pdfBase64 } = body;
             try {
+                await getAuthClient(userEmail); // Restore tokens for this request
                 const fileId = await uploadInvoiceToDrive(userEmail, invoice, pdfBase64);
                 return sendJson(res, 200, { success: true, fileId });
             } catch (err) {
