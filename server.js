@@ -243,7 +243,7 @@ const handleRequest = async (req, res) => {
     }
 
     // --- STATIC CONTENT SERVING ---
-    const distDir = path.join(__dirname, "invoice-react", "dist");
+    const distDir = path.join(__dirname, "dist");
     let filePath = path.join(distDir, requestPath);
     if (!filePath.startsWith(distDir)) return sendNotFound(res);
 

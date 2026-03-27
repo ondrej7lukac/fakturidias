@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "cd invoice-react && npm install && npm run build",
+    "build": "npm install --prefix invoice-react && npm run build --prefix invoice-react",
     "start": "node server.js"
   },
   "dependencies": {

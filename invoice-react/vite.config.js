@@ -167,6 +167,10 @@ function makeAresRequest(options, body = null) {
 
 export default defineConfig({
     plugins: [react(), aresProxyPlugin()],
+    build: {
+        outDir: '../dist',
+        emptyOutDir: true
+    },
     server: {
         port: 3000,
         host: true,
