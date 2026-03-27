@@ -168,10 +168,11 @@ function makeAresRequest(options, body = null) {
 export default defineConfig({
     plugins: [react(), aresProxyPlugin()],
     server: {
-        port: 5173,
+        port: 3000,
         host: true,
         proxy: {
-            '/api/email': 'http://localhost:5500'
+            '/auth': 'http://localhost:5500',
+            '/api': 'http://localhost:5500'
         }
     }
 })

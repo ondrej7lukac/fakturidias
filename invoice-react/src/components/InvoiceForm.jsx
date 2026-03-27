@@ -16,6 +16,7 @@ export default function InvoiceForm({
     onSave,
     onAddCategory,
     invoiceCounter,
+    invoicesLoaded,
     draftNumber,
     setDraftNumber,
     lang,
@@ -66,6 +67,8 @@ export default function InvoiceForm({
     const [items, setItems] = useState([])
     const stateRef = useRef({ formData, items })
     const itemSuggestionsRef = useRef(null)
+    // Stable ID for this new-invoice session — generated once, reused across all auto-saves
+    const newInvoiceIdRef = useRef(null)
 
     useEffect(() => {
         stateRef.current = { formData, items }
@@ -93,8 +96,19 @@ export default function InvoiceForm({
     const [customerSuggestions, setCustomerSuggestions] = useState([])
     const [saveTimer, setSaveTimer] = useState(null)
 
+    // ─── Effect 1: Load invoice data when selected invoice changes ────────────
+    // ONLY this effect may call setItems — prevents items being wiped by unrelated state changes
     useEffect(() => {
+        // Cancel any pending auto-save from the PREVIOUS invoice before switching
+        // Prevents stale timer from firing with wrong invoice ID / form data mix
+        setSaveTimer(prev => {
+            if (prev) clearTimeout(prev)
+            return null
+        })
+
         if (invoice) {
+            // Opening an existing invoice for editing
+            newInvoiceIdRef.current = null
             const ibanData = parseIban(invoice.payment.iban || '')
             setFormData({
                 invoiceNumber: invoice.invoiceNumber,
@@ -135,18 +149,14 @@ export default function InvoiceForm({
             })
             setItems(invoice.items || [])
         } else {
-            const today = new Date()
-            const newDraftNumber = draftNumber || formatInvoiceNumber(invoiceCounter)
-            if (!draftNumber) setDraftNumber(newDraftNumber)
-
-            let bankFields = { accountNumber: '', bankCode: '', prefix: '' }
-            if (defaultSupplier?.iban) {
-                const parsed = parseIban(defaultSupplier.iban)
-                if (parsed) bankFields = parsed
+            // Switching to new invoice mode — reset everything
+            if (!newInvoiceIdRef.current) {
+                newInvoiceIdRef.current = crypto.randomUUID()
             }
-
-            setFormData({
-                invoiceNumber: newDraftNumber,
+            const today = new Date()
+            setFormData(prev => ({
+                // Keep only layout/supplier defaults, reset client/invoice-specific fields
+                invoiceNumber: prev.invoiceNumber || '...',
                 issueDate: formatDate(today),
                 dueDate: formatDate(addDays(today, 7)),
                 taxableSupplyDate: '',
@@ -162,29 +172,85 @@ export default function InvoiceForm({
                 clientAddress: '',
                 currency: 'CZK',
                 amount: '0.00',
-                iban: defaultSupplier?.iban || '',
-                bic: '',
+                // Keep supplier/bank from previous state (filled in Effect 3)
+                iban: prev.iban,
+                bic: prev.bic,
                 paymentNote: '',
-                accountNumber: defaultSupplier?.accountNumber || bankFields.accountNumber,
-                bankCode: defaultSupplier?.bankCode || bankFields.bankCode,
-                prefix: defaultSupplier?.prefix || bankFields.prefix,
-                variableSymbol: newDraftNumber.replace(/\D/g, ''),
-                supplierName: defaultSupplier?.name || '',
-                supplierIco: defaultSupplier?.ico || '',
-                supplierVat: defaultSupplier?.vat || '',
-                supplierAddress: defaultSupplier?.address || '',
-                supplierRegistry: defaultSupplier?.registry || '',
-                supplierPhone: defaultSupplier?.phone || '',
-                supplierEmail: defaultSupplier?.email || '',
-                supplierWebsite: defaultSupplier?.website || '',
-                isVatPayer: defaultSupplier?.isVatPayer || false,
+                accountNumber: prev.accountNumber,
+                bankCode: prev.bankCode,
+                prefix: prev.prefix,
+                variableSymbol: (prev.invoiceNumber || '').replace(/\D/g, ''),
+                supplierName: prev.supplierName,
+                supplierIco: prev.supplierIco,
+                supplierVat: prev.supplierVat,
+                supplierAddress: prev.supplierAddress,
+                supplierRegistry: prev.supplierRegistry,
+                supplierPhone: prev.supplierPhone,
+                supplierEmail: prev.supplierEmail,
+                supplierWebsite: prev.supplierWebsite,
+                isVatPayer: prev.isVatPayer,
                 taxBase: '0.00',
-                taxRate: defaultSupplier?.taxRate || '21',
+                taxRate: prev.taxRate,
                 taxAmount: '0.00'
-            })
-            setItems([])
+            }))
+            setItems([])  // ← ONLY cleared here, when truly starting a new invoice
         }
-    }, [invoice, invoiceCounter, draftNumber, setDraftNumber, defaultSupplier])
+    }, [invoice]) // ← ONLY invoice as dependency
+
+    // ─── Effect 2: Generate invoice number once invoices are loaded ────────────
+    useEffect(() => {
+        if (invoice) return  // Editing existing — never change its number
+        if (!invoicesLoaded) {
+            setFormData(prev => ({ ...prev, invoiceNumber: '...' }))
+            return
+        }
+        // Generate number from real counter (draftNumber persists across renders)
+        if (!draftNumber) {
+            const newNumber = formatInvoiceNumber(invoiceCounter)
+            setDraftNumber(newNumber)
+            setFormData(prev => ({
+                ...prev,
+                invoiceNumber: newNumber,
+                variableSymbol: newNumber.replace(/\D/g, '')
+            }))
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                invoiceNumber: draftNumber,
+                variableSymbol: draftNumber.replace(/\D/g, '')
+            }))
+        }
+    }, [invoice, invoiceCounter, invoicesLoaded, draftNumber, setDraftNumber])
+
+    // ─── Effect 3: Pre-fill supplier/bank for new invoices when profile loads ──
+    useEffect(() => {
+        if (invoice) return  // Don't override data of an existing invoice being edited
+        if (!defaultSupplier) return
+        let bankFields = { accountNumber: '', bankCode: '', prefix: '' }
+        if (defaultSupplier.iban) {
+            const parsed = parseIban(defaultSupplier.iban)
+            if (parsed) bankFields = parsed
+        }
+        // Only fill fields that are currently empty (supplier fields, not client fields)
+        setFormData(prev => ({
+            ...prev,
+            iban: prev.iban || defaultSupplier.iban || '',
+            accountNumber: prev.accountNumber || defaultSupplier.accountNumber || bankFields.accountNumber,
+            bankCode: prev.bankCode || defaultSupplier.bankCode || bankFields.bankCode,
+            prefix: prev.prefix || defaultSupplier.prefix || bankFields.prefix,
+            supplierName: prev.supplierName || defaultSupplier.name || '',
+            supplierIco: prev.supplierIco || defaultSupplier.ico || '',
+            supplierVat: prev.supplierVat || defaultSupplier.vat || '',
+            supplierAddress: prev.supplierAddress || defaultSupplier.address || '',
+            supplierRegistry: prev.supplierRegistry || defaultSupplier.registry || '',
+            supplierPhone: prev.supplierPhone || defaultSupplier.phone || '',
+            supplierEmail: prev.supplierEmail || defaultSupplier.email || '',
+            supplierWebsite: prev.supplierWebsite || defaultSupplier.website || '',
+            isVatPayer: prev.isVatPayer || defaultSupplier.isVatPayer || false,
+            taxRate: prev.taxRate || defaultSupplier.taxRate || '21',
+            // Never touch: invoiceNumber, client fields, items, dates, status
+        }))
+    }, [defaultSupplier])  // ← only runs when supplier profile changes
 
     useEffect(() => {
         const total = items.reduce((sum, item) => sum + item.total, 0)
@@ -224,10 +290,14 @@ export default function InvoiceForm({
 
     const handleBlurSave = () => {
         if (saveTimer) clearTimeout(saveTimer)
+        // Don't auto-save blank forms — require at minimum a client name
+        const currentFormData = stateRef.current.formData
+        if (!currentFormData.clientName?.trim()) return
+
         const timer = setTimeout(() => {
             const currentData = stateRef.current
             const invoiceData = getCurrentInvoiceData(currentData.formData, currentData.items)
-            onSave(invoiceData)
+            onSave(invoiceData, { autoSave: true })
 
             if (invoiceData.client && invoiceData.client.name) {
                 fetch('/api/customers', {
@@ -263,7 +333,7 @@ export default function InvoiceForm({
 
     const getCurrentInvoiceData = (currentFormData = formData, currentItems = items) => {
         return {
-            id: invoice?.id || crypto.randomUUID(),
+            id: invoice?.id || newInvoiceIdRef.current,
             invoiceNumber: currentFormData.invoiceNumber.trim(),
             issueDate: currentFormData.issueDate,
             dueDate: currentFormData.dueDate,
@@ -299,7 +369,12 @@ export default function InvoiceForm({
                 registry: currentFormData.supplierRegistry.trim(),
                 phone: currentFormData.supplierPhone.trim(),
                 email: currentFormData.supplierEmail.trim(),
-                website: currentFormData.supplierWebsite.trim()
+                website: currentFormData.supplierWebsite.trim(),
+                // Fix: Include bank details in supplier object so they are saved to global settings
+                accountNumber: currentFormData.accountNumber || '',
+                bankCode: currentFormData.bankCode || '',
+                prefix: currentFormData.prefix || '',
+                iban: currentFormData.iban || ''
             },
             isVatPayer: currentFormData.isVatPayer,
             taxBase: currentFormData.taxBase,
@@ -528,12 +603,21 @@ export default function InvoiceForm({
 
     const handleSubmit = (e) => {
         e.preventDefault()
-        const invoiceData = getCurrentInvoiceData()
+        // Ensure we use the very latest state from stateRef for saving
+        const data = stateRef.current
+        const invoiceData = getCurrentInvoiceData(data.formData, data.items)
         onSave(invoiceData)
         setDefaultSupplier(invoiceData.supplier)
     }
 
-    const handleMarkPaid = () => setFormData(prev => ({ ...prev, status: 'paid' }))
+    const handleMarkPaid = () => {
+        if (!invoice) return // Safety: can't mark unsaved new invoice as paid
+        // Use invoice PROP (source of truth from DB), NOT formData
+        // formData may still be from previous invoice if Effect 1 hasn't re-rendered yet
+        const updatedData = { ...invoice, status: 'paid' }
+        setFormData(prev => ({ ...prev, status: 'paid' }))
+        onSave(updatedData)
+    }
 
     const handleAresData = (data) => {
         setFormData(prev => ({
@@ -570,18 +654,19 @@ export default function InvoiceForm({
         setIsGenerating(false)
     }
 
-    const handleEmailPDF = async () => {
+    // handleEmailPDF removed for production deployment
+
+    const handleBackupToDrive = async () => {
         if (!isAuthenticated) {
             return alert(
                 lang === 'cs'
-                    ? 'Pro odesílání emailů se musíte přihlásit. Klikněte na tlačítko "Přihlášení" v záhlaví.'
-                    : 'You must be logged in to send emails. Click the "Login" button in the header.'
+                    ? 'Pro zálohování na Google Drive se musíte přihlásit.'
+                    : 'You must be logged in to backup to Google Drive.'
             )
         }
         const currentData = getCurrentInvoiceData()
-        if (!currentData.client.email) return alert(t.alertEmailMissing)
         setIsGenerating(true)
-        setEmailStatus(t.alertGenerating)
+        setEmailStatus(lang === 'cs' ? 'Zálohování...' : 'Backing up...')
         try {
             let qrDataUrl = null
             try {
@@ -597,27 +682,20 @@ export default function InvoiceForm({
 
             const pdf = await generateInvoicePDF(currentData, t, qrDataUrl)
             const pdfBase64 = pdf.output('datauristring')
-            setEmailStatus(t.alertSending)
 
-            const response = await fetch('/api/email/send', {
+            const response = await fetch('/api/drive/backup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    to: currentData.client.email,
-                    cc: currentData.client.emailCopy,
-                    subject: `${t.invoice} ${currentData.invoiceNumber}`,
-                    html: `<p>Hello,</p><p>Please find attached the invoice ${currentData.invoiceNumber}.</p><p>Thank you!</p>`,
-                    pdfBase64: pdfBase64,
-                    filename: `${currentData.invoiceNumber}.pdf`,
-                    useGoogle: true
+                    invoice: currentData,
+                    pdfBase64: pdfBase64
                 })
             })
             if (response.ok) {
-                setFormData(prev => ({ ...prev, status: 'sent' }))
-                alert(t.alertEmailSuccess)
+                alert(lang === 'cs' ? 'Uloženo na Google Drive!' : 'Saved to Google Drive!')
             } else {
                 const result = await response.json()
-                alert(`${t.alertEmailFailed} ${result.message || result.error}`)
+                alert(`Backup failed: ${result.message || result.error}`)
             }
         } catch (error) {
             alert(t.alertError)
@@ -669,8 +747,8 @@ export default function InvoiceForm({
                         <button type="button" onClick={handleDownloadPDF} disabled={isGenerating} className="secondary">
                             {isGenerating && !emailStatus ? t.alertGenerating : t.downloadPdf}
                         </button>
-                        <button type="button" onClick={handleEmailPDF} disabled={isGenerating} className="secondary">
-                            {emailStatus || t.emailPdf}
+                        <button type="button" onClick={handleBackupToDrive} disabled={isGenerating} className="secondary">
+                            {emailStatus ? emailStatus : (lang === 'cs' ? '☁️ Zálohovat na Drive' : '☁️ Backup to Drive')}
                         </button>
                         <button type="button" onClick={handleMarkPaid} className="secondary" style={{ marginLeft: 'auto' }}>
                             {t.markPaid}
@@ -1121,9 +1199,6 @@ export default function InvoiceForm({
                         </button>
                         <button type="button" onClick={handleDownloadPDF} disabled={isGenerating} className="secondary">
                             {isGenerating && !emailStatus ? t.alertGenerating : t.downloadPdf}
-                        </button>
-                        <button type="button" onClick={handleEmailPDF} disabled={isGenerating} className="secondary">
-                            {emailStatus || t.emailPdf}
                         </button>
                         <button type="button" onClick={handleMarkPaid} className="secondary" style={{ marginLeft: 'auto' }}>
                             {t.markPaid}

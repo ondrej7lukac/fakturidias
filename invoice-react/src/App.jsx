@@ -3,7 +3,11 @@ import Header from './components/Header'
 import InvoiceForm from './components/InvoiceForm'
 import InvoiceList from './components/InvoiceList'
 import Settings from './components/Settings'
+import WelcomeScreen from './components/WelcomeScreen'
 import { getNextInvoiceCounter, loadApiData, loadLocalData, saveApiInvoice, saveLocalInvoice, deleteApiInvoice, deleteLocalInvoice } from './utils/storage'
+import { generateInvoicePDF } from './utils/pdf'
+import { getCzechQrPayload } from './utils/bank'
+import QRCode from 'qrcode'
 import { languages } from './utils/i18n'
 
 function App() {
@@ -17,8 +21,24 @@ function App() {
     const [defaultSupplier, setDefaultSupplier] = useState(null)
     const [currentView, setCurrentView] = useState('invoices')
     const [isLoading, setIsLoading] = useState(true)
+    const [invoicesLoaded, setInvoicesLoaded] = useState(false)
+    const [showWelcome, setShowWelcome] = useState(true)
+    const [mobileView, setMobileView] = useState('form') // 'form' or 'list'
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+    const [dashboardOpen, setDashboardOpen] = useState(false)
 
     const t = languages[lang]
+
+    // Show welcome screen only when not logged in
+    useEffect(() => {
+        if (user) {
+            // User is logged in, hide welcome screen
+            setShowWelcome(false)
+        } else {
+            // User is not logged in, show welcome screen
+            setShowWelcome(true)
+        }
+    }, [user])
 
     // Check Auth Status on Mount
     useEffect(() => {
@@ -42,15 +62,17 @@ function App() {
         }
     }
 
-    // Load local settings from localStorage (not invoices)
+    // Load lang + categories from localStorage on mount (UI prefs, not sensitive data)
     useEffect(() => {
         const savedLang = localStorage.getItem('lang')
-        const savedSupplier = localStorage.getItem('defaultSupplier')
         const savedCategories = localStorage.getItem('categories')
-
         if (savedLang) setLang(savedLang)
-        if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
         if (savedCategories) setCategories(JSON.parse(savedCategories))
+
+        // For guest mode: load supplier from localStorage
+        // For logged-in: will be overridden by MongoDB load below
+        const savedSupplier = localStorage.getItem('defaultSupplier_guest')
+        if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
     }, [])
 
     // Reusable data loader
@@ -74,8 +96,12 @@ function App() {
             // Calculate next counter based on loaded invoices
             const nextCounter = getNextInvoiceCounter(loadedInvoices)
             setInvoiceCounter(nextCounter)
+            setDraftNumber('')       // Always reset so form regenerates number from real counter
+            setInvoicesLoaded(true)  // Signal that counter is now reliable
         } catch (err) {
             console.error('Failed to load invoices:', err)
+            setDraftNumber('')
+            setInvoicesLoaded(true) // Still allow form to show even on error
         } finally {
             setIsLoading(false)
         }
@@ -86,85 +112,105 @@ function App() {
         fetchInvoices()
     }, [user])
 
-    // Load invoices and settings from server on mount
+    // Load settings from MongoDB when user logs in
     useEffect(() => {
-        const loadInitialData = async () => {
-            await fetchInvoices()
-
-            // 2. Load Settings (Supplier Profile)
+        if (!user) return
+        const loadSettings = async () => {
             try {
-                // Check for tokens first to avoid 401 spam if not logged in
-                const tokensStr = localStorage.getItem('google_tokens')
-                if (tokensStr) {
-                    const res = await fetch('/api/settings')
-                    if (res.ok) {
-                        const { settings } = await res.json()
-                        if (settings && Object.keys(settings).length > 0) {
-                            setDefaultSupplier(settings)
-                            console.log('Loaded settings from server', settings)
-                        } else {
-                            // Fallback to local storage if server is empty (first sync)
-                            const savedSupplier = localStorage.getItem('defaultSupplier')
-                            if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
-                        }
+                const res = await fetch('/api/settings')
+                if (res.ok) {
+                    const data = await res.json()
+                    const settings = data.settings
+
+                    // New format: { defaultSupplier: { name, iban, ... } }
+                    // Legacy format: supplier fields at root { name, iban, ... } (old save bug)
+                    let supplier = null
+                    if (settings?.defaultSupplier && Object.keys(settings.defaultSupplier).length > 0) {
+                        supplier = settings.defaultSupplier
+                        console.log('[Settings] Loaded (new format):', supplier)
+                    } else if (settings?.name || settings?.iban) {
+                        // Legacy: migrate root-level fields into defaultSupplier format
+                        const { _id, userEmail, updatedAt, __v, smtp, ...supplierFields } = settings
+                        supplier = supplierFields
+                        console.log('[Settings] Loaded (legacy format), migrating:', supplier)
+                        // Auto-fix: re-save in correct format immediately
+                        fetch('/api/settings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ settings: { defaultSupplier: supplier } })
+                        }).catch(() => { })
                     }
-                } else {
-                    // Fallback to local storage if not logged in
-                    const savedSupplier = localStorage.getItem('defaultSupplier')
-                    if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
+
+                    if (supplier) {
+                        setDefaultSupplier(supplier)
+                    } else {
+                        console.log('[Settings] No supplier settings found in MongoDB yet')
+                        setDefaultSupplier(null)
+                    }
                 }
             } catch (err) {
-                console.error('Failed to load settings:', err)
-                // Fallback
-                const savedSupplier = localStorage.getItem('defaultSupplier')
-                if (savedSupplier) setDefaultSupplier(JSON.parse(savedSupplier))
+                console.error('[Settings] Failed to load from MongoDB:', err)
             }
         }
+        loadSettings()
+    }, [user])
 
-        // Initial load is triggered by user state change or mount
-        // We just need to load settings if user is present
-
-        const loadSettings = async () => {
-            // ... logic to load settings
+    // Listen for Google Login success from OAuth popup
+    useEffect(() => {
+        const handleAuthSuccess = async () => {
+            console.log("Login detected, refreshing auth...")
+            await checkAuthStatus()
+            await fetchInvoices()
         }
 
-        // Listen for Google Login updates from OAuth popup via postMessage
+        // Method 1: postMessage from popup
         const handleMessage = async (event) => {
-            // Security: Validate origin if needed (for now accept all for localhost + production)
             if (event.data && event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
-                console.log("Login detected via postMessage, refreshing auth...")
-                await checkAuthStatus()
-                // Force reload invoices after auth status updates
-                await fetchInvoices()
+                await handleAuthSuccess()
             }
         }
         window.addEventListener('message', handleMessage)
-        return () => window.removeEventListener('message', handleMessage)
+
+        // Method 2: localStorage polling fallback (cross-origin popup can't postMessage)
+        const pollInterval = setInterval(async () => {
+            const flag = localStorage.getItem('auth_success')
+            if (flag) {
+                localStorage.removeItem('auth_success')
+                await handleAuthSuccess()
+            }
+        }, 500)
+
+        return () => {
+            window.removeEventListener('message', handleMessage)
+            clearInterval(pollInterval)
+        }
     }, [])
 
-    // Save local settings to localStorage and sync to server if authenticated
     useEffect(() => {
         localStorage.setItem('lang', lang)
+        if (categories.length > 0) {
+            localStorage.setItem('categories', JSON.stringify(categories))
+        }
         if (defaultSupplier) {
-            localStorage.setItem('defaultSupplier', JSON.stringify(defaultSupplier))
-
-            // Sync to server if logged in
+            // Safety: Ensure we don't save a completely empty object or one missing bank details if we have them
+            // This is secondary protection for the bug in InvoiceForm
             if (user) {
+                // Logged in: save exclusively to MongoDB
                 fetch('/api/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ settings: defaultSupplier })
-                }).catch(err => console.error('Failed to sync settings to server:', err))
+                    body: JSON.stringify({ settings: { defaultSupplier } })
+                }).catch(err => console.error('[Settings] Failed to save to MongoDB:', err))
+            } else {
+                // Guest: save to localStorage only
+                localStorage.setItem('defaultSupplier_guest', JSON.stringify(defaultSupplier))
             }
-        }
-        if (categories.length > 0) {
-            localStorage.setItem('categories', JSON.stringify(categories))
         }
     }, [lang, defaultSupplier, categories, user])
 
     const selectedInvoice = invoices.find(inv => inv.id === selectedId)
 
-    const handleSaveInvoice = async (invoice) => {
+    const handleSaveInvoice = async (invoice, { autoSave = false } = {}) => {
         try {
 
             // Guest Mode Restriction
@@ -186,18 +232,25 @@ function App() {
             let updatedInvoices = [...invoices]
 
             if (existingIndex >= 0) {
+                // Updating existing invoice — always keep it selected
                 updatedInvoices[existingIndex] = invoice
+                setSelectedId(invoice.id)
             } else {
-                updatedInvoices = [invoice, ...invoices]
-                setDraftNumber('')
+                // New invoice saved for the first time
+                updatedInvoices = [...invoices, invoice]
+                if (!autoSave) {
+                    // Explicit save: navigate to the saved invoice, reset draft number
+                    setSelectedId(invoice.id)
+                    setDraftNumber('')
+                }
+                // Auto-save: stay in new-invoice mode, don't change selectedId
+                // This prevents Effect 1 from firing and wiping items user is adding
             }
 
             setInvoices(updatedInvoices)
 
             // Recalculate counter
             setInvoiceCounter(getNextInvoiceCounter(updatedInvoices))
-
-            setSelectedId(invoice.id)
 
             // Add category if new
             if (invoice.category && !categories.includes(invoice.category)) {
@@ -228,13 +281,53 @@ function App() {
 
     const handleNewInvoice = () => {
         setSelectedId(null)
+        setDraftNumber('')       // Reset so next render generates correct number
+        setInvoicesLoaded(false) // Brief reset so form waits for counter
+        setInvoicesLoaded(true)  // Immediately re-enable (counter is already correct)
         setCurrentView('invoices')
     }
+
+    // handleSendReminderEmail removed for production deployment
 
     const handleAddCategory = (category) => {
         if (!categories.includes(category)) {
             setCategories([...categories, category].sort())
         }
+    }
+
+    // Quick status change from list/dashboard without opening the form
+    const handleStatusChange = async (invoiceId, newStatus) => {
+        const invoice = invoices.find(inv => inv.id === invoiceId)
+        if (!invoice) return
+        await handleSaveInvoice({ ...invoice, status: newStatus })
+    }
+
+    const handleLogin = async () => {
+        try {
+            const res = await fetch('/auth/google/url')
+            if (!res.ok) throw new Error('Failed to start login')
+            const data = await res.json()
+
+            if (data.url) {
+                const width = 500
+                const height = 600
+                const left = window.screen.width / 2 - width / 2
+                const top = window.screen.height / 2 - height / 2
+                window.open(data.url, 'Google Login', `width=${width},height=${height},top=${top},left=${left}`)
+            }
+        } catch (e) {
+            alert('Failed to connect to login server.')
+        }
+    }
+
+    const handleContinueAsGuest = () => {
+        // Just hide welcome screen, don't change auth state
+        setShowWelcome(false)
+    }
+
+    // Show welcome screen if user hasn't seen it
+    if (showWelcome) {
+        return <WelcomeScreen onLogin={handleLogin} onContinueAsGuest={handleContinueAsGuest} lang={lang} />
     }
 
     return (
@@ -247,6 +340,10 @@ function App() {
                 currentView={currentView}
                 onViewChange={setCurrentView}
                 user={user}
+                mobileView={mobileView}
+                setMobileView={setMobileView}
+                mobileMenuOpen={mobileMenuOpen}
+                setMobileMenuOpen={setMobileMenuOpen}
                 onLogout={() => {
                     // Call backend to disconnect/clear session
                     fetch('/auth/google/disconnect', { method: 'POST' })
@@ -269,7 +366,7 @@ function App() {
                         })
                 }}
             />
-            <main>
+            <main className={dashboardOpen ? 'dashboard-mode' : ''}>
                 {currentView === 'settings' ? (
                     <Settings
                         lang={lang}
@@ -279,24 +376,34 @@ function App() {
                     />
                 ) : (
                     <>
-                        <InvoiceForm
-                            invoice={selectedInvoice}
-                            categories={categories}
-                            onSave={handleSaveInvoice}
-                            onAddCategory={handleAddCategory}
-                            invoiceCounter={invoiceCounter}
-                            draftNumber={draftNumber}
-                            setDraftNumber={setDraftNumber}
-                            lang={lang}
-                            t={t}
-                            defaultSupplier={defaultSupplier}
-                            setDefaultSupplier={setDefaultSupplier}
-                        />
-                        <div>
+                        <div className={`invoice-form-container ${mobileView !== 'form' ? 'mobile-hidden' : ''}`}>
+                            <InvoiceForm
+                                invoice={selectedInvoice}
+                                categories={categories}
+                                onSave={handleSaveInvoice}
+                                onAddCategory={handleAddCategory}
+                                invoiceCounter={invoiceCounter}
+                                invoicesLoaded={invoicesLoaded}
+                                draftNumber={draftNumber}
+                                setDraftNumber={setDraftNumber}
+                                lang={lang}
+                                t={t}
+                                defaultSupplier={defaultSupplier}
+                                setDefaultSupplier={setDefaultSupplier}
+                                isAuthenticated={!!user}
+                            />
+                        </div>
+                        <div className={`invoice-list-container ${mobileView !== 'list' ? 'mobile-hidden' : ''}`}>
                             {isLoading ? (
                                 <section className="card" style={{ marginBottom: '20px', textAlign: 'center', padding: '3rem' }}>
-                                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
-                                    <h2>{lang === 'cs' ? 'Načítání faktur...' : 'Loading invoices...'}</h2>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                                        <img
+                                            src="/GEMINI_LOGO_LONG.png"
+                                            alt="Loading..."
+                                            style={{ width: '200px', opacity: 0.8, animation: 'pulse 2s ease-in-out infinite' }}
+                                        />
+                                        <h2>{lang === 'cs' ? 'Načítání faktur...' : 'Loading invoices...'}</h2>
+                                    </div>
                                 </section>
                             ) : (
                                 <InvoiceList
@@ -304,9 +411,22 @@ function App() {
                                     categories={categories}
                                     onSelect={setSelectedId}
                                     onDelete={handleDeleteInvoice}
+                                    onStatusChange={handleStatusChange}
                                     selectedId={selectedId}
                                     lang={lang}
                                     t={t}
+                                    isAuthenticated={!!user}
+                                    dashboardOpen={dashboardOpen}
+                                    setDashboardOpen={setDashboardOpen}
+                                    // Props for inline editing:
+                                    onSave={handleSaveInvoice}
+                                    onAddCategory={handleAddCategory}
+                                    invoiceCounter={invoiceCounter}
+                                    invoicesLoaded={invoicesLoaded}
+                                    draftNumber={draftNumber}
+                                    setDraftNumber={setDraftNumber}
+                                    defaultSupplier={defaultSupplier}
+                                    setDefaultSupplier={setDefaultSupplier}
                                 />
                             )}
                         </div>

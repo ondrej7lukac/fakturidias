@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { debounce } from '../utils/storage'
+import { searchAres, lookupAresByIco, formatAresAddress, parseAresItem } from '../utils/ares'
 
 export default function AresSearch({
     clientName,
@@ -9,54 +10,27 @@ export default function AresSearch({
     onAresData,
     t
 }) {
-    const [status, setStatus] = useState(t.aresPlaceholder)
-    const [results, setResults] = useState([])
-    const [showResults, setShowResults] = useState(false)
-    const [selectedEntity, setSelectedEntity] = useState(null)
+    const [selectedEntity, setSelectedEntity] = useState(
+        (clientName && clientIco) ? { name: clientName, ico: clientIco, address: '' } : null
+    )
+    const initialMountRef = useRef(true)
 
-    const searchAres = async (query) => {
-        const trimmed = query.trim()
+    const searchAresLocal = async (query) => {
+        const trimmed = query?.trim() || ''
         if (trimmed.length < 3) {
             setShowResults(false)
             setStatus(t.aresPlaceholder)
-            if (trimmed.length === 0) setSelectedEntity(null)
+            if (trimmed.length === 0 && !selectedEntity) setSelectedEntity(null)
             return
         }
 
-        const isIco = /^\d+$/.test(trimmed)
         setStatus(t.aresSearching)
 
         try {
-            const response = await fetch('/api/ares/search', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    obchodniJmeno: isIco ? undefined : trimmed,
-                    ico: isIco ? trimmed : undefined,
-                    pocet: 8,
-                    strana: 1
-                })
-            })
+            const resultsCandidate = await searchAres(trimmed)
+            setResults(resultsCandidate)
 
-            if (!response.ok) {
-                setStatus(t.aresError)
-                return
-            }
-
-            const data = await response.json()
-            const resultsCandidate =
-                data.ekonomickeSubjekty ||
-                data.data?.ekonomickeSubjekty ||
-                data.data?.ekonomickeSubjekty?.ekonomickeSubjekty ||
-                []
-
-            const parsedResults = Array.isArray(resultsCandidate)
-                ? resultsCandidate
-                : resultsCandidate?.ekonomickeSubjekty || []
-
-            setResults(parsedResults)
-
-            if (parsedResults.length > 0) {
+            if (resultsCandidate.length > 0) {
                 setShowResults(true)
                 setStatus(t.aresSelect)
             } else {
@@ -70,13 +44,19 @@ export default function AresSearch({
     }
 
     const debouncedSearch = useCallback(
-        debounce((query) => searchAres(query), 400),
+        debounce((query) => searchAresLocal(query), 400),
         []
     )
 
     useEffect(() => {
-        debouncedSearch(clientName)
-    }, [clientName, debouncedSearch])
+        if (initialMountRef.current) {
+            initialMountRef.current = false
+            return
+        }
+        if (!selectedEntity) {
+            debouncedSearch(clientName)
+        }
+    }, [clientName, debouncedSearch, selectedEntity])
 
     useEffect(() => {
         const normalized = clientIco.trim()
@@ -85,19 +65,13 @@ export default function AresSearch({
         }
     }, [clientIco])
 
-    const lookupAresByIco = async (ico) => {
+    const lookupByIco = async (ico) => {
         const normalized = ico.trim()
         if (!/^\d{6,10}$/.test(normalized)) return
 
         setStatus(t.aresSearching)
         try {
-            const response = await fetch(`/api/ares/ico?ico=${encodeURIComponent(normalized)}`)
-            if (!response.ok) {
-                setStatus(t.aresError)
-                return
-            }
-            const data = await response.json()
-            const entity = data.ekonomickySubjekt || data
+            const entity = await lookupAresByIco(normalized)
             if (entity && (entity.obchodniJmeno || entity.nazev || entity.ico)) {
                 applyAresEntity(entity)
             } else {
@@ -171,7 +145,7 @@ export default function AresSearch({
                                     placeholder="12345678"
                                     autoComplete="off"
                                 />
-                                <button type="button" onClick={() => lookupAresByIco(clientIco)} className="secondary">
+                                <button type="button" onClick={() => lookupByIco(clientIco)} className="secondary">
                                     ARES
                                 </button>
                             </div>
