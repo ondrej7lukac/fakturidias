@@ -57,7 +57,8 @@ const requestHandler = async (req, res) => {
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         secure: isProd, // Only send over HTTPS in production
         httpOnly: true,
-        sameSite: 'lax'
+        sameSite: 'lax',
+        proxy: isProd // Allow secure cookies when behind a proxy (like Vercel)
     });
     
     // Warn if missing secrets in production
