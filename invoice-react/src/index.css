@@ -1383,7 +1383,7 @@ body {
 }
 
 table {
-  min-width: 600px; /* Force scroll on very narrow screens if columns are many */
+  width: 100%; /* Changed from min-width: 600px to avoid stretching parent */
 }
 
 /* Mobile overlay for dropdown menu */
@@ -1638,7 +1638,7 @@ button.pill {
   line-height: 1;
 }
 
-/* FINAL MOBILE OVERRIDES - FORCE STACKING & WIDTH */
+/* FINAL MOBILE OVERRIDES - FORCE STACKING & TRUE FULL WIDTH */
 @media (max-width: 768px) {
   .invoice-form-container,
   .invoice-list-container,
@@ -1646,8 +1646,23 @@ button.pill {
   main {
     width: 100% !important;
     max-width: 100vw !important;
-    padding-left: 10px !important;
-    padding-right: 10px !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+  
+  main {
+    padding-top: calc(var(--headerH) + 1rem) !important;
+  }
+
+  .card, .panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    padding: 1.5rem 1rem !important;
     margin: 0 !important;
     box-sizing: border-box !important;
   }
@@ -1656,36 +1671,36 @@ button.pill {
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
-    gap: 1.25rem !important;
+    gap: 1rem !important;
   }
 
   .add-item-form.form-item-grid > div {
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
-    margin: 0 !important;
-  }
-
-  .add-item-form.form-item-grid label {
-    font-size: 0.75rem !important;
-    margin-bottom: 4px !important;
-  }
-  
-  .add-item-form.form-item-grid input,
-  .add-item-form.form-item-grid select {
-    width: 100% !important;
-    height: 48px !important; /* Touch friendly */
+    margin-bottom: 0.5rem !important;
   }
 
   .grid.two, .grid.three, .grid.four {
     grid-template-columns: 1fr !important;
-    gap: 1rem !important;
+    gap: 1.25rem !important;
+  }
+  
+  .payment-grid-mobile {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem !important;
   }
 
-  /* Fix the 3.5px overflow by making sure body is tight */
+  /* Fix inputs not scaling */
+  input, select, textarea {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Keep the 3.5px overflow fixed */
   html, body {
     overflow-x: hidden !important;
-    position: relative;
     width: 100%;
     margin: 0;
     padding: 0;
