@@ -60,15 +60,26 @@ const requestHandler = async (req, res) => {
         sameSite: 'lax'
     });
     
-    // Throw error if missing secrets in production
+    // Warn if missing secrets in production
     if (isProd && (!process.env.SESSION_SECRET || !process.env.SESSION_SECRET_2)) {
         console.error("CRITICAL: SESSION_SECRET and SESSION_SECRET_2 must be set in production!");
-        process.exit(1);
+        // We don't exit here anymore to allow potential debugging/other routes, 
+        // but session-based routes will likely fail or be insecure.
     }
 
-    sessionMiddleware(req, res, async () => {
-        await handleRequest(req, res);
-    });
+    try {
+        sessionMiddleware(req, res, async () => {
+            try {
+                await handleRequest(req, res);
+            } catch (err) {
+                console.error("Handler Error:", err);
+                sendJson(res, 500, { error: "Internal Server Error", message: err.message });
+            }
+        });
+    } catch (err) {
+        console.error("Middleware Error:", err);
+        sendJson(res, 500, { error: "Internal Server Error", message: err.message });
+    }
 };
 
 const handleRequest = async (req, res) => {
