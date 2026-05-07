@@ -1814,7 +1814,7 @@ button.pill {
 }
 
 .invoice-item {
-  padding: clamp(0.8rem, 1.6vw, 1rem);
+  padding: clamp(0.95rem, 1.8vw, 1.15rem);
 }
 
 .invoice-item-actions {
@@ -1900,6 +1900,10 @@ button.pill {
     width: 100%;
   }
 
+  .invoice-item {
+    padding: 0.95rem;
+  }
+
   .invoice-item-actions .danger {
     margin-left: 0 !important;
   }
@@ -1962,7 +1966,7 @@ button.pill {
   }
 
   .invoice-item {
-    padding: 0.75rem;
+    padding: 0.85rem;
   }
 
   .mobile-menu {

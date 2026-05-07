@@ -174,9 +174,11 @@ export default function InvoiceList({
                   lang={lang}
                 />
               </div>
-              <div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>
-                {inv.client.name}
-              </div>
+              {inv.client.name ? (
+                <div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>
+                  {inv.client.name}
+                </div>
+              ) : null}
               <div
                 className='invoice-meta'
                 style={{ marginBottom: '0.75rem', fontSize: '0.8rem' }}
