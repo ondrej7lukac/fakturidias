@@ -197,7 +197,7 @@ export default function InvoiceDashboard({
             allCategories: 'Všechny kategorie',
             num: 'Číslo', client: 'Klient', issued: 'Vystaveno', due: 'Splatnost',
             value: 'Hodnota', sent: 'Odeslaná', actions: 'Akce',
-            open: 'Otevřít', remind: '📧 Připomenout', delete: 'Smazat',
+            open: 'Otevřít', remind: 'Připomenout', delete: 'Smazat',
             yes: 'Ano', no: 'Ne',
             noResults: 'Žádné faktury neodpovídají filtru.',
             revenue: 'Příjmy v čase (dle data vystavení)',
@@ -219,7 +219,7 @@ export default function InvoiceDashboard({
             allCategories: 'All categories',
             num: '#', client: 'Client', issued: 'Issued', due: 'Due',
             value: 'Value', sent: 'Sent', actions: 'Actions',
-            open: 'Open', remind: '📧 Remind', delete: 'Delete',
+            open: 'Open', remind: 'Remind', delete: 'Delete',
             yes: 'Yes', no: 'No',
             noResults: 'No invoices match the filter.',
             revenue: 'Revenue over time (by issue date)',
@@ -305,9 +305,9 @@ export default function InvoiceDashboard({
         <div className="invoice-dashboard">
             {/* Header */}
             <div className="dashboard-header">
-                <h2 style={{ margin: 0 }}>📊 {L.dashboard}</h2>
+                <h2 style={{ margin: 0 }}>{L.dashboard}</h2>
                 <button className="secondary" onClick={onClose} style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}>
-                    ✕ {L.close}
+                    {L.close}
                 </button>
             </div>
 
@@ -497,8 +497,8 @@ export default function InvoiceDashboard({
                                                                 {inv.client?.address && <div style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>{inv.client.address}</div>}
                                                                 {inv.client?.ico && <div style={{ fontSize: '0.8rem' }}>IČO: {inv.client.ico}</div>}
                                                                 {inv.client?.vat && <div style={{ fontSize: '0.8rem' }}>DIČ: {inv.client.vat}</div>}
-                                                                {inv.client?.email && <div style={{ fontSize: '0.8rem' }}>📧 {inv.client.email}</div>}
-                                                                {inv.client?.phone && <div style={{ fontSize: '0.8rem' }}>📞 {inv.client.phone}</div>}
+                                                                {inv.client?.email && <div style={{ fontSize: '0.8rem' }}>{inv.client.email}</div>}
+                                                                {inv.client?.phone && <div style={{ fontSize: '0.8rem' }}>{inv.client.phone}</div>}
                                                             </div>
                                                             {/* Dates & amounts */}
                                                             <div className="expanded-section">

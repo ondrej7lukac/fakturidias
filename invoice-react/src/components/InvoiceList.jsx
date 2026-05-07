@@ -93,7 +93,7 @@ export default function InvoiceList({
           }}
           onClick={() => setDashboardOpen(true)}
         >
-          📊 {lang === 'cs' ? 'Přehled' : 'Dashboard'}
+          {lang === 'cs' ? 'Přehled' : 'Dashboard'}
         </button>
       </div>
       <div className='grid two'>

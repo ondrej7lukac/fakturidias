@@ -184,7 +184,7 @@ export default function Header({
                     padding: '8px 12px',
                   }}
                 >
-                  ⚙️ {t.settings || 'Settings'}
+                  {t.settings || 'Settings'}
                 </button>
 
                 <select
@@ -358,7 +358,7 @@ export default function Header({
               borderRadius: '12px',
             }}
           >
-            📄 {t.invoices || 'Invoices'}
+            {t.invoices || 'Invoices'}
           </button>
 
           <button
@@ -376,7 +376,7 @@ export default function Header({
               borderRadius: '12px',
             }}
           >
-            ⚙️ {t.settings || 'Settings'}
+            {t.settings || 'Settings'}
           </button>
         </div>
 

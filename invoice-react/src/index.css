@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap');
 
 * {
   box-sizing: border-box;
@@ -8,7 +8,7 @@
 
 body {
   font-family:
-    'Manrope',
+    'Plus Jakarta Sans',
     system-ui,
     -apple-system,
     Segoe UI,
@@ -38,6 +38,20 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.05) 0.6px,
+    transparent 0.6px
+  );
+  background-size: 20px 20px;
+  opacity: 0.2;
+  z-index: -1;
+}
+
 ::selection {
   background: var(--selection-bg);
   color: var(--selection-text);
@@ -59,6 +73,7 @@ body {
   background: var(--header-bg);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 8px 30px rgba(8, 14, 40, 0.2);
 }
 
 .header__inner {
@@ -199,11 +214,27 @@ main {
   margin: 0 auto;
 }
 
+main > * {
+  animation: reveal-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .card,
 .panel {
   border-radius: var(--radius2);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-surface-glass);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   backdrop-filter: blur(14px);
@@ -211,12 +242,33 @@ main {
   transition:
     transform 0.25s ease,
     box-shadow 0.25s ease;
+  position: relative;
+}
+
+.card::after,
+.panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.1),
+    transparent 36%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
 }
 
 .card:hover,
 .panel:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   box-shadow: var(--shadow);
+}
+
+.card:hover::after,
+.panel:hover::after {
+  opacity: 1;
 }
 
 .card h2 {
@@ -262,7 +314,7 @@ textarea {
   padding: 0.625rem 0.875rem;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-surface-glass);
   color: var(--text);
   font-size: 0.875rem;
   transition:
@@ -283,9 +335,9 @@ input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: rgba(124, 247, 212, 0.55);
-  box-shadow: 0 0 0 4px rgba(124, 247, 212, 0.1);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  box-shadow: 0 0 0 4px var(--focus-ring);
+  background: var(--color-surface-glass-strong);
 }
 
 select {
@@ -347,14 +399,23 @@ button,
   gap: 0.5rem;
   border: 1px solid transparent;
   color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-surface-glass);
 }
 
 button:hover,
 .btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-surface-glass-strong);
   box-shadow: var(--shadow-lg);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+}
+
+button:focus-visible,
+.btn:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-2) 60%, var(--text));
+  outline-offset: 2px;
 }
 
 button:active,
@@ -388,9 +449,20 @@ button[type='submit']:not(.secondary):hover,
   box-shadow: var(--shadow);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 button.secondary,
 .btn--soft {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-surface-glass);
   border: 1px solid var(--border);
   color: var(--text);
   box-shadow: none;
@@ -398,7 +470,7 @@ button.secondary,
 
 button.secondary:hover,
 .btn--soft:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-surface-glass-strong);
   box-shadow: var(--shadow-lg);
 }
 
@@ -435,6 +507,8 @@ table {
   border-collapse: separate;
   border-spacing: 0;
   margin-top: 1rem;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 th,
@@ -827,7 +901,10 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 0.6px, transparent 0.6px);
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.06) 0.6px,
+    transparent 0.6px
+  );
   background-size: 18px 18px;
   opacity: 0.32;
 }
@@ -845,7 +922,7 @@ body {
 }
 
 .welcome-kicker {
-  font-family: 'Sora', 'Manrope', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   display: inline-flex;
   padding: 0.32rem 0.7rem;
   border-radius: 999px;
@@ -871,7 +948,7 @@ body {
 }
 
 .welcome-title {
-  font-family: 'Sora', 'Manrope', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: clamp(1.8rem, 4vw, 2.9rem);
   font-weight: 800;
   color: var(--text);
@@ -913,7 +990,11 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), transparent 38%);
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.08),
+    transparent 38%
+  );
   opacity: 0;
   transition: opacity 0.35s ease;
 }
@@ -979,7 +1060,7 @@ body {
 }
 
 .pricing-card-title {
-  font-family: 'Sora', 'Manrope', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--text);
@@ -1070,13 +1151,21 @@ body {
 }
 
 .welcome-btn-primary {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 90%, white 10%), color-mix(in srgb, var(--accent-light) 72%, white 28%));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 90%, white 10%),
+    color-mix(in srgb, var(--accent-light) 72%, white 28%)
+  );
   color: #061022;
   border-color: color-mix(in srgb, var(--accent-light) 45%, var(--accent));
 }
 
 .welcome-btn-primary:hover {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 78%, white 22%), color-mix(in srgb, var(--accent-light) 90%, white 10%));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 78%, white 22%),
+    color-mix(in srgb, var(--accent-light) 90%, white 10%)
+  );
   border-color: var(--accent-light);
 }
 
@@ -1545,7 +1634,7 @@ main.dashboard-mode .invoice-list-container {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  background: var(--card);
+  background: var(--color-surface-glass);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1.5rem;
@@ -1563,7 +1652,11 @@ main.dashboard-mode .invoice-list-container {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  background: var(--bg);
+  background: color-mix(
+    in srgb,
+    var(--color-surface-glass-strong) 92%,
+    transparent
+  );
   border-radius: var(--radius);
   padding: 1rem;
   border: 1px solid var(--border);
@@ -1608,6 +1701,7 @@ main.dashboard-mode .invoice-list-container {
   font-size: 0.82rem;
   color: var(--muted);
   padding-top: 0.25rem;
+  border-top: 1px dashed var(--border);
 }
 
 .dash-divider {
@@ -1619,6 +1713,7 @@ main.dashboard-mode .invoice-list-container {
   overflow-x: auto;
   border-radius: var(--radius);
   border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--color-surface-glass) 95%, transparent);
 }
 
 .dashboard-table {
@@ -1628,7 +1723,11 @@ main.dashboard-mode .invoice-list-container {
 }
 
 .dashboard-table th {
-  background: var(--bg);
+  background: color-mix(
+    in srgb,
+    var(--color-surface-glass-strong) 92%,
+    transparent
+  );
   padding: 0.65rem 0.85rem;
   text-align: left;
   font-size: 0.72rem;
@@ -1655,11 +1754,11 @@ main.dashboard-mode .invoice-list-container {
 }
 
 .dashboard-table tbody tr:hover {
-  background: rgba(99, 102, 241, 0.04);
+  background: color-mix(in srgb, var(--accent-2) 14%, transparent);
 }
 
-.dashboard-table tbody tr.row-overdue td:first-child {
-  border-left: 3px solid var(--danger);
+.dashboard-table tbody tr.row-overdue {
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
 }
 
 /* Charts section */
@@ -1670,7 +1769,7 @@ main.dashboard-mode .invoice-list-container {
 }
 
 .dashboard-chart-card {
-  background: var(--bg);
+  background: color-mix(in srgb, var(--color-surface-glass) 94%, transparent);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1.25rem;
@@ -1912,6 +2011,33 @@ button.pill {
 .shadow-layout {
   width: min(100%, 1200px);
   margin: 0 auto;
+  gap: 1.1rem;
+}
+
+.shadow-layout .card {
+  background: color-mix(in srgb, var(--color-surface-glass) 96%, transparent);
+}
+
+.invoice-item {
+  background: color-mix(
+    in srgb,
+    var(--color-surface-glass) 96%,
+    transparent
+  ) !important;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.invoice-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.selected-company-card {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent-2) 45%, var(--border));
 }
 
 @media (max-width: 1200px) {

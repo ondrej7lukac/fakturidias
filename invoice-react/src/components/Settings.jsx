@@ -193,7 +193,7 @@ export default function Settings({
     return (
         <div className="grid two shadow-layout" style={{ alignItems: 'start', maxWidth: '1200px', margin: '0 auto' }}>
             <section className="card">
-                <h2>{lang === 'cs' ? '📇 Můj Profil (Dodavatel)' : '📇 My Profile (Supplier)'}</h2>
+                <h2>{lang === 'cs' ? 'Můj Profil (Dodavatel)' : 'My Profile (Supplier)'}</h2>
                 <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '1.5rem' }}>
                     {lang === 'cs'
                         ? 'Tyto údaje budou automaticky předvyplněny na každé nové faktuře.'
@@ -203,7 +203,7 @@ export default function Settings({
                 {/* ARES Search Container */}
                 <div style={{ marginBottom: '2rem', padding: '1.25rem', border: '1px solid var(--border)', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)' }}>
                     <h3 style={{ fontSize: '0.875rem', marginBottom: '1rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent)' }}>
-                        {lang === 'cs' ? '🔍 Rychlé vyplnění přes ARES' : '🔍 Fast Fill via ARES'}
+                        {lang === 'cs' ? 'Rychlé vyplnění přes ARES' : 'Fast Fill via ARES'}
                     </h3>
                     <AresSearch
                         clientName={defaultSupplier?.name || ''}
@@ -362,13 +362,13 @@ export default function Settings({
 
                 <div className="actions" style={{ marginTop: '2rem' }}>
                     <button onClick={handleSaveProfile} className="primary" style={{ width: '100%' }}>
-                        {lang === 'cs' ? '💾 Uložit do cloudu' : '💾 Save to Cloud'}
+                        {lang === 'cs' ? 'Uložit do cloudu' : 'Save to Cloud'}
                     </button>
                 </div>
             </section>
 
             <section className="card">
-                <h2>{lang === 'cs' ? '🔐 Nastavení Emailu & Drive' : '🔐 Email & Drive Settings'}</h2>
+                <h2>{lang === 'cs' ? 'Nastavení Emailu & Drive' : 'Email & Drive Settings'}</h2>
                 <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: '12px', background: 'rgba(255,255,255,0.03)' }}>
                     <h3 style={{ marginTop: 0, fontSize: '1rem' }}>Google Account (OAuth2)</h3>
                     <p style={{ fontSize: '14px', color: 'var(--muted)', marginBottom: '1.5rem' }}>
