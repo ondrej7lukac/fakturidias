@@ -22,6 +22,7 @@ build/
 npm-debug.log*
 .cursor/
 debug.log
+skills-lock.json
 
 # OS files
 .DS_Store
@@ -30,6 +31,7 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+.agents/
 *.swp
 *.swo
 *~
