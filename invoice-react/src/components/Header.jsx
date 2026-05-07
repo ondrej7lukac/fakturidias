@@ -133,7 +133,10 @@ export default function Header({
                 : 'Dark'}
           </button>
 
-          <div ref={userMenuRef} style={{ position: 'relative' }}>
+          <div
+            ref={userMenuRef}
+            style={{ position: 'relative', zIndex: userMenuOpen ? 1400 : 1 }}
+          >
             <button
               className='btn btn--soft'
               onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -154,24 +157,7 @@ export default function Header({
             </button>
 
             {userMenuOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 8px)',
-                  right: 0,
-                  zIndex: 200,
-                  background: 'rgba(20, 25, 45, 0.75)',
-                  backdropFilter: 'blur(14px)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '12px',
-                  boxShadow: 'var(--shadow-lg)',
-                  minWidth: '180px',
-                  padding: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                }}
-              >
+              <div className='user-menu-dropdown'>
                 <button
                   onClick={() => {
                     onViewChange('settings');
@@ -193,30 +179,13 @@ export default function Header({
                     setLang(e.target.value);
                     setUserMenuOpen(false);
                   }}
-                  className='field__control'
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    appearance: 'none',
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    color: 'var(--text)',
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
+                  className='field__control user-menu-select'
                 >
                   <option value='cs'>Čeština (CZ)</option>
                   <option value='en'>English (EN)</option>
                 </select>
 
-                <div
-                  style={{
-                    height: '1px',
-                    background: 'var(--border)',
-                    margin: '4px 0',
-                  }}
-                />
+                <div className='user-menu-divider' />
 
                 <button
                   onClick={() => {

@@ -181,6 +181,38 @@ body::before {
   gap: 10px;
 }
 
+.user-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1400;
+  min-width: 220px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg2) 96%, #000 4%);
+  box-shadow: 0 20px 48px rgba(5, 10, 30, 0.42);
+}
+
+.user-menu-select {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--color-surface-glass-strong) 94%, transparent);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.user-menu-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
+
 .iconBtn {
   width: 42px;
   height: 42px;
