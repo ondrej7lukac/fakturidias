@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap');
 
 * {
   box-sizing: border-box;
@@ -8,7 +8,7 @@
 
 body {
   font-family:
-    'Outfit',
+    'Manrope',
     system-ui,
     -apple-system,
     Segoe UI,
@@ -822,8 +822,18 @@ body {
   box-sizing: border-box;
 }
 
+.welcome-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 0.6px, transparent 0.6px);
+  background-size: 18px 18px;
+  opacity: 0.32;
+}
+
 .welcome-container {
-  max-width: 1120px;
+  max-width: 1160px;
   width: 100%;
   display: grid;
   gap: clamp(1rem, 2.2vw, 1.8rem);
@@ -832,6 +842,20 @@ body {
 
 .welcome-hero {
   text-align: center;
+}
+
+.welcome-kicker {
+  font-family: 'Sora', 'Manrope', sans-serif;
+  display: inline-flex;
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent-2) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent-2) 16%, transparent);
+  color: var(--text);
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 0.9rem;
 }
 
 .welcome-logo-container {
@@ -847,8 +871,9 @@ body {
 }
 
 .welcome-title {
+  font-family: 'Sora', 'Manrope', sans-serif;
   font-size: clamp(1.8rem, 4vw, 2.9rem);
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text);
   margin-bottom: 0.55rem;
   line-height: 1.05;
@@ -865,7 +890,7 @@ body {
 /* Pricing Cards */
 .pricing-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: clamp(0.8rem, 1.8vw, 1.2rem);
   margin-bottom: 0.75rem;
   width: 100%;
@@ -875,17 +900,34 @@ body {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: clamp(1rem, 2vw, 1.25rem);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: clamp(1rem, 2vw, 1.3rem);
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   position: relative;
   min-height: 100%;
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+
+.pricing-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), transparent 38%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
 }
 
 .pricing-card:hover,
 .pricing-card-hovered {
-  transform: translateY(-5px);
+  transform: translateY(-6px) scale(1.01);
   box-shadow: var(--shadow-lg);
   border-color: var(--accent);
+}
+
+.pricing-card:hover::after,
+.pricing-card-hovered::after {
+  opacity: 1;
 }
 
 .pricing-card-accent {
@@ -900,7 +942,22 @@ body {
 
 .pricing-card-accent:hover,
 .pricing-card-accent.pricing-card-hovered {
-  transform: translateY(-5px);
+  transform: translateY(-8px) scale(1.012);
+}
+
+.pricing-plan-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.3rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(6, 16, 34, 0.2);
+  background: rgba(6, 16, 34, 0.12);
+  color: #061022;
 }
 
 .pricing-card-accent .pricing-card-title,
@@ -922,6 +979,7 @@ body {
 }
 
 .pricing-card-title {
+  font-family: 'Sora', 'Manrope', sans-serif;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--text);
@@ -993,7 +1051,7 @@ body {
   font-weight: 700;
   font-size: clamp(0.95rem, 1.8vw, 1.06rem);
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1012,13 +1070,13 @@ body {
 }
 
 .welcome-btn-primary {
-  background: var(--accent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 90%, white 10%), color-mix(in srgb, var(--accent-light) 72%, white 28%));
   color: #061022;
-  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent-light) 45%, var(--accent));
 }
 
 .welcome-btn-primary:hover {
-  background: var(--accent-light);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 78%, white 22%), color-mix(in srgb, var(--accent-light) 90%, white 10%));
   border-color: var(--accent-light);
 }
 
@@ -1042,6 +1100,7 @@ body {
   text-align: center;
   color: var(--muted);
   font-size: 0.82rem;
+  opacity: 0.92;
 }
 
 /* ===== HEADER STYLES ===== */
@@ -1352,9 +1411,19 @@ header {
     max-width: 210px;
   }
 
+  .welcome-kicker {
+    font-size: 0.66rem;
+    letter-spacing: 0.04em;
+  }
+
   .pricing-grid {
     grid-template-columns: 1fr;
     gap: 0.85rem;
+  }
+
+  .pricing-plan-badge {
+    top: 10px;
+    right: 10px;
   }
 
   .welcome-actions {
@@ -1407,6 +1476,10 @@ header {
 
   .pricing-card {
     padding: 0.9rem;
+  }
+
+  .pricing-card-title {
+    font-size: 1rem;
   }
 
   .welcome-btn {

@@ -9,6 +9,7 @@ export default function WelcomeScreen({
 
   const t = {
     cs: {
+      kicker: 'Faktury bez chaosu',
       welcome: 'Vítejte v Fakturidias',
       tagline: 'Vytvořte fakturu nejrychleji jak to jde',
       free: 'Zdarma',
@@ -30,8 +31,10 @@ export default function WelcomeScreen({
       unlimitedFeature4: 'Vlastní šablony',
       login: 'Přihlásit se & pokračovat',
       guest: 'Pokračovat jako host',
+      popular: 'Nejčastější volba',
     },
     en: {
+      kicker: 'Invoices without chaos',
       welcome: 'Welcome to Fakturidias',
       tagline: 'Make your invoice the fastest way possible',
       free: 'Free',
@@ -53,6 +56,7 @@ export default function WelcomeScreen({
       unlimitedFeature4: 'Custom templates',
       login: 'Login & Continue',
       guest: 'Continue as Guest',
+      popular: 'Most popular',
     },
   };
 
@@ -105,6 +109,7 @@ export default function WelcomeScreen({
               className='welcome-logo'
             />
           </div>
+          <p className='welcome-kicker'>{text.kicker}</p>
           <h1 className='welcome-title'>{text.welcome}</h1>
           <p className='welcome-tagline'>{text.tagline}</p>
         </div>
@@ -118,6 +123,9 @@ export default function WelcomeScreen({
               onMouseEnter={() => setHoveredPlan(plan.id)}
               onMouseLeave={() => setHoveredPlan(null)}
             >
+              {plan.accent ? (
+                <span className='pricing-plan-badge'>{text.popular}</span>
+              ) : null}
               <div className='pricing-card-header'>
                 <h3 className='pricing-card-title'>{plan.name}</h3>
                 {plan.description && (
