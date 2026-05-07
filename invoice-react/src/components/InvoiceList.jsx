@@ -74,8 +74,8 @@ export default function InvoiceList({
     }
 
     return (
-        <section className="card" style={{ marginBottom: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <section className="card invoice-list-card" style={{ marginBottom: '20px' }}>
+            <div className="invoice-list-header" style={{ marginBottom: '1rem' }}>
                 <h2 style={{ margin: 0 }}>{t.invoices}</h2>
                 <button
                     type="button"
@@ -135,9 +135,9 @@ export default function InvoiceList({
                             key={inv.id}
                             className={`invoice-item ${selectedId === inv.id ? 'active' : ''}`}
                             onClick={() => onSelect(inv.id)}
-                            style={{ cursor: 'pointer', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1rem', background: 'var(--card)', marginBottom: '0.5rem', transition: 'all 0.2s ease' }}
+                            style={{ cursor: 'pointer', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--card)', marginBottom: '0.5rem', transition: 'all 0.2s ease' }}
                         >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <div className="invoice-item-header" style={{ marginBottom: '0.5rem' }}>
                                 <strong style={{ fontSize: '1rem' }}>{inv.invoiceNumber}</strong>
                                 <StatusBadge
                                     status={inv.status}
@@ -153,7 +153,7 @@ export default function InvoiceList({
                                     <span style={{ marginLeft: '0.5rem' }}>• {lang === 'cs' ? 'Vystaveno' : 'Issued'}: {inv.issueDate}</span>
                                 )}
                             </div>
-                            <div className="actions" style={{ display: 'flex', gap: '0.5rem' }}>
+                            <div className="actions invoice-item-actions" style={{ display: 'flex', gap: '0.5rem' }}>
                                 <button
                                     type="button"
                                     className="secondary"
