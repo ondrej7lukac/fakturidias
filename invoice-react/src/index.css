@@ -38,6 +38,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+::selection {
+  background: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+.pricing-card-accent *::selection,
+.pricing-card-accent::selection {
+  background: var(--selection-accent-bg);
+  color: var(--selection-accent-text);
+}
+
 .header {
   position: fixed;
   inset: 0 0 auto 0;

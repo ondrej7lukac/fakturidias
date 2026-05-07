@@ -4,6 +4,8 @@ export default function Header({
   onNewInvoice,
   lang,
   setLang,
+  theme,
+  setTheme,
   t,
   currentView,
   onViewChange,
@@ -66,6 +68,10 @@ export default function Header({
     setMobileView(mobileView === 'form' ? 'list' : 'form');
   };
 
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
   return (
     <header className='header'>
       <div className='header__inner'>
@@ -107,6 +113,24 @@ export default function Header({
 
           <button className='btn primary' onClick={onNewInvoice}>
             + {lang === 'cs' ? 'Vytvořit fakturu' : 'New Invoice'}
+          </button>
+
+          <button
+            type='button'
+            className='btn btn--soft'
+            onClick={toggleTheme}
+            aria-label={lang === 'cs' ? 'Přepnout motiv' : 'Toggle theme'}
+            title={lang === 'cs' ? 'Přepnout motiv' : 'Toggle theme'}
+            style={{ minWidth: '116px' }}
+          >
+            <span>{theme === 'dark' ? '☀' : '☾'}</span>
+            {theme === 'dark'
+              ? lang === 'cs'
+                ? 'Světlý'
+                : 'Light'
+              : lang === 'cs'
+                ? 'Tmavý'
+                : 'Dark'}
           </button>
 
           <div ref={userMenuRef} style={{ position: 'relative' }}>
@@ -408,6 +432,22 @@ export default function Header({
               </option>
             </select>
           </div>
+
+          <button
+            type='button'
+            className='btn btn--soft'
+            onClick={toggleTheme}
+            style={{ width: '100%', justifyContent: 'center', padding: '14px' }}
+          >
+            <span>{theme === 'dark' ? '☀' : '☾'}</span>
+            {theme === 'dark'
+              ? lang === 'cs'
+                ? 'Přepnout na světlý režim'
+                : 'Switch to light mode'
+              : lang === 'cs'
+                ? 'Přepnout na tmavý režim'
+                : 'Switch to dark mode'}
+          </button>
 
           <div
             style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}

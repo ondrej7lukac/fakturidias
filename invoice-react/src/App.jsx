@@ -26,6 +26,7 @@ function App() {
     const [mobileView, setMobileView] = useState('form') // 'form' or 'list'
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [dashboardOpen, setDashboardOpen] = useState(false)
+    const [theme, setTheme] = useState('dark')
 
     const t = languages[lang]
 
@@ -44,6 +45,24 @@ function App() {
     useEffect(() => {
         checkAuthStatus()
     }, [])
+
+    // Load theme preference (light/dark) once on mount
+    useEffect(() => {
+        const savedTheme = localStorage.getItem('theme')
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+            setTheme(savedTheme)
+            return
+        }
+
+        const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        setTheme(systemDark ? 'dark' : 'light')
+    }, [])
+
+    // Apply theme to document root and persist
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', theme)
+        localStorage.setItem('theme', theme)
+    }, [theme])
 
     const checkAuthStatus = async () => {
         try {
@@ -336,6 +355,8 @@ function App() {
                 onNewInvoice={handleNewInvoice}
                 lang={lang}
                 setLang={setLang}
+                theme={theme}
+                setTheme={setTheme}
                 t={t}
                 currentView={currentView}
                 onViewChange={setCurrentView}
