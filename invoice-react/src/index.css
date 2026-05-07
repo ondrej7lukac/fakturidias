@@ -213,6 +213,42 @@ body::before {
   background: var(--border);
 }
 
+.user-submenu-toggle {
+  width: 100%;
+  justify-content: space-between;
+  padding: 8px 12px;
+}
+
+.user-submenu-panel {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  margin-top: -2px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-surface-glass) 96%, #000 4%);
+}
+
+.user-submenu-option {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 8px 12px;
+}
+
+.user-submenu-option.is-active {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.mobile-language-submenu {
+  display: grid;
+  gap: 8px;
+}
+
+.mobile-submenu-panel {
+  padding: 10px;
+}
+
 .iconBtn {
   width: 42px;
   height: 42px;

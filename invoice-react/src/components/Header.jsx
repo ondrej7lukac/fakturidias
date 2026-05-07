@@ -17,6 +17,8 @@ export default function Header({
   setMobileMenuOpen,
 }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
+  const [mobileLanguageMenuOpen, setMobileLanguageMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
 
   // Close on outside click
@@ -29,6 +31,14 @@ export default function Header({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [userMenuOpen]);
+
+  useEffect(() => {
+    if (!userMenuOpen) setLanguageMenuOpen(false);
+  }, [userMenuOpen]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) setMobileLanguageMenuOpen(false);
+  }, [mobileMenuOpen]);
 
   const handleLogin = async () => {
     if (user) {
@@ -173,17 +183,42 @@ export default function Header({
                   {t.settings || 'Settings'}
                 </button>
 
-                <select
-                  value={lang}
-                  onChange={(e) => {
-                    setLang(e.target.value);
-                    setUserMenuOpen(false);
-                  }}
-                  className='field__control user-menu-select'
+                <button
+                  type='button'
+                  className='btn btn--soft user-submenu-toggle'
+                  onClick={() => setLanguageMenuOpen((v) => !v)}
+                  aria-expanded={languageMenuOpen}
                 >
-                  <option value='cs'>Čeština (CZ)</option>
-                  <option value='en'>English (EN)</option>
-                </select>
+                  <span>{lang === 'cs' ? 'Jazyk' : 'Language'}: {lang === 'cs' ? 'Čeština (CZ)' : 'English (EN)'}</span>
+                  <span>{languageMenuOpen ? '▴' : '▾'}</span>
+                </button>
+
+                {languageMenuOpen && (
+                  <div className='user-submenu-panel'>
+                    <button
+                      type='button'
+                      className={`btn btn--soft user-submenu-option ${lang === 'cs' ? 'is-active' : ''}`}
+                      onClick={() => {
+                        setLang('cs');
+                        setLanguageMenuOpen(false);
+                        setUserMenuOpen(false);
+                      }}
+                    >
+                      Čeština (CZ)
+                    </button>
+                    <button
+                      type='button'
+                      className={`btn btn--soft user-submenu-option ${lang === 'en' ? 'is-active' : ''}`}
+                      onClick={() => {
+                        setLang('en');
+                        setLanguageMenuOpen(false);
+                        setUserMenuOpen(false);
+                      }}
+                    >
+                      English (EN)
+                    </button>
+                  </div>
+                )}
 
                 <div className='user-menu-divider' />
 
@@ -361,45 +396,44 @@ export default function Header({
             width: '100%',
           }}
         >
-          <div style={{ position: 'relative' }}>
-            <div
-              style={{
-                marginBottom: '8px',
-                fontSize: '0.8rem',
-                opacity: 0.6,
-                textAlign: 'center',
-              }}
+          <div className='mobile-language-submenu'>
+            <button
+              type='button'
+              className='btn btn--soft user-submenu-toggle'
+              onClick={() => setMobileLanguageMenuOpen((v) => !v)}
+              aria-expanded={mobileLanguageMenuOpen}
+              style={{ width: '100%', justifyContent: 'space-between', padding: '14px' }}
             >
-              {lang === 'cs' ? 'JAZYK' : 'LANGUAGE'}
-            </div>
-            <select
-              value={lang}
-              onChange={(e) => {
-                setLang(e.target.value);
-                setMobileMenuOpen(false);
-              }}
-              className='field__control'
-              style={{
-                width: '100%',
-                padding: '14px',
-                appearance: 'none',
-                background: 'var(--card)',
-                border: '1px solid var(--border)',
-                borderRadius: '14px',
-                color: 'var(--text)',
-                outline: 'none',
-                cursor: 'pointer',
-                textAlign: 'center',
-                fontSize: '1rem',
-              }}
-            >
-              <option value='cs' style={{ color: '#000' }}>
-                Čeština (CZ)
-              </option>
-              <option value='en' style={{ color: '#000' }}>
-                English (EN)
-              </option>
-            </select>
+              <span>{lang === 'cs' ? 'Jazyk: Čeština (CZ)' : 'Language: English (EN)'}</span>
+              <span>{mobileLanguageMenuOpen ? '▴' : '▾'}</span>
+            </button>
+
+            {mobileLanguageMenuOpen && (
+              <div className='user-submenu-panel mobile-submenu-panel'>
+                <button
+                  type='button'
+                  className={`btn btn--soft user-submenu-option ${lang === 'cs' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setLang('cs');
+                    setMobileLanguageMenuOpen(false);
+                  }}
+                  style={{ width: '100%' }}
+                >
+                  Čeština (CZ)
+                </button>
+                <button
+                  type='button'
+                  className={`btn btn--soft user-submenu-option ${lang === 'en' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setLang('en');
+                    setMobileLanguageMenuOpen(false);
+                  }}
+                  style={{ width: '100%' }}
+                >
+                  English (EN)
+                </button>
+              </div>
+            )}
           </div>
 
           <button
