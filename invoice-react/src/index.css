@@ -202,7 +202,11 @@ body::before {
   padding: 8px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--color-surface-glass-strong) 94%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--color-surface-glass-strong) 94%,
+    transparent
+  );
   color: var(--text);
   cursor: pointer;
 }
@@ -1049,6 +1053,8 @@ body {
   transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   position: relative;
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
   backdrop-filter: blur(8px);
   overflow: hidden;
 }
@@ -1095,14 +1101,14 @@ body {
 }
 
 .pricing-plan-badge {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  display: inline-flex;
+  align-self: flex-end;
   font-size: 0.66rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 0.3rem 0.5rem;
+  margin-bottom: 0.8rem;
   border-radius: 999px;
   border: 1px solid rgba(6, 16, 34, 0.2);
   background: rgba(6, 16, 34, 0.12);
