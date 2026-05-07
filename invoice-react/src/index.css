@@ -1088,11 +1088,12 @@ body {
 .pricing-card-accent {
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--accent) 90%, white 10%) 0%,
-    color-mix(in srgb, var(--accent-light) 88%, white 12%) 100%
+    var(--pricing-feature-bg-start) 0%,
+    var(--pricing-feature-bg-end) 100%
   );
-  border: 2px solid var(--accent);
-  color: var(--color-text);
+  border: 2px solid var(--pricing-feature-border);
+  box-shadow: 0 22px 52px var(--pricing-feature-glow);
+  color: var(--pricing-feature-text);
 }
 
 .pricing-card-accent:hover,
@@ -1110,16 +1111,16 @@ body {
   padding: 0.3rem 0.5rem;
   margin-bottom: 0.8rem;
   border-radius: 999px;
-  border: 1px solid rgba(6, 16, 34, 0.2);
-  background: rgba(6, 16, 34, 0.12);
-  color: #061022;
+  border: 1px solid var(--pricing-feature-badge-border);
+  background: var(--pricing-feature-badge-bg);
+  color: var(--pricing-feature-badge-text);
 }
 
 .pricing-card-accent .pricing-card-title,
 .pricing-card-accent .pricing-card-description,
 .pricing-card-accent .pricing-card-price,
 .pricing-card-accent .pricing-card-feature {
-  color: #061022;
+  color: var(--pricing-feature-text);
 }
 
 .pricing-card-header {
@@ -1130,7 +1131,11 @@ body {
 }
 
 .pricing-card-accent .pricing-card-header {
-  border-bottom-color: rgba(255, 255, 255, 0.3);
+  border-bottom-color: color-mix(
+    in srgb,
+    var(--pricing-feature-text) 22%,
+    transparent
+  );
 }
 
 .pricing-card-title {
@@ -1147,6 +1152,10 @@ body {
   margin-bottom: 1rem;
 }
 
+.pricing-card-accent .pricing-card-description {
+  color: var(--pricing-feature-muted);
+}
+
 .pricing-card-price {
   font-size: clamp(1rem, 1.8vw, 1.2rem);
   font-weight: 800;
@@ -1154,7 +1163,7 @@ body {
 }
 
 .pricing-card-accent .pricing-card-price {
-  color: #061022;
+  color: var(--pricing-feature-price);
 }
 
 .pricing-card-features {
