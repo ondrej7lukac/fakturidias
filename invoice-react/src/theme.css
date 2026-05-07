@@ -1,0 +1,83 @@
+:root {
+  color-scheme: light;
+
+  /* Core palette */
+  --color-bg: #f6f7ff;
+  --color-bg-alt: #eef1ff;
+  --color-surface: rgba(10, 18, 60, 0.06);
+  --color-surface-strong: rgba(10, 18, 60, 0.08);
+  --color-text: #0f1430;
+  --color-text-muted: rgba(15, 20, 48, 0.72);
+  --color-text-subtle: rgba(15, 20, 48, 0.55);
+  --color-border: rgba(10, 18, 60, 0.14);
+
+  --color-primary: #2dd7a6;
+  --color-primary-strong: #5869ff;
+  --color-success: #2dd7a6;
+  --color-danger: #e33d63;
+  --color-warning: #d3921f;
+
+  --color-success-bg: rgba(45, 215, 166, 0.1);
+  --color-danger-bg: rgba(227, 61, 99, 0.15);
+  --color-header-bg: rgba(246, 247, 255, 0.66);
+  --color-overlay: rgba(13, 17, 23, 0.95);
+
+  /* Shadow system */
+  --shadow: 0 18px 50px rgba(12, 18, 60, 0.18);
+  --shadow-lg: 0 10px 26px rgba(12, 18, 60, 0.14);
+
+  /* Shared layout tokens */
+  --radius: 18px;
+  --radius2: 22px;
+  --headerH: 76px;
+
+  /* Legacy aliases used across existing styles */
+  --bg: var(--color-bg);
+  --bg2: var(--color-bg-alt);
+  --card: var(--color-surface);
+  --card2: var(--color-surface-strong);
+  --text: var(--color-text);
+  --muted: var(--color-text-muted);
+  --muted2: var(--color-text-subtle);
+  --border: var(--color-border);
+  --accent: var(--color-primary);
+  --accent-light: var(--color-primary-strong);
+  --accent-2: var(--color-primary-strong);
+  --danger: var(--color-danger);
+  --warn: var(--color-warning);
+  --header-bg: var(--color-header-bg);
+  --success-bg: var(--color-success-bg);
+  --success-border: var(--color-success);
+  --success-text: var(--color-text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --color-bg: #0b1022;
+    --color-bg-alt: #070a14;
+    --color-surface: rgba(255, 255, 255, 0.06);
+    --color-surface-strong: rgba(255, 255, 255, 0.08);
+    --color-text: #e9ecff;
+    --color-text-muted: rgba(233, 236, 255, 0.7);
+    --color-text-subtle: rgba(233, 236, 255, 0.55);
+    --color-border: rgba(255, 255, 255, 0.12);
+
+    --color-primary: #7cf7d4;
+    --color-primary-strong: #8aa4ff;
+    --color-success: #7cf7d4;
+    --color-danger: #ff5b7a;
+    --color-warning: #ffcc66;
+
+    --color-success-bg: rgba(124, 247, 212, 0.1);
+    --color-danger-bg: rgba(255, 91, 122, 0.15);
+    --color-header-bg: rgba(10, 12, 25, 0.55);
+    --color-overlay: rgba(10, 12, 25, 0.82);
+
+    --shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.35);
+
+    --success-text: var(--color-text);
+  }
+}

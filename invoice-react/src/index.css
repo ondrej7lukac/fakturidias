@@ -1,58 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
-:root {
-  --bg: #f6f7ff;
-  --bg2: #eef1ff;
-  --card: rgba(10, 18, 60, 0.06);
-  --card2: rgba(10, 18, 60, 0.08);
-  --text: #0f1430;
-  --muted: rgba(15, 20, 48, 0.72);
-  --muted2: rgba(15, 20, 48, 0.55);
-  --border: rgba(10, 18, 60, 0.14);
-
-  --accent: #2dd7a6;
-  --accent-light: #5869ff;
-  --accent-2: #5869ff;
-  --danger: #e33d63;
-  --warn: #d3921f;
-
-  --shadow: 0 18px 50px rgba(12, 18, 60, 0.18);
-  --shadow-lg: 0 10px 26px rgba(12, 18, 60, 0.14);
-
-  --radius: 18px;
-  --radius2: 22px;
-  --headerH: 76px;
-  --success-bg: rgba(45, 215, 166, 0.1);
-  --success-border: #2dd7a6;
-  --success-text: #0f1430;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b1022;
-    --bg2: #070a14;
-    --card: rgba(255, 255, 255, 0.06);
-    --card2: rgba(255, 255, 255, 0.08);
-    --text: #e9ecff;
-    --muted: rgba(233, 236, 255, 0.7);
-    --muted2: rgba(233, 236, 255, 0.55);
-    --border: rgba(255, 255, 255, 0.12);
-
-    --accent: #7cf7d4;
-    --accent-light: #8aa4ff;
-    --accent-2: #8aa4ff;
-    --danger: #ff5b7a;
-    --warn: #ffcc66;
-
-    --shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
-    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.35);
-    
-    --success-bg: rgba(124, 247, 212, 0.1);
-    --success-border: #7cf7d4;
-    --success-text: #e9ecff;
-  }
-}
-
 * {
   box-sizing: border-box;
   margin: 0;
@@ -78,15 +25,9 @@ body {
   display: block;
   height: var(--headerH);
   z-index: 100;
-  background: rgba(10, 12, 25, 0.55);
+  background: var(--header-bg);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
-}
-
-@media (prefers-color-scheme: light) {
-  .header {
-    background: rgba(246, 247, 255, 0.66);
-  }
 }
 
 .header__inner {
@@ -780,31 +721,31 @@ body {
 
 /* ===== WELCOME SCREEN STYLES ===== */
 .welcome-screen {
-  height: 100vh;
-  width: 100vw;
-  max-width: 100%;
+  min-height: 100dvh;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
-  padding: 1.5rem 1rem;
-  position: fixed;
-  top: 0;
-  left: 0;
-  overflow-x: hidden;
+  background: radial-gradient(1100px 620px at 18% 12%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 58%),
+              radial-gradient(950px 520px at 84% 16%, color-mix(in srgb, var(--accent-2) 20%, transparent), transparent 58%),
+              linear-gradient(180deg, var(--bg), var(--bg2));
+  padding: clamp(1rem, 2.8vw, 2rem);
+  position: relative;
+  overflow-x: clip;
   overflow-y: auto;
   box-sizing: border-box;
 }
 
 .welcome-container {
-  max-width: 1100px;
+  max-width: 1120px;
   width: 100%;
+  display: grid;
+  gap: clamp(1rem, 2.2vw, 1.8rem);
   z-index: 1;
 }
 
 .welcome-hero {
   text-align: center;
-  margin-bottom: 1.75rem;
 }
 
 .welcome-logo-container {
@@ -814,32 +755,33 @@ body {
 }
 
 .welcome-logo {
-  max-width: 300px;
+  max-width: clamp(180px, 32vw, 320px);
   width: 100%;
   height: auto;
 }
 
 .welcome-title {
-  font-size: 2.5rem;
+  font-size: clamp(1.8rem, 4vw, 2.9rem);
   font-weight: 700;
   color: var(--text);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.55rem;
+  line-height: 1.05;
 }
 
 .welcome-tagline {
-  font-size: 1.25rem;
+  font-size: clamp(0.98rem, 1.75vw, 1.25rem);
   color: var(--muted);
   font-weight: 400;
-  max-width: 600px;
+  max-width: 56ch;
   margin: 0 auto;
 }
 
 /* Pricing Cards */
 .pricing-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: clamp(0.8rem, 1.8vw, 1.2rem);
+  margin-bottom: 0.75rem;
   width: 100%;
 }
 
@@ -847,9 +789,10 @@ body {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.25rem;
+  padding: clamp(1rem, 2vw, 1.25rem);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  min-height: 100%;
 }
 
 .pricing-card:hover,
@@ -860,9 +803,9 @@ body {
 }
 
 .pricing-card-accent {
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 90%, white 10%) 0%, color-mix(in srgb, var(--accent-light) 88%, white 12%) 100%);
   border: 2px solid var(--accent);
-  color: white;
+  color: var(--color-text);
 }
 
 .pricing-card-accent:hover,
@@ -874,7 +817,7 @@ body {
 .pricing-card-accent .pricing-card-description,
 .pricing-card-accent .pricing-card-price,
 .pricing-card-accent .pricing-card-feature {
-  color: white;
+  color: #061022;
 }
 
 .pricing-card-header {
@@ -902,13 +845,13 @@ body {
 }
 
 .pricing-card-price {
-  font-size: 1.2rem;
+  font-size: clamp(1rem, 1.8vw, 1.2rem);
   font-weight: 800;
   color: var(--accent);
 }
 
 .pricing-card-accent .pricing-card-price {
-  color: white;
+  color: #061022;
 }
 
 .pricing-card-features {
@@ -934,30 +877,31 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: #061022;
   font-weight: 700;
   flex-shrink: 0;
   font-size: 0.7rem;
 }
 
 .pricing-card-accent .pricing-feature-icon {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(6, 16, 34, 0.16);
 }
 
 /* Welcome CTA Buttons */
 .welcome-actions {
   display: flex;
-  gap: 1.5rem;
+  gap: 0.9rem;
   justify-content: center;
   flex-wrap: wrap;
-  margin-bottom: 2rem;
+  margin-bottom: 0.3rem;
 }
 
 .welcome-btn {
-  padding: 1rem 2.5rem;
+  padding: 0.9rem 1.6rem;
+  min-width: min(100%, 240px);
   border-radius: 50px;
   font-weight: 700;
-  font-size: 1.125rem;
+  font-size: clamp(0.95rem, 1.8vw, 1.06rem);
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: inline-flex;
@@ -979,7 +923,7 @@ body {
 
 .welcome-btn-primary {
   background: var(--accent);
-  color: white;
+  color: #061022;
   border-color: var(--accent);
 }
 
@@ -989,7 +933,7 @@ body {
 }
 
 .welcome-btn-secondary {
-  background: transparent;
+  background: color-mix(in srgb, var(--card) 84%, transparent);
   color: var(--text);
   border-color: var(--border);
 }
@@ -1001,13 +945,13 @@ body {
 
 .welcome-btn-icon {
   font-weight: bold;
-  font-size: 1.25rem;
+  font-size: 1.1rem;
 }
 
 .welcome-footer {
   text-align: center;
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: 0.82rem;
 }
 
 /* ===== HEADER STYLES ===== */
@@ -1180,6 +1124,16 @@ header {
   display: none !important;
 }
 
+@media (max-width: 980px) {
+  .welcome-screen {
+    align-items: flex-start;
+  }
+
+  .pricing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* ===== MOBILE RESPONSIVE STYLES ===== */
 @media (max-width: 768px) {
   .mobile-only-flex {
@@ -1298,30 +1252,26 @@ header {
 
   /* Welcome Screen Mobile Adjustments */
   .welcome-title {
-    font-size: 2rem;
+    font-size: clamp(1.6rem, 7vw, 2.1rem);
   }
 
   .welcome-tagline {
-    font-size: 1rem;
+    font-size: 0.95rem;
   }
 
   .welcome-logo {
-    max-width: 220px;
+    max-width: 210px;
   }
 
   .pricing-grid {
     grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-
-  .pricing-card-accent {
-    transform: scale(1);
+    gap: 0.85rem;
   }
 
   .welcome-actions {
     flex-direction: column;
     width: 100%;
-    max-width: 400px;
+    max-width: 420px;
     margin-left: auto;
     margin-right: auto;
   }
@@ -1354,6 +1304,25 @@ header {
   /* Compact Payment Grid */
   .payment-grid-mobile {
      grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .welcome-screen {
+    padding: 0.85rem;
+  }
+
+  .welcome-logo-container {
+    margin-bottom: 1.25rem;
+  }
+
+  .pricing-card {
+    padding: 0.9rem;
+  }
+
+  .welcome-btn {
+    padding: 0.82rem 1rem;
+    min-width: 100%;
   }
 }
 

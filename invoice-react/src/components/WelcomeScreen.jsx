@@ -92,6 +92,7 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, lang = 'cs' 
                             className="welcome-logo"
                         />
                     </div>
+                    <h1 className="welcome-title">{text.welcome}</h1>
                     <p className="welcome-tagline">{text.tagline}</p>
                 </div>
 

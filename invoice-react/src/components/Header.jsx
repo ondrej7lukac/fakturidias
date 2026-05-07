@@ -210,12 +210,12 @@ export default function Header({
             <div className={`mobile-menu ${mobileMenuOpen ? 'mobile-menu-open' : ''}`} style={{ 
                 background: 'rgba(10, 12, 25, 0.75)', 
                 backdropFilter: 'blur(14px)',
-                borderLeft: '1px solid rgba(255,255,255,0.05)',
+                borderLeft: '1px solid var(--border)',
                 color: 'var(--text)'
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', width: '100%', padding: '0 0.5rem' }}>
-                    <div className="brand__title" style={{ fontWeight: '700', fontSize: '1.2rem', color: '#fff' }}>Menu</div>
-                    <button className="iconBtn" onClick={toggleMobileMenu} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff' }}>✕</button>
+                    <div className="brand__title" style={{ fontWeight: '700', fontSize: '1.2rem', color: 'var(--text)' }}>Menu</div>
+                    <button className="iconBtn" onClick={toggleMobileMenu} style={{ background: 'var(--card)', color: 'var(--text)' }}>✕</button>
                 </div>
                 
                 <div className="mobile-menu-actions" style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', alignItems: 'stretch' }}>
@@ -223,16 +223,16 @@ export default function Header({
                         + {t.newInvoice}
                     </button>
                     
-                    <button onClick={() => { onViewChange('invoices'); setMobileMenuOpen(false); }} className="btn" style={{ width: '100%', padding: '14px', background: 'rgba(255,255,255,0.05)', color: '#fff', justifyContent: 'center', borderRadius: '12px' }}>
+                    <button onClick={() => { onViewChange('invoices'); setMobileMenuOpen(false); }} className="btn" style={{ width: '100%', padding: '14px', background: 'var(--card)', color: 'var(--text)', justifyContent: 'center', borderRadius: '12px' }}>
                         📄 {t.invoices || 'Invoices'}
                     </button>
                     
-                    <button onClick={() => { onViewChange('settings'); setMobileMenuOpen(false); }} className="btn" style={{ width: '100%', padding: '14px', background: 'rgba(255,255,255,0.05)', color: '#fff', justifyContent: 'center', borderRadius: '12px' }}>
+                    <button onClick={() => { onViewChange('settings'); setMobileMenuOpen(false); }} className="btn" style={{ width: '100%', padding: '14px', background: 'var(--card)', color: 'var(--text)', justifyContent: 'center', borderRadius: '12px' }}>
                         ⚙️ {t.settings || 'Settings'}
                     </button>
                 </div>
                 
-                <div className="mobile-menu-footer" style={{ marginTop: 'auto', paddingTop: '2.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+                <div className="mobile-menu-footer" style={{ marginTop: 'auto', paddingTop: '2.5rem', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
                      <div style={{ position: 'relative' }}>
                         <div style={{ marginBottom: '8px', fontSize: '0.8rem', opacity: 0.6, textAlign: 'center' }}>{lang === 'cs' ? 'JAZYK' : 'LANGUAGE'}</div>
                         <select
@@ -244,9 +244,9 @@ export default function Header({
                             className="field__control"
                             style={{ 
                                 width: '100%', padding: '14px', 
-                                appearance: 'none', background: 'rgba(255,255,255,0.1)',
-                                border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px',
-                                color: '#fff', outline: 'none',
+                                appearance: 'none', background: 'var(--card)',
+                                border: '1px solid var(--border)', borderRadius: '14px',
+                                color: 'var(--text)', outline: 'none',
                                 cursor: 'pointer', textAlign: 'center', fontSize: '1rem'
                             }}
                         >
