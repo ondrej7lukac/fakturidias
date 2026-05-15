@@ -366,7 +366,7 @@ function App() {
                         })
                 }}
             />
-            <main className={dashboardOpen ? 'dashboard-mode' : ''}>
+            <main className={`${dashboardOpen ? 'dashboard-mode' : ''} ${currentView === 'settings' ? 'settings-view' : ''}`}>
                 {currentView === 'settings' ? (
                     <Settings
                         lang={lang}

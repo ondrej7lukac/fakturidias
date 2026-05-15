@@ -37,11 +37,11 @@ const {
     getAuthClient
 } = require('./lib/auth');
 
-const {
-    handleAresSearch,
-    handleAresIco
-} = require('./lib/ares');
-
+const { handleAresSearch, handleAresIco } = require('./lib/ares');
+const { handleRpoSearch, handleRpoIco } = require('./lib/slovakRpo');
+const { handleVatValidate } = require('./lib/vies');
+const { handleExchangeRate } = require('./lib/exchangeRate');
+const { generatePeppolXml } = require('./lib/peppol');
 const { uploadInvoiceToDrive } = require('./lib/drive');
 
 const port = process.env.PORT || 5500;
@@ -110,6 +110,38 @@ const handleRequest = async (req, res) => {
     if (requestPath === "/api/ares/ico") {
         if (req.method === "OPTIONS") return sendCors(res);
         if (req.method === "GET") return handleAresIco(req, res, url);
+    }
+
+    // --- RPO ROUTES (Slovakia) ---
+    if (requestPath === "/api/rpo/search") {
+        if (req.method === "OPTIONS") return sendCors(res);
+        if (req.method === "POST") {
+            return readJsonBody(req, (err, body) => {
+                if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+                return handleRpoSearch(req, res, body);
+            });
+        }
+    }
+
+    if (requestPath === "/api/rpo/ico") {
+        if (req.method === "OPTIONS") return sendCors(res);
+        if (req.method === "GET") return handleRpoIco(req, res, url);
+    }
+
+    // --- VAT & TAX ROUTES ---
+    if (requestPath === "/api/vat/validate") {
+        if (req.method === "OPTIONS") return sendCors(res);
+        if (req.method === "POST") {
+            return readJsonBody(req, (err, body) => {
+                if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+                return handleVatValidate(req, res, body);
+            });
+        }
+    }
+
+    if (requestPath === "/api/exchange-rate") {
+        if (req.method === "OPTIONS") return sendCors(res);
+        if (req.method === "GET") return handleExchangeRate(req, res, url);
     }
 
     // --- AUTH ROUTES ---
@@ -240,13 +272,35 @@ const handleRequest = async (req, res) => {
         });
     }
 
+    // EXPORT ROUTES
+    if (requestPath === "/api/export/peppol" && req.method === "POST") {
+        return readJsonBody(req, async (err, body) => {
+            if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+            const { invoice } = body;
+            try {
+                const xml = generatePeppolXml(invoice);
+                res.writeHead(200, {
+                    "Content-Type": "application/xml",
+                    "Content-Disposition": `attachment; filename=invoice-${invoice.invoiceNumber}.xml`
+                });
+                res.end(xml);
+            } catch (err) {
+                sendJson(res, 500, { error: "Failed to generate Peppol XML", message: err.message });
+            }
+        });
+    }
+
     // EMAIL SENDING (Temporarily Disabled for Production)
     if (requestPath === "/api/email/send") {
         return sendJson(res, 503, { error: "Email service temporarily unavailable" });
     }
 
     // --- STATIC CONTENT SERVING ---
-    const distDir = path.join(__dirname, "dist");
+    // Try root dist first, then invoice-react/dist as fallback
+    const rootDist = path.join(__dirname, "dist");
+    const subDist = path.join(__dirname, "invoice-react", "dist");
+    const distDir = fs.existsSync(rootDist) ? rootDist : subDist;
+
     let filePath = path.join(distDir, requestPath);
     if (!filePath.startsWith(distDir)) return sendNotFound(res);
 

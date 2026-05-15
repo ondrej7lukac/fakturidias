@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { debounce } from '../utils/storage'
-import { searchAres, lookupAresByIco, formatAresAddress, parseAresItem } from '../utils/ares'
+import { searchAres, lookupAresByIco, formatAresAddress } from '../utils/ares'
+import { searchRpo, lookupRpoByIco } from '../utils/rpo'
 
 export default function AresSearch({
     clientName,
@@ -8,8 +9,12 @@ export default function AresSearch({
     onClientNameChange,
     onClientIcoChange,
     onAresData,
-    t
+    t,
+    region = 'CZ'
 }) {
+    const [status, setStatus] = useState(t.aresPlaceholder)
+    const [results, setResults] = useState([])
+    const [showResults, setShowResults] = useState(false)
     const [selectedEntity, setSelectedEntity] = useState(
         (clientName && clientIco) ? { name: clientName, ico: clientIco, address: '' } : null
     )
@@ -19,17 +24,13 @@ export default function AresSearch({
         const trimmed = query?.trim() || ''
         if (trimmed.length < 3) {
             setShowResults(false)
-            setStatus(t.aresPlaceholder)
             if (trimmed.length === 0 && !selectedEntity) setSelectedEntity(null)
             return
         }
-
         setStatus(t.aresSearching)
-
         try {
-            const resultsCandidate = await searchAres(trimmed)
+            const resultsCandidate = region === 'SK' ? await searchRpo(trimmed) : await searchAres(trimmed)
             setResults(resultsCandidate)
-
             if (resultsCandidate.length > 0) {
                 setShowResults(true)
                 setStatus(t.aresSelect)
@@ -37,10 +38,7 @@ export default function AresSearch({
                 setShowResults(false)
                 setStatus(t.aresNotFound)
             }
-        } catch (error) {
-            setShowResults(false)
-            setStatus(t.aresError)
-        }
+        } catch (error) { setStatus(t.aresError) }
     }
 
     const debouncedSearch = useCallback(
@@ -49,156 +47,73 @@ export default function AresSearch({
     )
 
     useEffect(() => {
-        if (initialMountRef.current) {
-            initialMountRef.current = false
-            return
-        }
-        if (!selectedEntity) {
-            debouncedSearch(clientName)
-        }
-    }, [clientName, debouncedSearch, selectedEntity])
-
-    useEffect(() => {
-        const normalized = clientIco.trim()
-        if (/^\d{8}$/.test(normalized)) {
-            lookupAresByIco(normalized)
-        }
-    }, [clientIco])
-
-    const lookupByIco = async (ico) => {
-        const normalized = ico.trim()
-        if (!/^\d{6,10}$/.test(normalized)) return
-
-        setStatus(t.aresSearching)
-        try {
-            const entity = await lookupAresByIco(normalized)
-            if (entity && (entity.obchodniJmeno || entity.nazev || entity.ico)) {
-                applyAresEntity(entity)
-            } else {
-                setStatus(t.aresNotFound)
-            }
-        } catch (error) {
-            setStatus(t.aresError)
-        }
-    }
-
-    const formatAresAddress = (address) => {
-        if (!address) return ''
-        if (address.textovaAdresa) return address.textovaAdresa
-        const parts = [
-            address.ulice,
-            address.cisloDomovni,
-            address.cisloOrientacni ? `/${address.cisloOrientacni}` : ''
-        ].filter(Boolean).join(' ')
-        const city = address.nazevObce || address.obec || ''
-        const zip = address.psc || ''
-        return [parts.trim(), `${city} ${zip}`.trim()].filter(Boolean).join(', ')
-    }
+        if (!initialMountRef.current && !selectedEntity) debouncedSearch(clientName)
+        initialMountRef.current = false
+    }, [clientName, selectedEntity])
 
     const applyAresEntity = (entity) => {
-        const name = entity.obchodniJmeno || entity.nazev || ''
-        // Prioritize full address string if available, otherwise parse structured address
-        const address = entity.adresa || entity.textovaAdresa || formatAresAddress(entity.sidlo)
-        const city = entity.sidlo?.nazevObce || entity.sidlo?.obec || ''
+        const name = entity.obchodniJmeno || entity.nazev || entity.name || ''
+        const address = entity.adresa || entity.textovaAdresa || entity.address || (entity.sidlo ? formatAresAddress(entity.sidlo) : '')
         const ico = entity.ico || ''
-        const vat = entity.dic || ''
-        const legalFormCode = entity.pravniForma || entity.pravniFormaRos
-        const isVatPayer = !!vat // Simple heuristic
-
-        // Extract File Number (Spisová značka) from Public Register (VR)
-        let fileNumber = ''
-        if (entity.dalsiUdaje) {
-            const vrRecord = entity.dalsiUdaje.find(d => d.datovyZdroj === 'vr')
-            if (vrRecord && vrRecord.spisovaZnacka) {
-                fileNumber = vrRecord.spisovaZnacka
-            }
-        }
-
-        onAresData({ name, address, city, ico, vat, legalFormCode, isVatPayer, fileNumber })
-        setStatus(t.aresFilled)
+        onAresData({ ...entity, name, address, ico })
         setSelectedEntity({ name, ico, address })
         setShowResults(false)
     }
 
     return (
-        <div className="ares-search-container">
+        <div className="ares-v3-root">
             {!selectedEntity ? (
                 <>
-                    <div className="grid two">
-                        <div>
-                            <label htmlFor="clientName">{t.name}</label>
+                    <div className="settings-v3-form-grid">
+                        <div className="settings-v3-field">
+                            <label>{t.name}</label>
                             <input
-                                id="clientName"
                                 value={clientName}
                                 onChange={(e) => onClientNameChange(e.target.value)}
-                                placeholder={t.aresPlaceholder}
+                                placeholder="Vyhledat firmu..."
                                 autoComplete="off"
                             />
                         </div>
-                        <div>
-                            <label htmlFor="clientIco">{t.ico}</label>
-                            <div className="inline-actions">
-                                <input
-                                    id="clientIco"
-                                    value={clientIco}
-                                    onChange={(e) => onClientIcoChange(e.target.value)}
-                                    placeholder="12345678"
-                                    autoComplete="off"
-                                />
-                                <button type="button" onClick={() => lookupByIco(clientIco)} className="secondary">
-                                    ARES
-                                </button>
-                            </div>
+                        <div className="settings-v3-field">
+                            <label>{t.ico}</label>
+                            <input
+                                value={clientIco}
+                                onChange={(e) => onClientIcoChange(e.target.value)}
+                                placeholder="IČO"
+                                autoComplete="off"
+                            />
                         </div>
                     </div>
-
-                    <div className="status-note">{status}</div>
-
                     {showResults && (
-                        <div className="suggestions">
+                        <div style={{ marginTop: '1rem', display: 'grid', gap: '8px' }}>
                             {results.map((item, index) => (
                                 <button
                                     key={index}
                                     type="button"
-                                    className="suggestion-item"
+                                    style={{ textAlign: 'left', padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', cursor: 'pointer' }}
                                     onClick={() => applyAresEntity(item)}
                                 >
-                                    <strong>{item.obchodniJmeno || item.nazev || 'Unknown'}</strong>
-                                    <br />
-                                    <span className="invoice-meta">
-                                        IČO {item.ico || 'n/a'} • {item.adresa || formatAresAddress(item.sidlo) || 'No address'}
-                                    </span>
+                                    <div style={{ fontWeight: 600 }}>{item.obchodniJmeno || item.nazev || item.name}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>IČO: {item.ico} • {item.adresa || item.address}</div>
                                 </button>
                             ))}
                         </div>
                     )}
                 </>
             ) : (
-                <div className="selected-company-card">
-                    <div className="company-details">
-                        <div className="check-mark">✓</div>
-                        <div>
-                            <strong>{selectedEntity.name}</strong>
-                            <div className="invoice-meta">
-                                <span>IČO: {selectedEntity.ico}</span>
-                                <span> • </span>
-                                <span>{selectedEntity.address}</span>
-                            </div>
-                        </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: '1.1rem' }}>✨ {selectedEntity.name}</div>
+                        <div style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>IČO: {selectedEntity.ico} • {selectedEntity.address}</div>
                     </div>
-                    <button
-                        type="button"
-                        className="secondary small"
-                        onClick={() => {
-                            setSelectedEntity(null)
-                            setStatus(t.aresPlaceholder)
-                        }}
+                    <button 
+                        className="settings-v3-edit-link" 
+                        onClick={() => { setSelectedEntity(null); setResults([]); setShowResults(false); }}
                     >
-                        {t.change || 'Změnit'}
+                        Změnit firmu
                     </button>
                 </div>
             )}
         </div>
     )
 }
-

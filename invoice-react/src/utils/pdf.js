@@ -198,6 +198,22 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
                 </div>
             </div>
 
+            <!-- Tax Notes / Reverse Charge -->
+            ${(invoice.reverseChargeText || (invoice.exchangeRate && invoice.exchangeRate !== '1.0000')) ? `
+                <div style="margin: 20px 0; padding: 15px 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 13px; color: #0f172a;">
+                    ${invoice.reverseChargeText ? `
+                        <div style="margin-bottom: ${invoice.exchangeRate ? '8px' : '0'};">
+                            <strong>${t.reverseCharge}:</strong> ${invoice.reverseChargeText}
+                        </div>
+                    ` : ''}
+                    ${invoice.exchangeRate && invoice.exchangeRate !== '1.0000' ? `
+                        <div style="font-style: italic; color: #64748b;">
+                            ${t.exchangeRate}: 1 ${invoice.currency} = ${invoice.exchangeRate} ${(invoice.supplier?.region === 'SK' ? 'EUR' : 'CZK')}
+                        </div>
+                    ` : ''}
+                </div>
+            ` : ''}
+
             <!-- Minimalistic Payment Footer -->
             <div style="
                 padding: 15px 20px; 

@@ -1,0 +1,51 @@
+To implement a dual-region invoicing app for the Czech Republic and Slovakia, you need to structure your application's logic to handle dynamic auto-filling and complex cross-border tax rules. 
+
+Here is the architectural knowledge and business logic you need to feed into your app's system prompt or backend design.
+
+### 1. App Architecture: Region and User Settings
+When a user registers, they must select their "Home Region" (Czech Republic or Slovakia) and their "Tax Status" (Non-VAT payer, VAT payer, or Identified Person/Identifikovaná osoba). 
+
+Based on this, your app should dynamically adjust the invoice fields:
+*   **Czech Users:** Need fields for IČO (Company ID) and DIČ (Tax ID). 
+*   **Slovak Users:** Need fields for IČO, DIČ, and additionally IČ DPH (Value Added Tax ID, which is formatted differently than a standard DIČ).
+*   **Language & Currency Defaults:** CZ region defaults to Czech and CZK. SK region defaults to Slovak and EUR.
+
+### 2. Integrating Company Registers (ARES & RPO)
+To achieve the "fastest invoice creation," your app must auto-fill client details using a single IČO input. You will need to route API requests based on the client's country.
+
+**For Czech Clients (ARES API):**
+*   **API Source:** Use the modern ARES REST API v3 provided by the Czech Ministry of Finance. 
+*   **Endpoint Docs:** Technical documentation and Swagger UI are available at `ares.gov.cz`.
+*   **Data Mapping:** The API will return the Business Name, exact Address formatting, DIČ, and Legal Form.[1] 
+*   **Limitation:** Ensure your app's backend restricts requests to a maximum of 500 queries per minute per IP address, or the Ministry of Finance will block your app. Implementing a caching layer (like Redis) for frequently billed clients is highly recommended.
+
+**For Slovak Clients (RPO API):**
+*   **API Source:** Use the REST API for the Register of Legal Entities (RPO) provided by the Statistical Office of the Slovak Republic.
+*   **Endpoint Docs:** Documentation for developers is hosted at `susrrpo.docs.apiary.io`.
+*   **Data Mapping:** It provides JSON responses with the company name, registered address, and business IDs. Access is free and does not require registration.
+
+### 3. Logic for Cross-Border Invoicing (CZ <-> SK)
+When a Czech user invoices a Slovak client (or vice versa), the app must trigger specific cross-border EU rules. Feed this logic into your prompt:
+
+**A. Currency and Exchange Rates**
+By law, invoices can be issued in any currency (e.g., a Czech freelancer invoicing in EUR). However, if a Czech entity issues an invoice in EUR, the invoice must state the exchange rate of the foreign currency to CZK based on the Czech National Bank (CNB) rate on the date of invoicing. Your app should automatically fetch and print this daily CNB or ECB (European Central Bank) rate on the document.
+
+**B. VAT Reverse Charge (Přenesená daňová povinnost)**
+If both the supplier and the customer are VAT-registered businesses (B2B) in their respective countries:
+*   The supplier (e.g., a Czech company) issues the invoice with **0% VAT**.
+*   The app must automatically add a mandatory legal phrase to the invoice document. If invoicing from SK to CZ, it must state: *"Prenesenie daňovej povinnosti"*. If from CZ to SK, it must state: *"Přenesení daňové povinnosti"* (Reverse charge).
+*   The recipient is then responsible for self-assessing and paying the VAT in their home country.
+*   Both the supplier's and buyer's VAT ID (DIČ / IČ DPH) must be printed on the invoice.
+
+**C. The "Identified Person" (Identifikovaná osoba / Light VAT) Trigger**
+If your user is a non-VAT payer (neplátce DPH) in the Czech Republic, but they provide services to a business in Slovakia (or anywhere else in the EU), they are legally required to register as an "Identified Person" (Identifikovaná osoba).
+*   **App Logic:** If a non-VAT user creates an invoice for a client with an EU VAT number, your app should display a warning: *"Cross-border EU B2B transaction detected. Ensure you are registered as an Identified Person (Identifikovaná osoba)."*
+*   As an Identified Person, the user acts as a VAT payer only for cross-border trades but remains a non-payer for domestic trades. The invoice is issued with 0% VAT under the reverse charge mechanism.
+
+### Summary of System Rules for Your Prompt
+If you are instructing an AI or building a rules engine for the app, use this cheat sheet:
+1. **IF** Client Country == CZ, **THEN** fetch data from ARES v3 API.
+2. **IF** Client Country == SK, **THEN** fetch data from ŠÚ SR RPO API.
+3. **IF** Supplier Country!= Client Country **AND** both are in EU **AND** both have VAT IDs, **THEN** set VAT = 0% **AND** append text "Reverse Charge / Přenesení daňové povinnosti".
+4. **IF** Supplier == CZ Non-VAT **AND** Client == SK VAT Payer, **THEN** alert user about "Identifikovaná osoba" status **AND** set VAT = 0%.
+5. **IF** Invoice Currency!= Supplier Home Currency, **THEN** fetch and display National Bank exchange rate for the issue date.

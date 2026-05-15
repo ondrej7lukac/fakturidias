@@ -59,6 +59,10 @@ export default function InvoiceForm({
         supplierEmail: '',
         supplierWebsite: '',
         isVatPayer: false,
+        taxStatus: 'non-payer', // supplier's status
+        clientCountry: 'CZ', // CZ or SK
+        exchangeRate: '1.00',
+        reverseChargeText: '',
         taxBase: '0.00',
         taxRate: '21',
         taxAmount: '0.00'
@@ -90,6 +94,7 @@ export default function InvoiceForm({
     const [isGenerating, setIsGenerating] = useState(false)
     const [emailStatus, setEmailStatus] = useState('')
     const [previewMode, setPreviewMode] = useState(false)
+    const [viesStatus, setViesStatus] = useState(null) // null | 'loading' | 'valid' | 'invalid'
     const [savedItems, setSavedItems] = useState([])
     const [savedCustomers, setSavedCustomers] = useState([])
     const [itemSuggestions, setItemSuggestions] = useState([])
@@ -247,14 +252,93 @@ export default function InvoiceForm({
             supplierEmail: prev.supplierEmail || defaultSupplier.email || '',
             supplierWebsite: prev.supplierWebsite || defaultSupplier.website || '',
             isVatPayer: prev.isVatPayer || defaultSupplier.isVatPayer || false,
+            taxStatus: prev.taxStatus || defaultSupplier.taxStatus || 'non-payer',
             taxRate: prev.taxRate || defaultSupplier.taxRate || '21',
             // Never touch: invoiceNumber, client fields, items, dates, status
         }))
     }, [defaultSupplier])  // ← only runs when supplier profile changes
 
+    // ─── Effect 3.1: Cross-Border EU B2B Reverse Charge Logic ────────────
     useEffect(() => {
-        const total = items.reduce((sum, item) => sum + item.total, 0)
-        setFormData(prev => ({ ...prev, amount: money(total) }))
+        const supplierRegion = defaultSupplier?.region || 'CZ'
+        const isCrossBorder = formData.clientCountry && formData.clientCountry !== supplierRegion
+        const isB2B = formData.clientIco && formData.clientVat
+        
+        let message = ''
+        let forceZeroVat = false
+
+        if (isCrossBorder) {
+            // Logic B: VAT Reverse Charge
+            if (isB2B) {
+                forceZeroVat = true
+                message = supplierRegion === 'SK' ? 'Prenesenie daňovej povinnosti' : 'Přenesení daňové povinnosti'
+            }
+
+            // Logic C: "Identified Person" warning (CZ specific)
+            if (supplierRegion === 'CZ' && defaultSupplier?.taxStatus === 'non-payer' && formData.clientVat) {
+                // Warning only, don't force logic here unless user expects it
+                console.warn("Identifikovaná osoba trigger")
+            }
+        }
+
+        setFormData(prev => ({
+            ...prev,
+            reverseChargeText: message,
+            taxRate: forceZeroVat ? '0' : prev.taxRate
+        }))
+    }, [formData.clientCountry, formData.clientVat, formData.clientIco, defaultSupplier])
+
+    // ─── Effect 3.2: Exchange Rate Auto-Fetch ────────────
+    useEffect(() => {
+        const supplierRegion = defaultSupplier?.region || 'CZ'
+        const homeCurrency = supplierRegion === 'SK' ? 'EUR' : 'CZK'
+        
+        if (formData.currency && formData.currency !== homeCurrency) {
+            const fetchRate = async () => {
+                try {
+                    const source = supplierRegion === 'SK' ? 'ECB' : 'CNB'
+                    const date = formData.issueDate // format is YYYY-MM-DD in state usually
+                    const res = await fetch(`/api/exchange-rate?source=${source}&target=${formData.currency}&date=${date}`)
+                    if (res.ok) {
+                        const data = await res.json()
+                        setFormData(prev => ({ ...prev, exchangeRate: data.rate.toFixed(4) }))
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch exchange rate", e)
+                }
+            }
+            fetchRate()
+        } else {
+            setFormData(prev => ({ ...prev, exchangeRate: '1.0000' }))
+        }
+    }, [formData.currency, formData.issueDate, defaultSupplier])
+
+    // ─── Effect 4: Auto-calculate Amount and VAT Summary ────────────
+    useEffect(() => {
+        const calculatedTotals = items.reduce((acc, item) => {
+            const qty = parseFloat(item.qty) || 0
+            const price = parseFloat(item.price) || 0
+            const taxRate = parseFloat(item.taxRate) || 0
+            const discount = parseFloat(item.discount) || 0
+            
+            const subtotal = qty * price
+            const afterDiscount = subtotal - discount
+            const taxAmount = afterDiscount * (taxRate / 100)
+            const total = afterDiscount + taxAmount
+            
+            return {
+                taxBase: acc.taxBase + afterDiscount,
+                taxAmount: acc.taxAmount + taxAmount,
+                amount: acc.amount + total
+            }
+        }, { taxBase: 0, taxAmount: 0, amount: 0 })
+
+        setFormData(prev => ({
+            ...prev,
+            amount: money(calculatedTotals.amount),
+            taxBase: calculatedTotals.taxBase.toFixed(2),
+            taxAmount: calculatedTotals.taxAmount.toFixed(2)
+        }))
     }, [items])
 
     useEffect(() => {
@@ -435,20 +519,20 @@ export default function InvoiceForm({
             ).slice(0, 5).map(c => ({ ...c, source: 'saved' }))
             setCustomerSuggestions(matches)
 
-            // 2. ARES Search (Debounced)
+            // 2. ARES/RPO Search (Debounced)
             if (value.trim().length >= 3) {
                 if (aresDebounceRef.current) clearTimeout(aresDebounceRef.current)
                 aresDebounceRef.current = setTimeout(() => {
-                    searchAres(value).then(aresResults => {
-                        const aresMatches = aresResults.map(item => {
-                            const parsed = parseAresItem(item)
-                            return { ...parsed, source: 'ares' }
+                    const searchFn = formData.clientCountry === 'SK' ? searchRpo : searchAres
+                    searchFn(value).then(results => {
+                        const matches = results.map(item => {
+                            const parsed = formData.clientCountry === 'SK' ? item : parseAresItem(item)
+                            return { ...parsed, source: formData.clientCountry === 'SK' ? 'rpo' : 'ares' }
                         })
                         setCustomerSuggestions(prev => {
-                            // Deduplicate by name
                             const existingNames = new Set(prev.map(p => p.name))
-                            const newAres = aresMatches.filter(a => !existingNames.has(a.name)).slice(0, 3)
-                            return [...prev, ...newAres]
+                            const newResults = matches.filter(a => !existingNames.has(a.name)).slice(0, 3)
+                            return [...prev, ...newResults]
                         })
                     })
                 }, 500)
@@ -734,6 +818,13 @@ export default function InvoiceForm({
                 }
             `}</style>
 
+            {/* Region/Tax Warnings */}
+            {defaultSupplier?.region === 'CZ' && defaultSupplier?.taxStatus === 'non-payer' && formData.clientCountry !== 'CZ' && (
+                <div style={{ padding: '12px', background: 'rgba(255, 150, 0, 0.1)', border: '1px solid orange', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.875rem', color: '#ffb347' }}>
+                    ⚠️ {t.identifiedPersonWarning}
+                </div>
+            )}
+
             {previewMode ? (
                 <>
                     <InvoicePreview invoice={getCurrentInvoiceData()} t={t} lang={lang} />
@@ -749,6 +840,29 @@ export default function InvoiceForm({
                         </button>
                         <button type="button" onClick={handleBackupToDrive} disabled={isGenerating} className="secondary">
                             {emailStatus ? emailStatus : (lang === 'cs' ? '☁️ Zálohovat na Drive' : '☁️ Backup to Drive')}
+                        </button>
+                        <button type="button" 
+                            onClick={async () => {
+                                const invData = getCurrentInvoiceData();
+                                const res = await fetch('/api/export/peppol', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ invoice: invData })
+                                });
+                                if (res.ok) {
+                                    const blob = await res.blob();
+                                    const url = window.URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `invoice-${invData.invoiceNumber}.xml`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    a.remove();
+                                }
+                            }} 
+                            className="secondary"
+                        >
+                            📄 {lang === 'sk' ? 'Stiahnuť Peppol XML' : 'Stáhnout Peppol XML'}
                         </button>
                         <button type="button" onClick={handleMarkPaid} className="secondary" style={{ marginLeft: 'auto' }}>
                             {t.markPaid}
@@ -847,45 +961,23 @@ export default function InvoiceForm({
                         <input name="supplierWebsite" value={formData.supplierWebsite} onChange={handleChange} />
                     </div>
 
-                    <div style={{ marginBottom: '20px', padding: '15px', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-                            <input
-                                type="checkbox"
-                                name="isVatPayer"
-                                id="isVatPayer"
-                                checked={formData.isVatPayer}
-                                onChange={(e) => setFormData(prev => ({ ...prev, isVatPayer: e.target.checked }))}
-                                style={{ width: 'auto', margin: 0 }}
-                            />
-                            <label htmlFor="isVatPayer" style={{ margin: 0, cursor: 'pointer', fontWeight: 600 }}>
-                                {lang === 'cs' ? 'Jsem plátce DPH' : 'I am a VAT payer'}
-                            </label>
-                        </div>
-
-                        {formData.isVatPayer && (
-                            <div className="grid three">
-                                <div>
-                                    <label>{lang === 'cs' ? 'Základ daně' : 'Tax Base'}</label>
-                                    <input name="taxBase" type="number" step="0.01" value={formData.taxBase} onChange={handleChange} />
-                                </div>
-                                <div>
-                                    <label>{lang === 'cs' ? 'Sazba DPH (%)' : 'VAT Rate (%)'}</label>
-                                    <select name="taxRate" value={formData.taxRate} onChange={handleChange}>
-                                        <option value="21">21%</option>
-                                        <option value="15">15%</option>
-                                        <option value="12">12%</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label>{lang === 'cs' ? 'Výše daně' : 'Tax Amount'}</label>
-                                    <input name="taxAmount" type="number" step="0.01" value={formData.taxAmount} onChange={handleChange} />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
                     <h3>{t.client}</h3>
-                    <div className="grid two">
+                    <div className="grid two" style={{ marginBottom: '10px' }}>
+                        <div>
+                            <label>{t.clientArea}</label>
+                            <select 
+                                name="clientCountry" 
+                                value={formData.clientCountry} 
+                                onChange={(e) => setFormData(prev => ({ ...prev, clientCountry: e.target.value }))}
+                            >
+                                <option value="CZ">Czech Republic 🇨🇿</option>
+                                <option value="SK">Slovakia 🇸🇰</option>
+                                <option value="DE">Germany 🇩🇪</option>
+                                <option value="AT">Austria 🇦🇹</option>
+                                <option value="PL">Poland 🇵🇱</option>
+                                <option value="OTHER">Other EU / World</option>
+                            </select>
+                        </div>
                         <div>
                             <label>{t.clientName}</label>
                             <div style={{ position: 'relative' }}>
@@ -942,11 +1034,41 @@ export default function InvoiceForm({
                             <input name="clientIco" value={formData.clientIco} onChange={handleChange} />
                         </div>
                         <div>
-                            <label>{t.clientVat}</label>
-                            <input name="clientVat" value={formData.clientVat} onChange={handleChange} />
+                            <label>
+                                {t.clientVat} 
+                                {viesStatus === 'valid' && <span style={{ color: '#4ade80', marginLeft: '5px', fontSize: '0.75rem' }}>✓</span>}
+                                {viesStatus === 'invalid' && <span style={{ color: '#ef4444', marginLeft: '5px', fontSize: '0.75rem' }}>✗</span>}
+                            </label>
+                            <div style={{ display: 'flex', gap: '5px' }}>
+                                <input name="clientVat" value={formData.clientVat} onChange={handleChange} />
+                                {formData.clientVat && (
+                                    <button 
+                                        type="button" 
+                                        onClick={async () => {
+                                            setViesStatus('loading')
+                                            try {
+                                                const res = await fetch('/api/vat/validate', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ vat: formData.clientVat })
+                                                })
+                                                const data = await res.json()
+                                                setViesStatus(data.isValid ? 'valid' : 'invalid')
+                                            } catch (e) {
+                                                setViesStatus(null)
+                                            }
+                                        }}
+                                        className="secondary"
+                                        style={{ padding: '0 8px', fontSize: '0.75rem' }}
+                                        disabled={viesStatus === 'loading'}
+                                    >
+                                        {viesStatus === 'loading' ? '...' : 'VIES'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                         <div>
-                            <label>{t.clientArea}</label>
+                            <label>{formData.clientCountry === 'SK' ? t.clientIcDph : (lang === 'cs' ? 'DPH' : 'VAT')}</label>
                             <input name="clientArea" value={formData.clientArea} onChange={handleChange} />
                         </div>
                     </div>
@@ -1185,6 +1307,16 @@ export default function InvoiceForm({
                     </div>
 
                     <div className="summary">
+                        {formData.reverseChargeText && (
+                            <div style={{ padding: '8px', background: 'rgba(50, 200, 100, 0.1)', border: '1px dotted #32c864', borderRadius: '8px', marginBottom: '10px', fontSize: '0.85rem' }}>
+                                🔄 <strong>{t.reverseCharge}:</strong> {formData.reverseChargeText} (VAT 0%)
+                            </div>
+                        )}
+                        {formData.exchangeRate && formData.exchangeRate !== '1.0000' && (
+                            <div style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '5px' }}>
+                                💱 {t.exchangeRate}: 1 {formData.currency} = {formData.exchangeRate} {(defaultSupplier?.region === 'SK' ? 'EUR' : 'CZK')}
+                            </div>
+                        )}
                         <div style={{ fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'left', marginTop: '20px' }}>
                             {t.total}: {formData.amount} {formData.currency}
                         </div>

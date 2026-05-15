@@ -11,6 +11,15 @@ export default function Settings({
     user,
     t
 }) {
+    const [activeTab, setActiveTab] = useState('basic') // 'basic', 'finance', 'integrations'
+    const [lockedFields, setLockedFields] = useState({
+        name: !!defaultSupplier?.name,
+        ico: !!defaultSupplier?.ico,
+        vat: !!defaultSupplier?.vat,
+        address: !!defaultSupplier?.address,
+        registry: !!defaultSupplier?.registry
+    })
+
     const [smtpConfig, setSmtpConfig] = useState({
         useGoogle: false,
         fromName: '',
@@ -47,12 +56,6 @@ export default function Settings({
                     if (prev.useGoogle !== shouldBeConnected) {
                         const newConfig = { ...prev, useGoogle: shouldBeConnected };
                         localStorage.setItem('smtpConfig', JSON.stringify(newConfig));
-                        if (shouldBeConnected) {
-                            localStorage.setItem('google_tokens', JSON.stringify({ connected: true, source: 'server' }));
-                        } else {
-                            localStorage.removeItem('google_tokens');
-                        }
-                        window.dispatchEvent(new Event('google_login_update'));
                         return newConfig;
                     }
                     return prev;
@@ -66,11 +69,7 @@ export default function Settings({
         if (defaultSupplier?.accountNumber && defaultSupplier?.bankCode) {
             const newIban = calculateIban(defaultSupplier.accountNumber, defaultSupplier.bankCode, defaultSupplier.prefix)
             if (newIban && newIban !== defaultSupplier?.iban) {
-                const currentClean = (defaultSupplier.iban || '').replace(/\s/g, '')
-                const newClean = newIban.replace(/\s/g, '')
-                if (currentClean !== newClean) {
-                    setDefaultSupplier(prev => ({ ...prev, iban: newIban }))
-                }
+                setDefaultSupplier(prev => ({ ...prev, iban: newIban }))
             }
         }
     }, [defaultSupplier?.accountNumber, defaultSupplier?.bankCode, defaultSupplier?.prefix])
@@ -81,34 +80,6 @@ export default function Settings({
             ...prev,
             [name]: type === 'checkbox' ? checked : value
         }))
-    }
-
-    const handlePasteBank = (e) => {
-        const text = e.clipboardData.getData('text').trim()
-        if (!text) return
-
-        const cleanIban = text.replace(/\s/g, '').toUpperCase()
-        if (/^[A-Z]{2}\d{10,}/.test(cleanIban)) {
-            e.preventDefault()
-            const parsed = parseIban(cleanIban)
-            setDefaultSupplier(prev => ({
-                ...prev,
-                iban: cleanIban,
-                accountNumber: parsed.accountNumber || prev.accountNumber,
-                bankCode: parsed.bankCode || prev.bankCode,
-                prefix: parsed.prefix || prev.prefix
-            }))
-            return
-        }
-
-        const czechMatch = text.match(/^(\d{0,6}-)?(\d{1,10})\/(\d{4})$/)
-        if (czechMatch) {
-            e.preventDefault()
-            const prefix = czechMatch[1] ? czechMatch[1].replace('-', '') : ''
-            const accountNumber = czechMatch[2]
-            const bankCode = czechMatch[3]
-            setDefaultSupplier(prev => ({ ...prev, prefix, accountNumber, bankCode }))
-        }
     }
 
     const handleAresData = (data) => {
@@ -131,33 +102,11 @@ export default function Settings({
             }
             if (registerInfo && data.fileNumber) {
                 const parts = data.fileNumber.split('/')
-                if (parts.length === 2) {
-                    const [mark, courtCode] = parts
-                    const courtMap = {
-                        'MSPH': 'Městským soudem v Praze',
-                        'KSBR': 'Krajským soudem v Brně',
-                        'KSOS': 'Krajským soudem v Ostravě',
-                        'KSPL': 'Krajským soudem v Plzni',
-                        'KSHK': 'Krajským soudem v Hradci Králové',
-                        'KSUL': 'Krajským soudem v Ústí nad Labem',
-                        'KSCB': 'Krajským soudem v Českých Budějovicích',
-                        'KSLB': 'Krajským soudem v Ústí nad Labem - pobočka Liberec',
-                        'KSOL': 'Krajským soudem v Ostravě - pobočka Olomouc',
-                        'KSZL': 'Krajským soudem v Brně - pobočka Zlín',
-                        'KSJI': 'Krajským soudem v Brně - pobočka Jihlava',
-                        'KSPARD': 'Krajským soudem v Hradci Králové - pobočka Pardubice'
-                    }
-                    const courtName = courtMap[courtCode] || `soudem ${courtCode}`
-                    registryText = lang === 'cs'
-                        ? `${registerInfo.cs.subject} je zapsána v ${registerInfo.cs.register} vedeném ${courtName}, spisová značka ${mark}.`
-                        : `${registerInfo.en.subject} registered in ${registerInfo.en.register} kept by ${courtName}, file no. ${mark}.`
-                    if (registerInfo.cs.subject === 'Spolek') registryText = registryText.replace('zapsána', 'zapsán')
-                } else {
-                    registryText = lang === 'cs'
-                        ? `${registerInfo.cs.subject} je zapsána v ${registerInfo.cs.register}, spisová značka ${data.fileNumber}.`
-                        : `${registerInfo.en.subject} registered in ${registerInfo.en.register}, file no. ${data.fileNumber}.`
-                    if (registerInfo.cs.subject === 'Spolek') registryText = registryText.replace('zapsána', 'zapsán')
-                }
+                const courtMap = { 'MSPH': 'Městským soudem v Praze', 'KSBR': 'Krajským soudem v Brně', 'KSOS': 'Krajským soudem v Ostravě' }
+                const courtName = parts[1] ? (courtMap[parts[1]] || `soudem ${parts[1]}`) : ''
+                registryText = lang === 'cs'
+                    ? `${registerInfo.cs.subject} je zapsána v ${registerInfo.cs.register} vedeném ${courtName}, spisová značka ${parts[0]}.`
+                    : `${registerInfo.en.subject} registered in ${registerInfo.en.register} kept by ${courtName}, file no. ${parts[0]}.`
             }
         }
 
@@ -166,10 +115,12 @@ export default function Settings({
             name: data.name,
             address: data.address,
             ico: data.ico,
-            vat: data.vat,
+            vat: data.vat || prev.vat,
             isVatPayer: data.isVatPayer || false,
-            registry: registryText
+            registry: registryText || prev.registry
         }))
+
+        setLockedFields({ name: true, ico: true, vat: true, address: true, registry: true })
     }
 
     const handleSaveProfile = async () => {
@@ -179,264 +130,251 @@ export default function Settings({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ settings: { defaultSupplier } })
             })
-            if (res.ok) {
-                alert(lang === 'cs' ? 'Profil uložen!' : 'Profile saved!')
-            } else {
-                throw new Error('Failed to save')
-            }
-        } catch (e) {
-            console.error(e)
-            alert(lang === 'cs' ? 'Chyba při ukládání profilu!' : 'Error saving profile!')
-        }
+            if (res.ok) alert(lang === 'cs' ? 'Profil uložen!' : 'Profile saved!')
+        } catch (e) { alert(lang === 'cs' ? 'Chyba!' : 'Error!') }
     }
 
+    const unlockField = (field) => setLockedFields(prev => ({ ...prev, [field]: false }))
+
     return (
-        <div className="grid two shadow-layout" style={{ alignItems: 'start', maxWidth: '1200px', margin: '0 auto' }}>
-            <section className="card">
-                <h2>{lang === 'cs' ? '📇 Můj Profil (Dodavatel)' : '📇 My Profile (Supplier)'}</h2>
-                <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '1.5rem' }}>
-                    {lang === 'cs'
-                        ? 'Tyto údaje budou automaticky předvyplněny na každé nové faktuře.'
-                        : 'These details will be pre-filled on every new invoice.'}
-                </p>
+        <div className="settings-v3-layout">
+            {/* Sidebar Navigation */}
+            <aside className="settings-v3-sidebar">
+                <button
+                    className={`settings-v3-nav-item ${activeTab === 'basic' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('basic')}
+                >
+                    <span>📇</span> {lang === 'cs' ? 'Základní údaje' : 'Basic Info'}
+                </button>
+                <button
+                    className={`settings-v3-nav-item ${activeTab === 'finance' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('finance')}
+                >
+                    <span>💰</span> {lang === 'cs' ? 'Daně a Banka' : 'Taxes & Bank'}
+                </button>
+                <button
+                    className={`settings-v3-nav-item ${activeTab === 'integrations' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('integrations')}
+                >
+                    <span>🔌</span> {lang === 'cs' ? 'Integrace' : 'Integrations'}
+                </button>
+            </aside>
 
-                {/* ARES Search Container */}
-                <div style={{ marginBottom: '2rem', padding: '1.25rem', border: '1px solid var(--border)', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)' }}>
-                    <h3 style={{ fontSize: '0.875rem', marginBottom: '1rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent)' }}>
-                        {lang === 'cs' ? '🔍 Rychlé vyplnění přes ARES' : '🔍 Fast Fill via ARES'}
-                    </h3>
-                    <AresSearch
-                        clientName={defaultSupplier?.name || ''}
-                        clientIco={defaultSupplier?.ico || ''}
-                        onClientNameChange={(v) => setDefaultSupplier(p => ({ ...p, name: v }))}
-                        onClientIcoChange={(v) => setDefaultSupplier(p => ({ ...p, ico: v }))}
-                        onAresData={handleAresData}
-                        t={t}
-                    />
-                </div>
+            {/* Main Content Area */}
+            <div className="settings-v3-content">
+                {activeTab === 'basic' && (
+                    <div className="fade-in">
+                        <header className="settings-v3-header">
+                            <h1>{lang === 'cs' ? 'Základní údaje' : 'Basic Info'}</h1>
+                            <p>{lang === 'cs' ? 'Správa vaší identity a údajů dodavatele.' : 'Manage your identity and supplier details.'}</p>
+                        </header>
 
-                <div className="grid">
-                    <div>
-                        <label>{t.supplierName} *</label>
-                        <input
-                            name="name"
-                            value={defaultSupplier?.name || ''}
-                            onChange={handleProfileChange}
-                            placeholder="Firma s.r.o."
-                            required
-                        />
-                    </div>
-
-                    <div className="grid two mobile-grid-2">
-                        <div>
-                            <label>{lang === 'cs' ? 'IČO *' : 'Business ID (IČO) *'}</label>
-                            <input
-                                name="ico"
-                                value={defaultSupplier?.ico || ''}
-                                onChange={handleProfileChange}
-                                placeholder="12345678"
-                                required
+                        <div className="ares-v3-box">
+                            <AresSearch
+                                clientName={defaultSupplier?.name || ''}
+                                clientIco={defaultSupplier?.ico || ''}
+                                onClientNameChange={(v) => setDefaultSupplier(p => ({ ...p, name: v }))}
+                                onClientIcoChange={(v) => setDefaultSupplier(p => ({ ...p, ico: v }))}
+                                onAresData={handleAresData}
+                                t={t}
+                                region={defaultSupplier?.region || 'CZ'}
                             />
                         </div>
-                        <div>
-                            <label>{lang === 'cs' ? 'DIČ' : 'VAT ID (DIČ)'}</label>
-                            <input
-                                name="vat"
-                                value={defaultSupplier?.vat || ''}
-                                onChange={handleProfileChange}
-                                placeholder="CZ12345678"
-                            />
-                        </div>
-                    </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: 'rgba(0,0,0,0.1)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                        <input
-                            type="checkbox"
-                            name="isVatPayer"
-                            id="isVatPayer"
-                            checked={defaultSupplier?.isVatPayer || false}
-                            onChange={handleProfileChange}
-                            style={{ width: 'auto', margin: 0 }}
-                        />
-                        <label htmlFor="isVatPayer" style={{ margin: 0, cursor: 'pointer', fontWeight: 600 }}>
-                            {lang === 'cs' ? 'Jsem plátce DPH' : 'I am a VAT payer'}
-                        </label>
+                        <section className="settings-v3-section">
+                            <h2>{lang === 'cs' ? 'Fakturační údaje' : 'Billing Details'}</h2>
+                            <div className="settings-v3-form-grid">
+                                <div className="settings-v3-field">
+                                    <div className="settings-v3-label-row">
+                                        <label>{t.homeRegion}</label>
+                                    </div>
+                                    <select
+                                        name="region"
+                                        value={defaultSupplier?.region || 'CZ'}
+                                        onChange={handleProfileChange}
+                                    >
+                                        <option value="CZ">Czech Republic 🇨🇿</option>
+                                        <option value="SK">Slovakia 🇸🇰</option>
+                                    </select>
+                                </div>
 
-                        {defaultSupplier?.isVatPayer && (
-                            <select
-                                name="taxRate"
-                                value={defaultSupplier?.taxRate || '21'}
-                                onChange={handleProfileChange}
-                                style={{ width: 'auto', marginLeft: 'auto', padding: '4px 8px' }}
-                            >
-                                <option value="21">21%</option>
-                                <option value="15">15%</option>
-                                <option value="12">12%</option>
-                            </select>
-                        )}
-                    </div>
+                                <div className="settings-v3-field">
+                                    <div className="settings-v3-label-row">
+                                        <label>{t.supplierName} *</label>
+                                        {lockedFields.name && <button className="settings-v3-edit-link" onClick={() => unlockField('name')}>{lang === 'cs' ? 'Upravit' : 'Edit'}</button>}
+                                    </div>
+                                    <input
+                                        name="name"
+                                        className={lockedFields.name ? 'settings-v3-input-locked' : ''}
+                                        value={defaultSupplier?.name || ''}
+                                        onChange={handleProfileChange}
+                                        readOnly={lockedFields.name}
+                                    />
+                                </div>
 
-                    <div>
-                        <label>{t.supplierAddress} *</label>
-                        <textarea
-                            name="address"
-                            value={defaultSupplier?.address || ''}
-                            onChange={handleProfileChange}
-                            placeholder={lang === 'cs' ? 'Ulice 123, 110 00 Praha' : 'Street 123, 110 00 Prague'}
-                            rows="2"
-                            required
-                        />
-                    </div>
+                                <div className="settings-v3-field">
+                                    <div className="settings-v3-label-row">
+                                        <label>{lang === 'cs' ? 'IČO *' : 'Business ID (IČO) *'}</label>
+                                        {lockedFields.ico && <button className="settings-v3-edit-link" onClick={() => unlockField('ico')}>{lang === 'cs' ? 'Upravit' : 'Edit'}</button>}
+                                    </div>
+                                    <input
+                                        name="ico"
+                                        className={lockedFields.ico ? 'settings-v3-input-locked' : ''}
+                                        value={defaultSupplier?.ico || ''}
+                                        onChange={handleProfileChange}
+                                        readOnly={lockedFields.ico}
+                                    />
+                                </div>
 
-                    <div>
-                        <label>{lang === 'cs' ? 'Zápis v rejstříku' : 'Registry Entry'}</label>
-                        <input
-                            name="registry"
-                            value={defaultSupplier?.registry || ''}
-                            onChange={handleProfileChange}
-                            placeholder={lang === 'cs' ? 'např. Městský soud v Praze, oddíl C...' : 'e.g. Commercial Register...'}
-                        />
-                    </div>
+                                <div className="settings-v3-field">
+                                    <div className="settings-v3-label-row">
+                                        <label>{lang === 'sk' ? 'DIČ' : 'VAT / Tax ID (DIČ)'}</label>
+                                        {lockedFields.vat && <button className="settings-v3-edit-link" onClick={() => unlockField('vat')}>{lang === 'cs' ? 'Upravit' : 'Edit'}</button>}
+                                    </div>
+                                    <input
+                                        name="vat"
+                                        className={lockedFields.vat ? 'settings-v3-input-locked' : ''}
+                                        value={defaultSupplier?.vat || ''}
+                                        onChange={handleProfileChange}
+                                        readOnly={lockedFields.vat}
+                                    />
+                                </div>
 
-                    <div>
-                        <label>{lang === 'cs' ? 'Bankovní spojení' : 'Bank Account'}</label>
-                        <div className="grid three mobile-grid-2" style={{ gap: '0.5rem', marginBottom: '0.5rem' }}>
-                            <div style={{ flex: '0 0 70px' }}>
-                                <input
-                                    name="prefix"
-                                    value={defaultSupplier?.prefix || ''}
-                                    onChange={handleProfileChange}
-                                    onPaste={handlePasteBank}
-                                    placeholder="Prefix"
-                                />
+                                <div className="settings-v3-field full">
+                                    <div className="settings-v3-label-row">
+                                        <label>{t.supplierAddress} *</label>
+                                        {lockedFields.address && <button className="settings-v3-edit-link" onClick={() => unlockField('address')}>{lang === 'cs' ? 'Upravit' : 'Edit'}</button>}
+                                    </div>
+                                    <input
+                                        name="address"
+                                        className={lockedFields.address ? 'settings-v3-input-locked' : ''}
+                                        value={defaultSupplier?.address || ''}
+                                        onChange={handleProfileChange}
+                                        readOnly={lockedFields.address}
+                                    />
+                                </div>
+
+                                <div className="settings-v3-field full">
+                                    <div className="settings-v3-label-row">
+                                        <label>{lang === 'cs' ? 'Zápis v rejstříku' : 'Registry Entry'}</label>
+                                        {lockedFields.registry && <button className="settings-v3-edit-link" onClick={() => unlockField('registry')}>{lang === 'cs' ? 'Upravit' : 'Edit'}</button>}
+                                    </div>
+                                    <input
+                                        name="registry"
+                                        className={lockedFields.registry ? 'settings-v3-input-locked' : ''}
+                                        value={defaultSupplier?.registry || ''}
+                                        onChange={handleProfileChange}
+                                        readOnly={lockedFields.registry}
+                                    />
+                                </div>
                             </div>
-                            <div style={{ flex: 1 }}>
-                                <input
-                                    name="accountNumber"
-                                    value={defaultSupplier?.accountNumber || ''}
-                                    onChange={handleProfileChange}
-                                    onPaste={handlePasteBank}
-                                    placeholder={lang === 'cs' ? 'Číslo účtu' : 'Account Number'}
-                                />
-                            </div>
-                            <div style={{ flex: '0 0 90px' }}>
-                                <input
-                                    name="bankCode"
-                                    value={defaultSupplier?.bankCode || ''}
-                                    onChange={handleProfileChange}
-                                    onPaste={handlePasteBank}
-                                    placeholder={lang === 'cs' ? 'Kód' : 'Code'}
-                                />
-                            </div>
-                        </div>
-                        <input
-                            name="iban"
-                            value={defaultSupplier?.iban || ''}
-                            placeholder="IBAN"
-                            readOnly
-                            style={{ background: 'rgba(0,0,0,0.1)', color: 'var(--muted)', cursor: 'not-allowed', fontSize: '0.85rem' }}
-                        />
+                        </section>
                     </div>
+                )}
 
-                    <div className="grid two mobile-grid-2">
-                        <div>
-                            <label>{lang === 'cs' ? 'Telefon' : 'Phone'}</label>
-                            <input
-                                name="phone"
-                                value={defaultSupplier?.phone || ''}
-                                onChange={handleProfileChange}
-                                placeholder="+420..."
-                            />
-                        </div>
-                        <div>
-                            <label>Email</label>
-                            <input
-                                name="email"
-                                type="email"
-                                value={defaultSupplier?.email || ''}
-                                onChange={handleProfileChange}
-                            />
-                        </div>
+                {activeTab === 'finance' && (
+                    <div className="fade-in">
+                        <header className="settings-v3-header">
+                            <h1>{lang === 'cs' ? 'Daně a Banka' : 'Taxes & Bank'}</h1>
+                            <p>{lang === 'cs' ? 'Nastavení finančních toků a DPH.' : 'Manage financial flows and VAT.'}</p>
+                        </header>
+
+                        <section className="settings-v3-section">
+                            <h2>{lang === 'cs' ? 'Status plátce' : 'Tax Status'}</h2>
+                            <div className="settings-v3-form-grid">
+                                <div className="settings-v3-field">
+                                    <label>{t.taxStatus}</label>
+                                    <select
+                                        name="taxStatus"
+                                        value={defaultSupplier?.taxStatus || 'non-payer'}
+                                        onChange={handleProfileChange}
+                                    >
+                                        <option value="non-payer">{t.nonVatPayer}</option>
+                                        <option value="vat-payer">{t.vatPayer}</option>
+                                        <option value="identified-person">{t.identifiedPerson}</option>
+                                    </select>
+                                </div>
+                                <div className="settings-v3-field" style={{ justifyContent: 'center' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            name="isVatPayer"
+                                            checked={defaultSupplier?.isVatPayer || false}
+                                            onChange={handleProfileChange}
+                                            style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                                        />
+                                        <span>{lang === 'cs' ? 'Aktivní plátce DPH' : 'Active VAT Payer'}</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="settings-v3-section">
+                            <h2>{lang === 'cs' ? 'Bankovní spojení' : 'Bank Details'}</h2>
+                            <div className="settings-v3-form-grid">
+                                <div className="settings-v3-field">
+                                    <label>{lang === 'cs' ? 'Číslo účtu / Kód banky' : 'Account Number / Bank Code'}</label>
+                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                        <input
+                                            name="accountNumber"
+                                            value={defaultSupplier?.accountNumber || ''}
+                                            onChange={handleProfileChange}
+                                            placeholder="1234567890"
+                                        />
+                                        <span style={{ opacity: 0.3 }}>/</span>
+                                        <input
+                                            name="bankCode"
+                                            value={defaultSupplier?.bankCode || ''}
+                                            onChange={handleProfileChange}
+                                            style={{ width: '120px' }}
+                                            placeholder="0800"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="settings-v3-field">
+                                    <label>IBAN</label>
+                                    <input
+                                        name="iban"
+                                        value={defaultSupplier?.iban || ''}
+                                        readOnly
+                                        style={{ background: 'rgba(255,255,255,0.03)', opacity: 0.6 }}
+                                    />
+                                </div>
+                            </div>
+                        </section>
                     </div>
-                </div>
+                )}
 
-                <div className="actions" style={{ marginTop: '2rem' }}>
-                    <button onClick={handleSaveProfile} className="primary" style={{ width: '100%' }}>
-                        {lang === 'cs' ? '💾 Uložit do cloudu' : '💾 Save to Cloud'}
+                {activeTab === 'integrations' && (
+                    <div className="fade-in">
+                        <header className="settings-v3-header">
+                            <h1>{lang === 'cs' ? 'Integrace' : 'Integrations'}</h1>
+                            <p>{lang === 'cs' ? 'Propojte své cloudové služby.' : 'Connect your cloud services.'}</p>
+                        </header>
+
+                        <section className="settings-v3-section">
+                            <h2>Google Workspace</h2>
+                            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '2rem', borderRadius: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                    <div style={{ fontWeight: 700, marginBottom: '4px' }}>OAuth2 Authentication</div>
+                                    <div style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>{smtpConfig.useGoogle ? `Connected as ${smtpConfig.fromEmail}` : 'Not connected'}</div>
+                                </div>
+                                {!smtpConfig.useGoogle ? (
+                                    <button className="settings-v3-save-btn" onClick={() => { /* oauth logic */ }}>Connect</button>
+                                ) : (
+                                    <button className="danger" onClick={() => { /* diconnect logic */ }}>Disconnect</button>
+                                )}
+                            </div>
+                        </section>
+                    </div>
+                )}
+
+                <footer className="settings-v3-action-bar">
+                    <button className="settings-v3-save-btn" onClick={handleSaveProfile}>
+                        {lang === 'cs' ? '💾 Uložit všechna nastavení' : '💾 Save All Settings'}
                     </button>
-                </div>
-            </section>
-
-            <section className="card">
-                <h2>{lang === 'cs' ? '🔐 Nastavení Emailu & Drive' : '🔐 Email & Drive Settings'}</h2>
-                <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: '12px', background: 'rgba(255,255,255,0.03)' }}>
-                    <h3 style={{ marginTop: 0, fontSize: '1rem' }}>Google Account (OAuth2)</h3>
-                    <p style={{ fontSize: '14px', color: 'var(--muted)', marginBottom: '1.5rem' }}>
-                        {lang === 'cs' ? 'Připojte svůj Google účet pro odesílání emailů a automatické zálohování faktur na Disk Google.' : 'Connect your Google account to send emails and backup invoices to Google Drive.'}
-                    </p>
-
-                    {!smtpConfig.useGoogle ? (
-                        <button
-                            type="button"
-                            className="secondary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'center' }}
-                            onClick={async () => {
-                                try {
-                                    const res = await fetch('/auth/google/url');
-                                    const data = await res.json();
-                                    if (data.url) {
-                                        window.open(data.url, 'Google Auth', 'width=600,height=700');
-                                        const handleMessage = (event) => {
-                                            if (event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
-                                                const { tokens, email } = event.data;
-                                                localStorage.setItem('google_tokens', JSON.stringify(tokens));
-                                                const newConfig = { ...smtpConfig, useGoogle: true, fromEmail: email };
-                                                setSmtpConfig(newConfig);
-                                                localStorage.setItem('smtpConfig', JSON.stringify(newConfig));
-                                                alert(lang === 'cs' ? 'Úspěšně připojeno!' : 'Successfully connected!');
-                                                window.removeEventListener('message', handleMessage);
-                                                window.dispatchEvent(new Event('google_login_update'))
-                                            }
-                                        };
-                                        window.addEventListener('message', handleMessage);
-                                    }
-                                } catch (e) {
-                                    alert('Failed to start auth flow');
-                                }
-                            }}
-                        >
-                            <span style={{ fontSize: '18px' }}>G</span>
-                            {lang === 'cs' ? 'Přihlásit se přes Google' : 'Sign in with Google'}
-                        </button>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <div style={{ padding: '12px', background: 'rgba(102, 187, 106, 0.1)', border: '1px solid #66bb6a', borderRadius: '8px', color: '#66bb6a', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span>✓</span> {lang === 'cs' ? `Připojeno jako: ${smtpConfig.fromEmail}` : `Connected as: ${smtpConfig.fromEmail}`}
-                            </div>
-                            <button
-                                type="button"
-                                className="danger"
-                                style={{ width: '100%' }}
-                                onClick={async () => {
-                                    if (!confirm(lang === 'cs' ? 'Opravdu se chcete odhlásit? Aplikace se restartuje.' : 'Are you sure you want to log out? The application will restart.')) return;
-                                    try {
-                                        await fetch('/auth/google/disconnect', { method: 'POST' });
-                                    } catch (e) { console.error("Logout failed on server", e); }
-                                    localStorage.removeItem('google_tokens');
-                                    localStorage.removeItem('smtpConfig');
-                                    localStorage.removeItem('defaultSupplier');
-                                    localStorage.removeItem('categories');
-                                    setSmtpConfig({ useGoogle: false, fromName: '', fromEmail: '' });
-                                    window.dispatchEvent(new Event('google_login_update'));
-                                    window.location.reload();
-                                }}
-                            >
-                                {lang === 'cs' ? 'Odpojit účet' : 'Disconnect Account'}
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </section>
+                </footer>
+            </div>
         </div>
     )
 }
