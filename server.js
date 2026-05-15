@@ -343,7 +343,7 @@ const handleRequest = async (req, res) => {
 
 if (require.main === module) {
     const server = http.createServer(requestHandler);
-    server.listen(port, () => console.log(`Modular server running at http://localhost:${port}/`));
+    server.listen(port, "0.0.0.0", () => console.log(`Modular server running at http://0.0.0.0:${port}/`));
 }
 
 module.exports = requestHandler;
