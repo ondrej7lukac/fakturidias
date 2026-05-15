@@ -1,5 +1,5 @@
 import './InvoiceDashboard.css'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Fragment } from 'react'
 import { money } from '../utils/storage'
 import StatusBadge from './StatusBadge'
 import InvoiceForm from './InvoiceForm'
@@ -386,7 +386,7 @@ export default function InvoiceDashboard({
                                 const overdue = isOverdue(inv)
                                 const isExpanded = expandedId === inv.id
                                 return (
-                                    <>
+                                    <Fragment key={inv.id}>
                                         <tr
                                             key={inv.id}
                                             className={overdue && inv.status !== 'paid' ? 'row-overdue' : ''}
@@ -545,7 +545,7 @@ export default function InvoiceDashboard({
                                                 </td>
                                             </tr>
                                         )}
-                                    </>
+                                    </Fragment>
                                 )
                             })}
                         </tbody>
