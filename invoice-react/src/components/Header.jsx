@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import './Header.css';
+import { Button } from './ui/button';
 
 export default function Header({
   onNewInvoice,
@@ -9,6 +11,7 @@ export default function Header({
   t,
   currentView,
   onViewChange,
+  setDashboardOpen,
   user,
   onLogout,
   mobileView,
@@ -86,52 +89,50 @@ export default function Header({
     <header className='header'>
       <div className='header__inner'>
         {/* Brand / Logo */}
-        <div className='brand' onClick={() => onViewChange('invoices')}>
+        <Button
+          type='button'
+          className='brand brand-button'
+          onClick={() => onViewChange('invoices')}
+          aria-label='Open invoices view'
+          variant='ghost'
+        >
           <img
             src='/GEMINI_GEN_LOGO.png'
             alt='F'
-            className='brand__mark'
-            style={{
-              background: 'transparent',
-              objectFit: 'contain',
-              padding: '2px',
-            }}
+            className='brand__mark brand__mark-image'
           />
           <div className='brand__text header-logo-desktop'>
             <span className='brand__name'>Fakturidias</span>
             <span className='brand__sub'>Invoices & Proforma</span>
           </div>
-        </div>
+        </Button>
 
         {/* Header Actions (Desktop) */}
-        <div
-          className='header__actions desktop-only'
-          style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}
-        >
-          <button
-            className={`btn ${currentView === 'invoices' ? 'btn--soft' : 'btn--soft'}`}
-            onClick={() => onViewChange('invoices')}
-            style={{
-              border:
-                currentView === 'invoices'
-                  ? '1px solid var(--border)'
-                  : '1px solid transparent',
+        <div className='header__actions header__actions--desktop desktop-only'>
+          <Button
+            variant='soft'
+            size='sm'
+            className={`btn btn--soft ${currentView === 'invoices' ? 'is-current-view' : ''}`}
+            onClick={() => {
+              onViewChange('invoices');
+              setDashboardOpen(true);
             }}
           >
             {lang === 'cs' ? 'Přehled faktur' : 'Invoices'}
-          </button>
+          </Button>
 
-          <button className='btn primary' onClick={onNewInvoice}>
+          <Button className='btn primary' onClick={onNewInvoice} size='sm'>
             + {lang === 'cs' ? 'Vytvořit fakturu' : 'New Invoice'}
-          </button>
+          </Button>
 
-          <button
+          <Button
             type='button'
-            className='btn btn--soft'
+            className='btn btn--soft header-theme-btn'
             onClick={toggleTheme}
             aria-label={lang === 'cs' ? 'Přepnout motiv' : 'Toggle theme'}
             title={lang === 'cs' ? 'Přepnout motiv' : 'Toggle theme'}
-            style={{ minWidth: '116px' }}
+            variant='soft'
+            size='sm'
           >
             <span>{theme === 'dark' ? '☀' : '☾'}</span>
             {theme === 'dark'
@@ -141,61 +142,59 @@ export default function Header({
               : lang === 'cs'
                 ? 'Tmavý'
                 : 'Dark'}
-          </button>
+          </Button>
 
           <div
             ref={userMenuRef}
-            style={{ position: 'relative', zIndex: userMenuOpen ? 1400 : 1 }}
+            className={`user-menu-wrap ${userMenuOpen ? 'is-open' : ''}`}
           >
-            <button
-              className='btn btn--soft'
+            <Button
+              variant='soft'
+              size='sm'
+              className={`btn btn--soft user-menu-trigger ${user ? 'is-authenticated' : ''}`}
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              style={{
-                gap: '8px',
-                background: user ? 'var(--success-bg)' : undefined,
-                borderColor: user ? 'var(--success-border)' : undefined,
-                color: user ? 'var(--success-text)' : undefined,
-                padding: '10px 16px',
-              }}
+              aria-expanded={userMenuOpen}
             >
-              <span style={{ fontWeight: 'bold' }}>{user ? '✓' : 'G'}</span>
+              <span className='user-menu-trigger-icon'>{user ? '✓' : 'G'}</span>
               {user
                 ? `(${user.email?.split('@')[0]})`
                 : lang === 'cs'
                   ? 'Přihlášení'
                   : 'Login'}
-            </button>
+            </Button>
 
             {userMenuOpen && (
               <div className='user-menu-dropdown'>
-                <button
+                <Button
                   onClick={() => {
                     onViewChange('settings');
                     setUserMenuOpen(false);
                   }}
-                  className='btn btn--soft'
-                  style={{
-                    width: '100%',
-                    justifyContent: 'flex-start',
-                    padding: '8px 12px',
-                  }}
+                  className='btn btn--soft user-menu-item'
+                  variant='soft'
+                  size='sm'
                 >
                   {t.settings || 'Settings'}
-                </button>
+                </Button>
 
-                <button
+                <Button
                   type='button'
                   className='btn btn--soft user-submenu-toggle'
                   onClick={() => setLanguageMenuOpen((v) => !v)}
                   aria-expanded={languageMenuOpen}
+                  variant='soft'
+                  size='sm'
                 >
-                  <span>{lang === 'cs' ? 'Jazyk' : 'Language'}: {lang === 'cs' ? 'Čeština (CZ)' : 'English (EN)'}</span>
+                  <span>
+                    {lang === 'cs' ? 'Jazyk' : 'Language'}:{' '}
+                    {lang === 'cs' ? 'Čeština (CZ)' : 'English (EN)'}
+                  </span>
                   <span>{languageMenuOpen ? '▴' : '▾'}</span>
-                </button>
+                </Button>
 
                 {languageMenuOpen && (
                   <div className='user-submenu-panel'>
-                    <button
+                    <Button
                       type='button'
                       className={`btn btn--soft user-submenu-option ${lang === 'cs' ? 'is-active' : ''}`}
                       onClick={() => {
@@ -203,10 +202,12 @@ export default function Header({
                         setLanguageMenuOpen(false);
                         setUserMenuOpen(false);
                       }}
+                      variant='soft'
+                      size='sm'
                     >
                       Čeština (CZ)
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type='button'
                       className={`btn btn--soft user-submenu-option ${lang === 'en' ? 'is-active' : ''}`}
                       onClick={() => {
@@ -214,27 +215,26 @@ export default function Header({
                         setLanguageMenuOpen(false);
                         setUserMenuOpen(false);
                       }}
+                      variant='soft'
+                      size='sm'
                     >
                       English (EN)
-                    </button>
+                    </Button>
                   </div>
                 )}
 
                 <div className='user-menu-divider' />
 
-                <button
+                <Button
                   onClick={() => {
                     handleLogin();
                     setUserMenuOpen(false);
                   }}
-                  className='btn btn--soft'
-                  style={{
-                    width: '100%',
-                    justifyContent: 'flex-start',
-                    padding: '8px 12px',
-                  }}
+                  className='btn btn--soft user-menu-item'
+                  variant='soft'
+                  size='sm'
                 >
-                  <span style={{ fontWeight: 'bold' }}>G</span>
+                  <span className='user-menu-trigger-icon'>G</span>
                   {user
                     ? lang === 'cs'
                       ? 'Odhlásit se'
@@ -242,205 +242,152 @@ export default function Header({
                     : lang === 'cs'
                       ? 'Přihlásit se'
                       : 'Login'}
-                </button>
+                </Button>
               </div>
             )}
           </div>
         </div>
 
         {/* Mobile Menu Button & View Switch */}
-        <div
-          className='header__actions mobile-only-flex'
-          style={{ marginLeft: 'auto' }}
-        >
-          <div className='view-switch' style={{ marginRight: '10px' }}>
-            <button
+        <div className='header__actions header__actions--mobile mobile-only-flex'>
+          <div className='view-switch'>
+            <Button
+              variant='ghost'
+              size='sm'
               className={`switch-option ${mobileView === 'list' ? 'active' : ''}`}
               onClick={() => setMobileView('list')}
-              style={{ padding: '4px 8px', fontSize: '0.8rem' }}
             >
               {lang === 'cs' ? 'Seznam' : 'List'}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant='ghost'
+              size='sm'
               className={`switch-option ${mobileView === 'form' ? 'active' : ''}`}
               onClick={() => setMobileView('form')}
-              style={{ padding: '4px 8px', fontSize: '0.8rem' }}
             >
               {lang === 'cs' ? 'Faktura' : 'Invoice'}
-            </button>
+            </Button>
           </div>
 
-          <button
-            className='iconBtn mobile-menu-btn'
+          <Button
+            variant='ghost'
+            size='icon'
+            className={`iconBtn mobile-menu-btn ${mobileMenuOpen ? 'is-hidden' : ''}`}
             onClick={toggleMobileMenu}
             aria-label='Toggle menu'
-            style={{ display: mobileMenuOpen ? 'none' : '' }}
           >
             ☰
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Mobile Slide-in Menu */}
       <div
         className={`mobile-menu ${mobileMenuOpen ? 'mobile-menu-open' : ''}`}
-        style={{
-          background: 'rgba(10, 12, 25, 0.75)',
-          backdropFilter: 'blur(14px)',
-          borderLeft: '1px solid var(--border)',
-          color: 'var(--text)',
-        }}
       >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '2.5rem',
-            width: '100%',
-            padding: '0 0.5rem',
-          }}
-        >
-          <div
-            className='brand__title'
-            style={{
-              fontWeight: '700',
-              fontSize: '1.2rem',
-              color: 'var(--text)',
-            }}
-          >
-            Menu
-          </div>
-          <button
-            className='iconBtn'
+        <div className='mobile-menu-head'>
+          <div className='brand__title mobile-menu-title'>Menu</div>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='iconBtn mobile-menu-close'
             onClick={toggleMobileMenu}
-            style={{ background: 'var(--card)', color: 'var(--text)' }}
           >
             ✕
-          </button>
+          </Button>
         </div>
 
-        <div
-          className='mobile-menu-actions'
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-            width: '100%',
-            alignItems: 'stretch',
-          }}
-        >
-          <button
+        <div className='mobile-menu-actions'>
+          <Button
             onClick={() => {
               onNewInvoice();
               setMobileMenuOpen(false);
             }}
-            className='btn primary'
-            style={{
-              width: '100%',
-              padding: '16px',
-              justifyContent: 'center',
-              fontSize: '1.1rem',
-              borderRadius: '14px',
-            }}
+            className='btn primary mobile-menu-action-btn mobile-menu-action-btn-primary'
+            size='sm'
           >
             + {t.newInvoice}
-          </button>
+          </Button>
 
-          <button
+          <Button
             onClick={() => {
               onViewChange('invoices');
               setMobileMenuOpen(false);
             }}
-            className='btn'
-            style={{
-              width: '100%',
-              padding: '14px',
-              background: 'var(--card)',
-              color: 'var(--text)',
-              justifyContent: 'center',
-              borderRadius: '12px',
-            }}
+            className='btn btn--soft mobile-menu-action-btn'
+            variant='soft'
+            size='sm'
           >
             {t.invoices || 'Invoices'}
-          </button>
+          </Button>
 
-          <button
+          <Button
             onClick={() => {
               onViewChange('settings');
               setMobileMenuOpen(false);
             }}
-            className='btn'
-            style={{
-              width: '100%',
-              padding: '14px',
-              background: 'var(--card)',
-              color: 'var(--text)',
-              justifyContent: 'center',
-              borderRadius: '12px',
-            }}
+            className='btn btn--soft mobile-menu-action-btn'
+            variant='soft'
+            size='sm'
           >
             {t.settings || 'Settings'}
-          </button>
+          </Button>
         </div>
 
-        <div
-          className='mobile-menu-footer'
-          style={{
-            marginTop: 'auto',
-            paddingTop: '2.5rem',
-            borderTop: '1px solid var(--border)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-            width: '100%',
-          }}
-        >
+        <div className='mobile-menu-footer'>
           <div className='mobile-language-submenu'>
-            <button
+            <Button
               type='button'
               className='btn btn--soft user-submenu-toggle'
               onClick={() => setMobileLanguageMenuOpen((v) => !v)}
               aria-expanded={mobileLanguageMenuOpen}
-              style={{ width: '100%', justifyContent: 'space-between', padding: '14px' }}
+              variant='soft'
+              size='sm'
             >
-              <span>{lang === 'cs' ? 'Jazyk: Čeština (CZ)' : 'Language: English (EN)'}</span>
+              <span>
+                {lang === 'cs'
+                  ? 'Jazyk: Čeština (CZ)'
+                  : 'Language: English (EN)'}
+              </span>
               <span>{mobileLanguageMenuOpen ? '▴' : '▾'}</span>
-            </button>
+            </Button>
 
             {mobileLanguageMenuOpen && (
               <div className='user-submenu-panel mobile-submenu-panel'>
-                <button
+                <Button
                   type='button'
                   className={`btn btn--soft user-submenu-option ${lang === 'cs' ? 'is-active' : ''}`}
                   onClick={() => {
                     setLang('cs');
                     setMobileLanguageMenuOpen(false);
                   }}
-                  style={{ width: '100%' }}
+                  variant='soft'
+                  size='sm'
                 >
                   Čeština (CZ)
-                </button>
-                <button
+                </Button>
+                <Button
                   type='button'
                   className={`btn btn--soft user-submenu-option ${lang === 'en' ? 'is-active' : ''}`}
                   onClick={() => {
                     setLang('en');
                     setMobileLanguageMenuOpen(false);
                   }}
-                  style={{ width: '100%' }}
+                  variant='soft'
+                  size='sm'
                 >
                   English (EN)
-                </button>
+                </Button>
               </div>
             )}
           </div>
 
-          <button
+          <Button
             type='button'
             className='btn btn--soft'
             onClick={toggleTheme}
-            style={{ width: '100%', justifyContent: 'center', padding: '14px' }}
+            variant='soft'
+            size='sm'
           >
             <span>{theme === 'dark' ? '☀' : '☾'}</span>
             {theme === 'dark'
@@ -450,42 +397,26 @@ export default function Header({
               : lang === 'cs'
                 ? 'Přepnout na tmavý režim'
                 : 'Switch to dark mode'}
-          </button>
+          </Button>
 
-          <div
-            style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
-          >
+          <div className='mobile-auth-section'>
             {user && (
-              <div
-                style={{
-                  fontSize: '0.85rem',
-                  opacity: 0.7,
-                  textAlign: 'center',
-                  marginBottom: '5px',
-                }}
-              >
+              <div className='mobile-auth-caption'>
                 {lang === 'cs' ? 'Přihlášen jako' : 'Logged in as'}:{' '}
                 <strong>{user.email}</strong>
               </div>
             )}
-            <button
+            <Button
               onClick={() => {
                 if (user) onLogout();
                 else handleLogin();
                 setMobileMenuOpen(false);
               }}
-              className={`btn ${user ? 'danger' : 'primary'}`}
-              style={{
-                width: '100%',
-                padding: '16px',
-                justifyContent: 'center',
-                borderRadius: '14px',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-              }}
+              className={`btn ${user ? 'danger' : 'primary'} mobile-auth-btn`}
+              variant={user ? 'destructive' : 'default'}
+              size='sm'
             >
-              <span style={{ fontWeight: 'bold', marginRight: '10px' }}>
-                {user ? '✕' : 'G'}
-              </span>
+              <span className='mobile-auth-icon'>{user ? '✕' : 'G'}</span>
               {user
                 ? lang === 'cs'
                   ? 'Odhlásit se'
@@ -493,7 +424,7 @@ export default function Header({
                 : lang === 'cs'
                   ? 'Přihlásit se přes Google'
                   : 'Sign in with Google'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

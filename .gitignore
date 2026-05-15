@@ -55,3 +55,6 @@ push.bat
 start.bat
 .vercel
 .env*.local
+
+# Local env override
+_env.local

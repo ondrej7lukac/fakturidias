@@ -1,11 +1,18 @@
 import { useState } from 'react';
+import './InvoiceList.css';
 import { money } from '../utils/storage';
 import InvoiceDashboard from './InvoiceDashboard';
 import StatusBadge from './StatusBadge';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Select } from './ui/select';
+import { Card } from './ui/card';
 
 export default function InvoiceList({
   invoices,
   categories,
+  onLoadDemoInvoices,
+  onClearDemoInvoices,
   onSelect,
   onDelete,
   onSendReminder,
@@ -75,31 +82,69 @@ export default function InvoiceList({
   }
 
   return (
-    <section
-      className='card invoice-list-card'
-      style={{ marginBottom: '20px' }}
-    >
-      <div className='invoice-list-header' style={{ marginBottom: '1rem' }}>
-        <h2 style={{ margin: 0 }}>{t.invoices}</h2>
-        <button
-          type='button'
-          className='secondary'
-          style={{
-            padding: '0.4rem 0.9rem',
-            fontSize: '0.8rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-          }}
-          onClick={() => setDashboardOpen(true)}
-        >
-          {lang === 'cs' ? 'Přehled' : 'Dashboard'}
-        </button>
+    <Card className='invoice-list-card'>
+      <div className='invoice-list-header'>
+        <div className='invoice-list-title-wrap'>
+          <h2 className='invoice-list-title'>{t.invoices}</h2>
+          <p className='invoice-list-caption'>
+            {filteredInvoices.length} {lang === 'cs' ? 'zobrazeno' : 'shown'}
+          </p>
+        </div>
+        <div className='invoice-list-toolbar'>
+          {!isAuthenticated ? (
+            <Button
+              type='button'
+              variant='soft'
+              size='sm'
+              className='compact-btn'
+              onClick={
+                invoices.length ? onClearDemoInvoices : onLoadDemoInvoices
+              }
+            >
+              {invoices.length ? t.clearDemoInvoices : t.loadDemoInvoices}
+            </Button>
+          ) : null}
+          <Button
+            type='button'
+            variant='secondary'
+            size='sm'
+            className='compact-btn'
+            onClick={() => setDashboardOpen(true)}
+          >
+            {lang === 'cs' ? 'Přehled' : 'Dashboard'}
+          </Button>
+        </div>
       </div>
+      {!isAuthenticated ? (
+        <div className='demo-seed-panel'>
+          <div>
+            <p className='demo-seed-eyebrow'>{t.demoTitle}</p>
+            <p className='demo-seed-copy'>{t.demoDescription}</p>
+          </div>
+          <div className='demo-seed-actions'>
+            <Button
+              type='button'
+              onClick={onLoadDemoInvoices}
+              variant='default'
+              size='sm'
+            >
+              {t.loadDemoInvoices}
+            </Button>
+            <Button
+              type='button'
+              onClick={onClearDemoInvoices}
+              variant='secondary'
+              size='sm'
+            >
+              {t.clearDemoInvoices}
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <div className='grid two'>
         <div>
           <label htmlFor='searchText'>{t.search}</label>
-          <input
+          <Input
             id='searchText'
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
@@ -108,7 +153,7 @@ export default function InvoiceList({
         </div>
         <div>
           <label htmlFor='filterStatus'>{t.status}</label>
-          <select
+          <Select
             id='filterStatus'
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
@@ -118,13 +163,13 @@ export default function InvoiceList({
             <option value='sent'>{t.sent}</option>
             <option value='paid'>{t.paid}</option>
             <option value='overdue'>{t.overdue}</option>
-          </select>
+          </Select>
         </div>
       </div>
       <div className='grid'>
         <div>
           <label htmlFor='filterCategory'>{t.category}</label>
-          <select
+          <Select
             id='filterCategory'
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
@@ -137,13 +182,29 @@ export default function InvoiceList({
                 {cat}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
       <div className='list'>
         {filteredInvoices.length === 0 ? (
           <div className='empty'>
-            {lang === 'cs' ? 'Nenalezeny žádné faktury.' : 'No invoices found.'}
+            <p>
+              {lang === 'cs'
+                ? 'Nenalezeny žádné faktury.'
+                : 'No invoices found.'}
+            </p>
+            {!isAuthenticated ? (
+              <div className='demo-empty-actions'>
+                <Button
+                  type='button'
+                  variant='default'
+                  size='sm'
+                  onClick={onLoadDemoInvoices}
+                >
+                  {t.loadDemoInvoices}
+                </Button>
+              </div>
+            ) : null}
           </div>
         ) : (
           filteredInvoices.map((inv) => (
@@ -151,20 +212,17 @@ export default function InvoiceList({
               key={inv.id}
               className={`invoice-item ${selectedId === inv.id ? 'active' : ''}`}
               onClick={() => onSelect(inv.id)}
-              style={{
-                cursor: 'pointer',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                background: 'var(--card)',
-                marginBottom: '0.5rem',
-                transition: 'all 0.2s ease',
+              role='button'
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelect(inv.id);
+                }
               }}
             >
-              <div
-                className='invoice-item-header'
-                style={{ marginBottom: '0.5rem' }}
-              >
-                <strong style={{ fontSize: '1rem' }}>
+              <div className='invoice-item-header'>
+                <strong className='invoice-item-number'>
                   {inv.invoiceNumber}
                 </strong>
                 <StatusBadge
@@ -175,57 +233,47 @@ export default function InvoiceList({
                 />
               </div>
               {inv.client.name ? (
-                <div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>
-                  {inv.client.name}
-                </div>
+                <div className='invoice-item-client'>{inv.client.name}</div>
               ) : null}
-              <div
-                className='invoice-meta'
-                style={{ marginBottom: '0.75rem', fontSize: '0.8rem' }}
-              >
+              <div className='invoice-meta'>
                 {inv.currency} {money(inv.amount)} •{' '}
                 {inv.client.area || (lang === 'cs' ? 'Bez oblasti' : 'No area')}
                 {inv.issueDate && (
-                  <span style={{ marginLeft: '0.5rem' }}>
+                  <span className='invoice-item-issued'>
                     • {lang === 'cs' ? 'Vystaveno' : 'Issued'}: {inv.issueDate}
                   </span>
                 )}
               </div>
-              <div
-                className='actions invoice-item-actions'
-                style={{ display: 'flex', gap: '0.5rem' }}
-              >
-                <button
+              <div className='actions invoice-item-actions'>
+                <Button
                   type='button'
-                  className='secondary'
+                  variant='secondary'
+                  size='sm'
+                  className='invoice-item-btn'
                   onClick={(e) => {
                     e.stopPropagation();
-                    onSelect(inv.id);
+                    setDashboardOpen(true);
                   }}
-                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
                 >
                   {lang === 'cs' ? 'Otevřít' : 'Open'}
-                </button>
-                <button
+                </Button>
+                <Button
                   type='button'
-                  className='danger'
+                  variant='destructive'
+                  size='sm'
+                  className='invoice-item-btn invoice-item-btn-danger'
                   onClick={(e) => {
                     e.stopPropagation();
                     onDelete(inv.id);
                   }}
-                  style={{
-                    padding: '0.4rem 0.8rem',
-                    fontSize: '0.75rem',
-                    marginLeft: 'auto',
-                  }}
                 >
                   {lang === 'cs' ? 'Smazat' : 'Delete'}
-                </button>
+                </Button>
               </div>
             </div>
           ))
         )}
       </div>
-    </section>
+    </Card>
   );
 }

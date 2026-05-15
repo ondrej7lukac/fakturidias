@@ -6,22 +6,20 @@ const { connectDB, TokenModel, isConnected } = require('./storage');
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const baseDir = path.join(__dirname, '..');
+const baseDir = path.join(__dirname, '..', '..');
 const TOKENS_PATH = path.join(baseDir, 'google_tokens.json');
 
-const SCOPES = [
-  'https://www.googleapis.com/auth/userinfo.email'
-];
+const SCOPES = ['https://www.googleapis.com/auth/userinfo.email'];
 
 let oAuth2Client;
 try {
   oAuth2Client = new google.auth.OAuth2(
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
-    "http://localhost:5500/auth/google/callback"
+    'http://localhost:5500/auth/google/callback',
   );
 } catch (e) {
-  console.warn("googleapis not installed or failed to load");
+  console.warn('googleapis not installed or failed to load');
 }
 
 // Load saved tokens if exist (Local FS Fallback)
@@ -30,7 +28,7 @@ if (oAuth2Client && fs.existsSync(TOKENS_PATH)) {
     const tokens = JSON.parse(fs.readFileSync(TOKENS_PATH, 'utf8'));
     oAuth2Client.setCredentials(tokens);
   } catch (e) {
-    console.error("[OAuth] Failed to load saved tokens", e);
+    console.error('[OAuth] Failed to load saved tokens', e);
   }
 }
 
@@ -48,13 +46,14 @@ async function getCurrentUserEmail(req) {
 }
 
 async function handleAuthUrl(req, res) {
-  if (!oAuth2Client) return sendJson(res, 500, { error: "OAuth not initialized" });
+  if (!oAuth2Client)
+    return sendJson(res, 500, { error: 'OAuth not initialized' });
   const redirectUri = getRedirectUri(req);
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
     prompt: 'consent',
-    redirect_uri: redirectUri
+    redirect_uri: redirectUri,
   });
   return sendJson(res, 200, { url: authUrl });
 }
@@ -62,11 +61,15 @@ async function handleAuthUrl(req, res) {
 async function handleAuthCallback(req, res, url) {
   if (!oAuth2Client) return sendNotFound(res);
   const code = url.searchParams.get('code');
-  if (!code) return sendJson(res, 400, { error: "Missing code" });
+  if (!code) return sendJson(res, 400, { error: 'Missing code' });
 
   try {
     const redirectUri = getRedirectUri(req);
-    const tempClient = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, redirectUri);
+    const tempClient = new google.auth.OAuth2(
+      GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET,
+      redirectUri,
+    );
     const { tokens } = await tempClient.getToken(code);
     oAuth2Client.setCredentials(tokens);
 
@@ -74,7 +77,7 @@ async function handleAuthCallback(req, res, url) {
     if (tokens.id_token) {
       const ticket = await tempClient.verifyIdToken({
         idToken: tokens.id_token,
-        audience: GOOGLE_CLIENT_ID
+        audience: GOOGLE_CLIENT_ID,
       });
       userEmail = ticket.getPayload().email;
     }
@@ -82,7 +85,9 @@ async function handleAuthCallback(req, res, url) {
     const tokensToSave = { ...tokens, email: userEmail };
 
     if (!process.env.VERCEL) {
-      try { fs.writeFileSync(TOKENS_PATH, JSON.stringify(tokensToSave)); } catch (e) {}
+      try {
+        fs.writeFileSync(TOKENS_PATH, JSON.stringify(tokensToSave));
+      } catch (e) {}
     }
 
     await connectDB();
@@ -91,7 +96,7 @@ async function handleAuthCallback(req, res, url) {
       await TokenModel.findOneAndUpdate(
         { userEmail },
         { tokens: tokensToSave, userEmail, updatedAt: new Date() },
-        { upsert: true }
+        { upsert: true },
       );
       savedToDb = true;
     }
@@ -107,10 +112,10 @@ async function handleAuthCallback(req, res, url) {
     const clientData = JSON.stringify({
       type: 'GOOGLE_LOGIN_SUCCESS',
       email: userEmail,
-      tokens: { connected: true, note: "managed_by_session" }
+      tokens: { connected: true, note: 'managed_by_session' },
     });
 
-    res.writeHead(200, { "Content-Type": "text/html" });
+    res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(`
       <html>
         <body style="font-family: sans-serif; text-align: center; padding: 50px;">
@@ -127,8 +132,8 @@ async function handleAuthCallback(req, res, url) {
       </html>
     `);
   } catch (error) {
-    res.writeHead(500, { "Content-Type": "text/plain" });
-    res.end("Authentication failed: " + error.message);
+    res.writeHead(500, { 'Content-Type': 'text/plain' });
+    res.end('Authentication failed: ' + error.message);
   }
 }
 
@@ -167,5 +172,5 @@ module.exports = {
   handleAuthStatus,
   handleAuthDisconnect,
   getAuthClient,
-  TOKENS_PATH
+  TOKENS_PATH,
 };

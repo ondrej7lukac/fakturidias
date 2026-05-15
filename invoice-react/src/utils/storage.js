@@ -80,6 +80,16 @@ export function saveLocalInvoice(invoice) {
     return invoice;
 }
 
+export function replaceLocalInvoices(invoices) {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(invoices))
+    return invoices
+}
+
+export function clearLocalInvoices() {
+    localStorage.removeItem(LOCAL_STORAGE_KEY)
+    return true
+}
+
 export function deleteLocalInvoice(invoiceId) {
     const { invoices } = loadLocalData();
     const newInvoices = invoices.filter(inv => inv.id !== invoiceId);

@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "build": "npm install --prefix invoice-react && npm run build --prefix invoice-react",
-    "start": "node server.js"
+    "start": "node server.js",
+    "backend:check": "node -c backend/server.js && node -c backend/routes/api.js && node -e \"require('./server'); require('./backend/server'); console.log('modular-routes-ok')\""
   },
   "dependencies": {
     "cookie": "^1.1.1",

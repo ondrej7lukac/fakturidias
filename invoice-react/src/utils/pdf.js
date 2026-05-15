@@ -1,71 +1,105 @@
 /**
- * Utility for generating PDF invoices using jspdf and html2canvas
- * These are expected to be available via window.jspdf and window.html2canvas (CDN)
+ * Utility for generating PDF invoices using jsPDF and html2canvas.
+ * Libraries are loaded from bundled dependencies with CDN global fallback.
  */
 
-export const generateInvoicePDF = async (invoice, t, qrDataUrl = null) => {
-    const { jsPDF } = window.jspdf;
-    const canvas = await createInvoiceCanvas(invoice, t, qrDataUrl);
+let cachedPdfLibs = null;
 
-    // Higher quality output
-    const imgData = canvas.toDataURL('image/jpeg', 1.0);
-    const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-        compress: true
-    });
+const loadPdfLibraries = async () => {
+  if (cachedPdfLibs) return cachedPdfLibs;
 
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-
-    // Calculate the height of the image on the PDF page
-    const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-    let heightLeft = imgHeight;
-    let position = 0;
-
-    // First page
-    pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
-    heightLeft -= pdfHeight;
-
-    // Add more pages if content overflows (with 5mm tolerance for rounding errors)
-    while (heightLeft > 5) {
-        position = heightLeft - imgHeight; // Negative position to shift image up
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
-        heightLeft -= pdfHeight;
+  // Prefer bundled libs for reliability (especially on mobile).
+  try {
+    const [{ jsPDF }, html2canvasModule] = await Promise.all([
+      import('jspdf'),
+      import('html2canvas'),
+    ]);
+    const html2canvas = html2canvasModule.default || html2canvasModule;
+    cachedPdfLibs = { jsPDF, html2canvas };
+    return cachedPdfLibs;
+  } catch (bundleErr) {
+    // Fallback to CDN globals if dynamic imports fail for any reason.
+    if (window.jspdf?.jsPDF && typeof window.html2canvas === 'function') {
+      cachedPdfLibs = {
+        jsPDF: window.jspdf.jsPDF,
+        html2canvas: window.html2canvas,
+      };
+      return cachedPdfLibs;
     }
-
-    return pdf;
+    throw bundleErr;
+  }
 };
 
-const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
-    // Create a temporary container off-screen (but visible to DOM)
-    const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.left = '-10000px'; // Off-screen
-    container.style.top = '0';
-    container.style.zIndex = '9999999';
-    // container.style.visibility = 'hidden'; // DO NOT USE: breaks html2canvas
-    container.style.width = '210mm'; // A4 width
-    container.style.minHeight = '297mm'; // A4 height
-    container.style.padding = '20mm';
-    container.style.background = '#ffffff';
-    container.style.color = '#111827';
-    container.style.fontFamily = 'Inter, sans-serif';
-    container.style.boxSizing = 'border-box'; // Ensure padding is included in width
+export const generateInvoicePDF = async (invoice, t, qrDataUrl = null) => {
+  const { jsPDF, html2canvas } = await loadPdfLibraries();
+  const canvas = await createInvoiceCanvas(invoice, t, qrDataUrl, html2canvas);
 
-    // Inject font style explicitly to ensure capture
-    const style = document.createElement('style');
-    style.innerHTML = `
+  // Higher quality output
+  const imgData = canvas.toDataURL('image/jpeg', 1.0);
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true,
+  });
+
+  const imgProps = pdf.getImageProperties(imgData);
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = pdf.internal.pageSize.getHeight();
+
+  // Calculate the height of the image on the PDF page
+  const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+  let heightLeft = imgHeight;
+  let position = 0;
+
+  // First page
+  pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
+  heightLeft -= pdfHeight;
+
+  // Add more pages if content overflows (with 5mm tolerance for rounding errors)
+  while (heightLeft > 5) {
+    position = heightLeft - imgHeight; // Negative position to shift image up
+    pdf.addPage();
+    pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
+    heightLeft -= pdfHeight;
+  }
+
+  return pdf;
+};
+
+const A4_WIDTH_PX = 794; // 210mm at 96dpi
+const A4_HEIGHT_PX = 1123; // 297mm at 96dpi
+const A4_PADDING_PX = 76; // 20mm at 96dpi
+
+const createInvoiceCanvas = async (invoice, t, qrDataUrl, html2canvas) => {
+  // Create a temporary container off-screen (but visible to DOM)
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-10000px'; // Off-screen
+  container.style.top = '0';
+  container.style.zIndex = '9999999';
+  // container.style.visibility = 'hidden'; // DO NOT USE: breaks html2canvas
+  // Use fixed desktop pixel dimensions so PDF output is identical on mobile and desktop.
+  container.style.width = `${A4_WIDTH_PX}px`;
+  container.style.minHeight = `${A4_HEIGHT_PX}px`;
+  container.style.padding = `${A4_PADDING_PX}px`;
+  container.style.background = '#ffffff';
+  container.style.color = '#111827';
+  container.style.fontFamily = 'Inter, sans-serif';
+  container.style.boxSizing = 'border-box'; // Ensure padding is included in width
+
+  // Inject font style explicitly to ensure capture
+  const style = document.createElement('style');
+  style.innerHTML = `
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { -webkit-font-smoothing: antialiased; }
     `;
-    container.appendChild(style);
+  container.appendChild(style);
 
-    const itemsHtml = invoice.items.map(item => `
+  const itemsHtml = invoice.items
+    .map(
+      (item) => `
         <tr>
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb;">${item.name}</td>
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.qty}</td>
@@ -74,9 +108,11 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.discount > 0 ? `${invoice.currency} ${item.discount.toFixed(2)}` : '-'}</td>
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${invoice.currency} ${item.total.toFixed(2)}</td>
         </tr>
-    `).join('');
+    `,
+    )
+    .join('');
 
-    container.innerHTML += `
+  container.innerHTML += `
         <div style="font-family: 'Inter', sans-serif;">
             <!-- Header -->
             <div style="display: flex; justify-content: space-between; margin-bottom: 50px; border-bottom: 2px solid #6366f1; padding-bottom: 20px;">
@@ -87,9 +123,14 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
                 <div style="text-align: right; color: #1f2937;">
                     <p style="margin: 0; font-weight: 600;">${t.issueDate}: <span style="font-weight: 400;">${invoice.issueDate}</span></p>
                     <p style="margin: 5px 0; font-weight: 600;">${t.dueDate}: <span style="font-weight: 400;">${invoice.dueDate || 'N/A'}</span></p>
-                    ${invoice.taxableSupplyDate && invoice.taxableSupplyDate !== invoice.issueDate ? `
+                    ${
+                      invoice.taxableSupplyDate &&
+                      invoice.taxableSupplyDate !== invoice.issueDate
+                        ? `
                         <p style="margin: 5px 0; font-weight: 600; font-size: 12px;">DUZP: <span style="font-weight: 400;">${invoice.taxableSupplyDate}</span></p>
-                    ` : ''}
+                    `
+                        : ''
+                    }
                 </div>
             </div>
 
@@ -106,14 +147,18 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
                         ${invoice.supplier?.phone ? `<p style="margin: 2px 0;">Tel: ${invoice.supplier.phone}</p>` : ''}
                         ${invoice.supplier?.email ? `<p style="margin: 2px 0;">Email: ${invoice.supplier.email}</p>` : ''}
                     </div>
-                    ${!invoice.isVatPayer ? `
+                    ${
+                      !invoice.isVatPayer
+                        ? `
                         <p style="
                             margin-top: 10px;
                             color: #64748b;
                             font-size: 11px;
                             font-style: italic;
                         ">Nejsem plátce DPH</p>
-                    ` : ''}
+                    `
+                        : ''
+                    }
                 </div>
                 <div>
                     <h3 style="margin: 0 0 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em;">${t.billTo}</h3>
@@ -144,7 +189,9 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
             </table>
 
             <!-- VAT Section -->
-            ${invoice.isVatPayer ? `
+            ${
+              invoice.isVatPayer
+                ? `
                 <div style="margin-bottom: 30px; padding: 15px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px;">
                     <h3 style="margin: 0 0 10px; font-size: 13px; font-weight: 700; text-transform: uppercase; color: #166534; letter-spacing: 0.05em;">Daňový doklad - Rozpis DPH</h3>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; font-size: 14px;">
@@ -162,22 +209,28 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
                         </div>
                     </div>
                 </div>
-            ` : ''}
+            `
+                : ''
+            }
 
             <!-- Footer (QR & Total) -->
             <div style="display: flex; justify-content: space-between; margin-bottom: 40px;">
                 <div style="width: 180px;">
-                    ${qrDataUrl ? `
+                    ${
+                      qrDataUrl
+                        ? `
                         <div style="margin-bottom: 10px;">
                             <h3 style="margin: 0 0 8px; font-size: 12px; text-transform: uppercase; color: #64748b;">${t.qrPreview}</h3>
                             <img src="${qrDataUrl}" style="width: 120px; height: 120px; border: 1px solid #e5e7eb;" />
                         </div>
-                    ` : ''}
+                    `
+                        : ''
+                    }
                 </div>
                 <div style="width: 250px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                         <span style="color: #64748b;">${t.subtotal}:</span>
-                        <span style="font-weight: 600;">${invoice.currency} ${parseFloat(invoice.isVatPayer ? (invoice.taxBase || invoice.amount) : invoice.amount).toFixed(2)}</span>
+                        <span style="font-weight: 600;">${invoice.currency} ${parseFloat(invoice.isVatPayer ? invoice.taxBase || invoice.amount : invoice.amount).toFixed(2)}</span>
                     </div>
 
                     <div style="
@@ -188,7 +241,7 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
                         font-size: 13px;
                     ">
                         <span>${t.lang === 'cs' || !t.lang ? 'DPH' : 'VAT'} (${invoice.isVatPayer ? invoice.taxRate : '0'}%)</span>
-                        <span>${invoice.currency} ${parseFloat(invoice.isVatPayer ? (invoice.taxAmount || 0) : 0).toFixed(2)}</span>
+                        <span>${invoice.currency} ${parseFloat(invoice.isVatPayer ? invoice.taxAmount || 0 : 0).toFixed(2)}</span>
                     </div>
 
                     <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #6366f1;">
@@ -235,17 +288,18 @@ const createInvoiceCanvas = async (invoice, t, qrDataUrl) => {
         </div>
     `;
 
-    document.body.appendChild(container);
-    // Ensure fonts and images are loaded
-    await new Promise(resolve => setTimeout(resolve, 800));
+  document.body.appendChild(container);
+  // Ensure fonts and images are loaded
+  await new Promise((resolve) => setTimeout(resolve, 800));
 
-    const canvas = await window.html2canvas(container, {
-        scale: 3, // High quality, reasonable size
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-    });
-    document.body.removeChild(container);
-    return canvas;
+  const canvas = await html2canvas(container, {
+    scale: 3, // High quality, reasonable size
+    useCORS: true,
+    logging: false,
+    backgroundColor: '#ffffff',
+    windowWidth: A4_WIDTH_PX,
+    windowHeight: A4_HEIGHT_PX,
+  });
+  document.body.removeChild(container);
+  return canvas;
 };
-

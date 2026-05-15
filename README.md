@@ -37,6 +37,7 @@ cd ..
 ### 2. Configure Environment Variables
 
 **Option A: Use the helper script (Windows)**
+
 ```bash
 create-env.bat
 ```
@@ -80,7 +81,26 @@ npm run dev
 
 ```
 .
-├── server.js                 # Main Express backend
+├── server.js                 # Compatibility entry point (delegates to backend/)
+├── backend/                  # Backend source folder
+│   ├── server.js             # Main HTTP backend handler
+│   ├── middleware/
+│   │   ├── rateLimit.js
+│   │   └── session.js
+│   ├── routes/
+│   │   ├── health.js
+│   │   ├── ares.js
+│   │   ├── auth.js
+│   │   ├── api.js
+│   │   └── static.js
+│   └── lib/
+│       ├── utils.js
+│       ├── validators.js
+│       ├── storage.js
+│       ├── auth.js
+│       ├── ares.js
+│       └── drive.js
+├── lib/                      # Compatibility wrappers for backend/lib
 ├── invoice-react/            # React frontend
 │   ├── src/
 │   │   ├── components/
@@ -107,6 +127,13 @@ npm run dev
 - `GOOGLE_CLIENT_SECRET` - Your Google OAuth2 Client Secret
 - `MONGODB_URI` - MongoDB connection string (optional)
 
+### Optional Hardening Variables
+
+- `CORS_ORIGINS` - Comma-separated CORS allowlist (recommended in production)
+- `RATE_LIMIT_WINDOW_MS` - Rate-limit window in ms (default: `60000`)
+- `RATE_LIMIT_MAX` - Max requests per route+IP per window (default: `240`)
+- `MAX_BODY_BYTES` - Default max JSON body size in bytes (default: `1048576`)
+
 ## Deployment
 
 ### Vercel Deployment
@@ -120,29 +147,49 @@ npm run dev
 4. Deploy!
 
 **Important**: Update your Google Cloud Console OAuth2 redirect URI to include your Vercel URL:
+
 ```
 https://your-app.vercel.app/auth/google/callback
 ```
 
 ## API Endpoints
 
+### Health
+
+- `GET /healthz` - Service health and DB connectivity
+
 ### ARES Integration
+
 - `POST /api/ares/search` - Search Czech companies
 - `GET /api/ares/ico?ico=<ico>` - Get company by ICO
 
 ### Google OAuth
+
 - `GET /auth/google/url` - Get OAuth authorization URL
 - `GET /auth/google/callback` - OAuth callback handler
 - `GET /auth/google/status` - Check connection status
 - `POST /auth/google/disconnect` - Disconnect Google account
 
 ### Invoice Management
+
 - `GET /api/invoices` - Get all invoices
 - `POST /api/invoices` - Create/update invoice
 - `DELETE /api/invoices/:id` - Delete invoice
 
 ### Email
+
 - `POST /api/email/send` - Send invoice via email
+
+## Backend Hardening
+
+- Request tracing with `X-Request-Id`
+- Security headers on API and static responses
+- Route method enforcement (`405 Method Not Allowed`)
+- JSON body-size limits with route-level caps
+- Input validation for write endpoints
+- Basic in-memory rate limiting for `/api/*` and `/auth/*`
+
+Architecture details: see `BACKEND_DESIGN.md`.
 
 ## Security Best Practices
 
@@ -155,12 +202,14 @@ https://your-app.vercel.app/auth/google/callback
 ## Technologies Used
 
 ### Frontend
+
 - React 18
 - Vite
 - qrcode.react
 - i18next (internationalization)
 
 ### Backend
+
 - Node.js
 - Express
 - nodemailer (email sending)
@@ -171,14 +220,17 @@ https://your-app.vercel.app/auth/google/callback
 ## Troubleshooting
 
 ### "OAuth not initialized" error
+
 - Make sure your `.env` file exists with valid credentials
 - Restart the server after creating `.env`
 
 ### "Google account not connected" when sending email
+
 - Go to Settings and click "Connect Google Account"
 - Make sure you've authorized the application
 
 ### ARES search not working
+
 - Make sure `server.js` is running on port 5500
 - Check that Vite proxy is configured correctly
 

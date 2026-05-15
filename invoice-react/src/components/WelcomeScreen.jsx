@@ -1,4 +1,8 @@
 import { useState } from 'react';
+import './WelcomeScreen.css';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
 
 export default function WelcomeScreen({
   onLogin,
@@ -117,46 +121,59 @@ export default function WelcomeScreen({
         {/* Pricing Cards */}
         <div className='pricing-grid'>
           {plans.map((plan) => (
-            <div
+            <Card
               key={plan.id}
               className={`pricing-card ${plan.accent ? 'pricing-card-accent' : ''} ${hoveredPlan === plan.id ? 'pricing-card-hovered' : ''}`}
               onMouseEnter={() => setHoveredPlan(plan.id)}
               onMouseLeave={() => setHoveredPlan(null)}
             >
               {plan.accent ? (
-                <span className='pricing-plan-badge'>{text.popular}</span>
+                <Badge className='pricing-plan-badge' variant='secondary'>
+                  {text.popular}
+                </Badge>
               ) : null}
-              <div className='pricing-card-header'>
-                <h3 className='pricing-card-title'>{plan.name}</h3>
+              <CardHeader className='pricing-card-header'>
+                <CardTitle className='pricing-card-title'>
+                  {plan.name}
+                </CardTitle>
                 {plan.description && (
                   <p className='pricing-card-description'>{plan.description}</p>
                 )}
                 <div className='pricing-card-price'>{plan.price}</div>
-              </div>
-              <ul className='pricing-card-features'>
-                {plan.features.map((feature, idx) => (
-                  <li key={idx} className='pricing-card-feature'>
-                    <span className='pricing-feature-icon'>✓</span>
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            </div>
+              </CardHeader>
+              <CardContent>
+                <ul className='pricing-card-features'>
+                  {plan.features.map((feature, idx) => (
+                    <li key={idx} className='pricing-card-feature'>
+                      <span className='pricing-feature-icon'>✓</span>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
           ))}
         </div>
 
         {/* CTA Buttons */}
         <div className='welcome-actions'>
-          <button onClick={onLogin} className='welcome-btn welcome-btn-primary'>
+          <Button
+            onClick={onLogin}
+            className='welcome-btn welcome-btn-primary'
+            variant='default'
+            size='lg'
+          >
             <span className='welcome-btn-icon'>G</span>
             {text.login}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onContinueAsGuest}
             className='welcome-btn welcome-btn-secondary'
+            variant='secondary'
+            size='lg'
           >
             {text.guest}
-          </button>
+          </Button>
         </div>
 
         {/* Footer Note */}

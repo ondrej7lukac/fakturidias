@@ -1,0 +1,37 @@
+.items-table-action-cell {
+  width: 40px;
+  text-align: center;
+}
+
+.items-table-delete-btn {
+  color: var(--danger);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
+.items-table-tax-row {
+  border-top: 2px solid var(--border);
+}
+
+.items-table-tax-label {
+  text-align: right;
+  padding-right: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.items-table-tax-value {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.items-table-total-row {
+  font-weight: 600;
+}
+
+.items-table-total-label {
+  text-align: right;
+  padding-right: 10px;
+}

@@ -1,0 +1,354 @@
+.welcome-screen {
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.2rem;
+  background:
+    radial-gradient(circle at 14% 8%, rgba(32, 89, 147, 0.2), transparent 44%),
+    radial-gradient(
+      circle at 84% 16%,
+      rgba(34, 186, 153, 0.16),
+      transparent 42%
+    ),
+    linear-gradient(
+      155deg,
+      color-mix(in srgb, var(--bg) 93%, #061022 7%),
+      color-mix(in srgb, var(--bg2) 90%, transparent)
+    );
+}
+
+.welcome-container {
+  width: min(100%, 1140px);
+  display: grid;
+  gap: 1.35rem;
+  padding: 1.4rem;
+  border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--border));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    color-mix(in srgb, var(--color-surface-glass) 94%, transparent);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(8px);
+}
+
+.welcome-hero {
+  text-align: center;
+}
+
+.welcome-logo-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.45rem;
+}
+
+.welcome-logo {
+  width: min(100%, 260px);
+  height: auto;
+}
+
+.welcome-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.welcome-title {
+  margin: 0.42rem 0 0.35rem;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: clamp(2rem, 4.2vw, 2.9rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.welcome-tagline {
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(0.95rem, 1.6vw, 1.06rem);
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.pricing-card {
+  position: relative;
+  padding: 1.1rem 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  transition:
+    transform 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    background 0.22s ease;
+}
+
+.pricing-card:hover,
+.pricing-card-hovered {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  box-shadow: var(--shadow);
+}
+
+.pricing-card-accent {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--border));
+  background:
+    linear-gradient(170deg, rgba(34, 186, 153, 0.14), transparent 60%),
+    color-mix(in srgb, var(--accent-2) 16%, var(--card));
+}
+
+.pricing-plan-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.48rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 80%, white 20%);
+  color: #061022;
+}
+
+.pricing-card-accent .pricing-card-title,
+.pricing-card-accent .pricing-card-description,
+.pricing-card-accent .pricing-card-price,
+.pricing-card-accent .pricing-card-feature {
+  color: var(--pricing-feature-text);
+}
+
+.pricing-card-header {
+  margin-bottom: 1rem;
+  text-align: center;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.pricing-card-accent .pricing-card-header {
+  border-bottom-color: color-mix(
+    in srgb,
+    var(--pricing-feature-text) 22%,
+    transparent
+  );
+}
+
+.pricing-card-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.35rem;
+}
+
+.pricing-card-description {
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+.pricing-card-accent .pricing-card-description {
+  color: var(--pricing-feature-muted);
+}
+
+.pricing-card-price {
+  font-size: clamp(1rem, 1.8vw, 1.2rem);
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.pricing-card-accent .pricing-card-price {
+  color: var(--pricing-feature-price);
+}
+
+.pricing-card-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pricing-card-feature {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.pricing-feature-icon {
+  width: 18px;
+  height: 18px;
+  background: var(--accent-2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #061022;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+}
+
+.pricing-card-accent .pricing-feature-icon {
+  background: rgba(6, 16, 34, 0.16);
+}
+
+/* Welcome CTA Buttons */
+.welcome-actions {
+  display: flex;
+  gap: 0.9rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.3rem;
+}
+
+.welcome-btn {
+  padding: 0.9rem 1.6rem;
+  min-width: min(100%, 240px);
+  border-radius: 50px;
+  font-weight: 700;
+  font-size: clamp(0.95rem, 1.8vw, 1.06rem);
+  cursor: pointer;
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  border: 2px solid transparent;
+  box-shadow: var(--shadow);
+}
+
+.welcome-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.welcome-btn:active {
+  transform: translateY(-1px);
+}
+
+.welcome-btn-primary {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 90%, white 10%),
+    color-mix(in srgb, var(--accent-light) 72%, white 28%)
+  );
+  color: #061022;
+  border-color: color-mix(in srgb, var(--accent-light) 45%, var(--accent));
+}
+
+.welcome-btn-primary:hover {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 78%, white 22%),
+    color-mix(in srgb, var(--accent-light) 90%, white 10%)
+  );
+  border-color: var(--accent-light);
+}
+
+.welcome-btn-secondary {
+  background: color-mix(in srgb, var(--card) 84%, transparent);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.welcome-btn-secondary:hover {
+  background: var(--card);
+  border-color: var(--accent);
+}
+
+.welcome-btn-icon {
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.welcome-footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+  opacity: 0.92;
+}
+
+@media (max-width: 980px) {
+  .welcome-screen {
+    align-items: flex-start;
+  }
+
+  .pricing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .welcome-title {
+    font-size: clamp(1.6rem, 7vw, 2.1rem);
+  }
+
+  .welcome-tagline {
+    font-size: 0.95rem;
+  }
+
+  .welcome-logo {
+    max-width: 210px;
+  }
+
+  .welcome-kicker {
+    font-size: 0.66rem;
+    letter-spacing: 0.04em;
+  }
+
+  .pricing-grid {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .pricing-plan-badge {
+    top: 10px;
+    right: 10px;
+  }
+
+  .welcome-actions {
+    flex-direction: column;
+    width: 100%;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .welcome-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .welcome-screen {
+    padding: 0.85rem;
+  }
+
+  .welcome-logo-container {
+    margin-bottom: 1.25rem;
+  }
+
+  .pricing-card {
+    padding: 0.9rem;
+  }
+
+  .pricing-card-title {
+    font-size: 1rem;
+  }
+
+  .welcome-btn {
+    padding: 0.82rem 1rem;
+    min-width: 100%;
+  }
+}
