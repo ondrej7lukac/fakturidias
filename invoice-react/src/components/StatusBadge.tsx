@@ -32,16 +32,13 @@ export default function StatusBadge({ status, invoiceId, onStatusChange, lang = 
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={getStatusClass(current)}
-          onClick={e => e.stopPropagation()}
-          style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px', paddingRight: '0.5rem' }}
-        >
-          {labels[current]}
-          <span style={{ opacity: 0.6, fontSize: '0.6rem' }}>▼</span>
-        </button>
+      <DropdownMenuTrigger
+        className={getStatusClass(current)}
+        onClick={e => e.stopPropagation()}
+        style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px', paddingRight: '0.5rem' }}
+      >
+        {labels[current]}
+        <span style={{ opacity: 0.6, fontSize: '0.6rem' }}>▼</span>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
