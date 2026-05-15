@@ -1,0 +1,10 @@
+node_modules
+npm-debug.log
+.env
+.env.local
+.git
+.cursor
+.agents
+dist
+invoice-react/node_modules
+invoice-react/dist
