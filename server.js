@@ -38,6 +38,8 @@ const {
 } = require('./lib/auth');
 
 const { handleAresSearch, handleAresIco } = require('./lib/ares');
+const { handleGeminiInvoice } = require('./lib/gemini');
+const { handleEmailSend } = require('./lib/email');
 const { handleRpoSearch, handleRpoIco } = require('./lib/slovakRpo');
 const { handleVatValidate } = require('./lib/vies');
 const { handleExchangeRate } = require('./lib/exchangeRate');
@@ -142,6 +144,17 @@ const handleRequest = async (req, res) => {
     if (requestPath === "/api/exchange-rate") {
         if (req.method === "OPTIONS") return sendCors(res);
         if (req.method === "GET") return handleExchangeRate(req, res, url);
+    }
+
+    // --- AI ROUTES (public — key lives server-side) ---
+    if (requestPath === "/api/ai/invoice") {
+        if (req.method === "OPTIONS") return sendCors(res);
+        if (req.method === "POST") {
+            return readJsonBody(req, (err, body) => {
+                if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+                return handleGeminiInvoice(req, res, body);
+            });
+        }
     }
 
     // --- AUTH ROUTES ---
@@ -290,9 +303,12 @@ const handleRequest = async (req, res) => {
         });
     }
 
-    // EMAIL SENDING (Temporarily Disabled for Production)
-    if (requestPath === "/api/email/send") {
-        return sendJson(res, 503, { error: "Email service temporarily unavailable" });
+    // EMAIL SENDING
+    if (requestPath === "/api/email/send" && req.method === "POST") {
+        return readJsonBody(req, (err, body) => {
+            if (err) return sendJson(res, 400, { error: "Invalid JSON body" });
+            return handleEmailSend(req, res, body);
+        });
     }
 
     // --- STATIC CONTENT SERVING ---

@@ -1,7 +1,31 @@
+import './AresSearch.css'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Sparkles } from '@/lib/icons'
 import { debounce } from '../utils/storage'
 import { searchAres, lookupAresByIco, formatAresAddress } from '../utils/ares'
 import { searchRpo, lookupRpoByIco } from '../utils/rpo'
+
+interface AresEntity {
+    obchodniJmeno?: string
+    nazev?: string
+    name?: string
+    adresa?: string
+    textovaAdresa?: string
+    address?: string
+    ico?: string
+    sidlo?: Record<string, unknown>
+    [key: string]: unknown
+}
+
+interface AresSearchProps {
+    clientName: string
+    clientIco: string
+    onClientNameChange: (v: string) => void
+    onClientIcoChange: (v: string) => void
+    onAresData: (data: Record<string, unknown>) => void
+    t: Record<string, string>
+    region?: string
+}
 
 export default function AresSearch({
     clientName,
@@ -11,16 +35,16 @@ export default function AresSearch({
     onAresData,
     t,
     region = 'CZ'
-}) {
+}: AresSearchProps) {
     const [status, setStatus] = useState(t.aresPlaceholder)
-    const [results, setResults] = useState([])
+    const [results, setResults] = useState<AresEntity[]>([])
     const [showResults, setShowResults] = useState(false)
-    const [selectedEntity, setSelectedEntity] = useState(
+    const [selectedEntity, setSelectedEntity] = useState<{ name: string; ico: string; address: string } | null>(
         (clientName && clientIco) ? { name: clientName, ico: clientIco, address: '' } : null
     )
     const initialMountRef = useRef(true)
 
-    const searchAresLocal = async (query) => {
+    const searchAresLocal = async (query: string) => {
         const trimmed = query?.trim() || ''
         if (trimmed.length < 3) {
             setShowResults(false)
@@ -51,7 +75,7 @@ export default function AresSearch({
         initialMountRef.current = false
     }, [clientName, selectedEntity])
 
-    const applyAresEntity = (entity) => {
+    const applyAresEntity = (entity: AresEntity) => {
         const name = entity.obchodniJmeno || entity.nazev || entity.name || ''
         const address = entity.adresa || entity.textovaAdresa || entity.address || (entity.sidlo ? formatAresAddress(entity.sidlo) : '')
         const ico = entity.ico || ''
@@ -103,7 +127,7 @@ export default function AresSearch({
             ) : (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: '1.1rem' }}>✨ {selectedEntity.name}</div>
+                        <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '6px' }}><Sparkles size={16} strokeWidth={2} />{selectedEntity.name}</div>
                         <div style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>IČO: {selectedEntity.ico} • {selectedEntity.address}</div>
                     </div>
                     <button 

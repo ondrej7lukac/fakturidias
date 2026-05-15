@@ -1,6 +1,24 @@
 import { money } from '../utils/storage'
 
-export default function ItemsTable({ items, lang, t, onDelete }) {
+interface LineItem {
+    id?: string
+    name: string
+    qty: number
+    price: number
+    taxRate?: number
+    discount?: number
+    total: number
+    taxAmount?: number
+}
+
+interface ItemsTableProps {
+    items: LineItem[]
+    lang: string
+    t: Record<string, string>
+    onDelete: (index: number) => void
+}
+
+export default function ItemsTable({ items, lang, t, onDelete }: ItemsTableProps) {
     if (!items || items.length === 0) {
         return (
             <table>
@@ -16,7 +34,7 @@ export default function ItemsTable({ items, lang, t, onDelete }) {
                 </thead>
                 <tbody>
                     <tr>
-                        <td colSpan="6" className="empty">No items yet.</td>
+                        <td colSpan={6} className="empty">No items yet.</td>
                     </tr>
                 </tbody>
             </table>
@@ -60,18 +78,18 @@ export default function ItemsTable({ items, lang, t, onDelete }) {
                         </tr>
                     ))}
                     <tr style={{ borderTop: '2px solid var(--border)' }}>
-                        <td colSpan="5" style={{ textAlign: 'right', paddingRight: '10px', color: 'var(--muted)', fontSize: '0.9rem' }}>
+                        <td colSpan={5} style={{ textAlign: 'right', paddingRight: '10px', color: 'var(--muted)', fontSize: '0.9rem' }}>
                             {lang === 'cs' ? 'DPH' : 'Tax'}:
                         </td>
-                        <td colSpan="2" style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>
+                        <td colSpan={2} style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>
                             {money(items.reduce((sum, item) => sum + (item.taxAmount || 0), 0))}
                         </td>
                     </tr>
                     <tr style={{ fontWeight: 600 }}>
-                        <td colSpan="5" style={{ textAlign: 'right', paddingRight: '10px' }}>
+                        <td colSpan={5} style={{ textAlign: 'right', paddingRight: '10px' }}>
                             {lang === 'cs' ? 'Celkem' : 'Total'}:
                         </td>
-                        <td colSpan="2">{money(items.reduce((sum, item) => sum + item.total, 0))}</td>
+                        <td colSpan={2}>{money(items.reduce((sum, item) => sum + item.total, 0))}</td>
                     </tr>
                 </tbody>
             </table>

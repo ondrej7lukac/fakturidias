@@ -1,9 +1,12 @@
+import './InvoiceForm.css'
 import { useState, useEffect, useRef } from 'react'
 import { formatInvoiceNumber, addDays, formatDate, money, getUserId } from '../utils/storage'
 import { searchAres, parseAresItem } from '../utils/ares'
+import { Pencil, Eye, AlertTriangle, Cloud, FileText, RefreshCw, ArrowLeftRight, Check, Mail, ICON_MD, STROKE } from '@/lib/icons'
 
 import ItemsTable from './ItemsTable'
 import InvoicePreview from './InvoicePreview'
+import AIPrompt from './AIPrompt'
 import { generateInvoicePDF } from '../utils/pdf'
 import { BANK_CODES, calculateIban, parseIban, getCzechQrPayload } from '../utils/bank'
 import { QRCodeCanvas } from 'qrcode.react'
@@ -738,7 +741,47 @@ export default function InvoiceForm({
         setIsGenerating(false)
     }
 
-    // handleEmailPDF removed for production deployment
+    const handleEmailPDF = async () => {
+        if (!isAuthenticated) {
+            return alert(lang === 'cs'
+                ? 'Pro odeslání emailu se musíte přihlásit.'
+                : 'You must be logged in to send emails.')
+        }
+        const currentData = getCurrentInvoiceData()
+        if (!currentData.client.email) {
+            return alert(t.alertEmailMissing)
+        }
+        setIsGenerating(true)
+        setEmailStatus(lang === 'cs' ? 'Odesílám…' : 'Sending…')
+        try {
+            let qrDataUrl = null
+            try {
+                const qrPayload = getCzechQrPayload(currentData)
+                if (qrPayload) {
+                    qrDataUrl = await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: 'M', margin: 0, width: 256 })
+                }
+            } catch (err) {}
+            const pdf = await generateInvoicePDF(currentData, t, qrDataUrl)
+            const pdfBase64 = pdf.output('datauristring')
+            const response = await fetch('/api/email/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ invoice: currentData, pdfBase64, lang })
+            })
+            const result = await response.json()
+            if (response.ok) {
+                setEmailStatus(t.alertEmailSuccess)
+                setTimeout(() => setEmailStatus(''), 3000)
+            } else {
+                setEmailStatus('')
+                alert(`${t.alertEmailFailed}${result.message || result.error}`)
+            }
+        } catch (error) {
+            setEmailStatus('')
+            alert(t.alertError)
+        }
+        setIsGenerating(false)
+    }
 
     const handleBackupToDrive = async () => {
         if (!isAuthenticated) {
@@ -790,7 +833,54 @@ export default function InvoiceForm({
 
     const togglePreview = () => setPreviewMode(!previewMode)
 
+    const handleAIFill = (data: any) => {
+        setFormData(prev => ({
+            ...prev,
+            clientName: data.clientName || prev.clientName,
+            clientEmail: data.clientEmail || prev.clientEmail,
+            clientPhone: data.clientPhone || prev.clientPhone,
+            clientAddress: data.clientAddress || prev.clientAddress,
+            clientIco: data.clientIco || prev.clientIco,
+            clientVat: data.clientVat || prev.clientVat,
+            clientArea: data.clientArea || prev.clientArea,
+            currency: data.currency || prev.currency,
+            dueDate: data.dueDate || prev.dueDate,
+            issueDate: data.issueDate || prev.issueDate,
+            variableSymbol: data.variableSymbol || prev.variableSymbol,
+            paymentNote: data.paymentNote || prev.paymentNote,
+        }))
+        if (Array.isArray(data.items) && data.items.length > 0) {
+            const vatPayer = formData.isVatPayer
+            const newItems = data.items.map((item: any) => {
+                const qty = Number(item.qty) || 1
+                const price = Number(item.price) || 0
+                const taxRate = vatPayer ? 21 : 0
+                const subtotal = qty * price
+                const taxAmount = subtotal * (taxRate / 100)
+                return {
+                    id: crypto.randomUUID(),
+                    name: String(item.name || ''),
+                    qty,
+                    price,
+                    discount: 0,
+                    taxRate,
+                    subtotal,
+                    taxAmount,
+                    total: subtotal + taxAmount,
+                }
+            })
+            setItems(newItems)
+        }
+    }
+
+    const handleAIPreview = (data: any) => {
+        handleAIFill(data)
+        setPreviewMode(true)
+    }
+
     return (
+        <>
+        <AIPrompt lang={lang} onFillForm={handleAIFill} onPreviewInvoice={handleAIPreview} />
         <section className="card" style={{ position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h2 style={{ margin: 0 }}>{t.createEditInvoice}</h2>
@@ -801,8 +891,8 @@ export default function InvoiceForm({
                     style={{ padding: '8px 16px' }}
                 >
                     {previewMode
-                        ? `✏️ ${lang === 'cs' ? 'Upravit' : 'Edit'}`
-                        : `👁️ ${lang === 'cs' ? 'Náhled' : 'Preview'}`
+                        ? <><Pencil size={ICON_MD} strokeWidth={STROKE} /> {lang === 'cs' ? 'Upravit' : 'Edit'}</>
+                        : <><Eye size={ICON_MD} strokeWidth={STROKE} /> {lang === 'cs' ? 'Náhled' : 'Preview'}</>
                     }
                 </button>
             </div>
@@ -821,7 +911,7 @@ export default function InvoiceForm({
             {/* Region/Tax Warnings */}
             {defaultSupplier?.region === 'CZ' && defaultSupplier?.taxStatus === 'non-payer' && formData.clientCountry !== 'CZ' && (
                 <div style={{ padding: '12px', background: 'rgba(255, 150, 0, 0.1)', border: '1px solid orange', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.875rem', color: '#ffb347' }}>
-                    ⚠️ {t.identifiedPersonWarning}
+                    <AlertTriangle size={14} strokeWidth={2} style={{ flexShrink: 0 }} /> {t.identifiedPersonWarning}
                 </div>
             )}
 
@@ -832,14 +922,17 @@ export default function InvoiceForm({
                         <button type="button" onClick={(e) => { e.preventDefault(); onSave(getCurrentInvoiceData()); }} className="primary">
                             {t.saveInvoice}
                         </button>
-                        <button type="button" onClick={(e) => { e.preventDefault(); setPreviewMode(false); }} className="secondary">
-                            ✏️ {lang === 'cs' ? 'Upravit' : 'Edit'}
+                        <button type="button" onClick={(e) => { e.preventDefault(); setPreviewMode(false); }} className="secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <Pencil size={ICON_MD} strokeWidth={STROKE} /> {lang === 'cs' ? 'Upravit' : 'Edit'}
                         </button>
                         <button type="button" onClick={handleDownloadPDF} disabled={isGenerating} className="secondary">
                             {isGenerating && !emailStatus ? t.alertGenerating : t.downloadPdf}
                         </button>
+                        <button type="button" onClick={handleEmailPDF} disabled={isGenerating || !isAuthenticated} className="secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <Mail size={ICON_MD} strokeWidth={STROKE} /> {emailStatus || t.emailPdf}
+                        </button>
                         <button type="button" onClick={handleBackupToDrive} disabled={isGenerating} className="secondary">
-                            {emailStatus ? emailStatus : (lang === 'cs' ? '☁️ Zálohovat na Drive' : '☁️ Backup to Drive')}
+                            <Cloud size={ICON_MD} strokeWidth={STROKE} /> {emailStatus ? emailStatus : (lang === 'cs' ? 'Zálohovat na Drive' : 'Backup to Drive')}
                         </button>
                         <button type="button" 
                             onClick={async () => {
@@ -862,7 +955,7 @@ export default function InvoiceForm({
                             }} 
                             className="secondary"
                         >
-                            📄 {lang === 'sk' ? 'Stiahnuť Peppol XML' : 'Stáhnout Peppol XML'}
+                            <FileText size={ICON_MD} strokeWidth={STROKE} /> {lang === 'sk' ? 'Stiahnuť Peppol XML' : 'Stáhnout Peppol XML'}
                         </button>
                         <button type="button" onClick={handleMarkPaid} className="secondary" style={{ marginLeft: 'auto' }}>
                             {t.markPaid}
@@ -970,11 +1063,11 @@ export default function InvoiceForm({
                                 value={formData.clientCountry} 
                                 onChange={(e) => setFormData(prev => ({ ...prev, clientCountry: e.target.value }))}
                             >
-                                <option value="CZ">Czech Republic 🇨🇿</option>
-                                <option value="SK">Slovakia 🇸🇰</option>
-                                <option value="DE">Germany 🇩🇪</option>
-                                <option value="AT">Austria 🇦🇹</option>
-                                <option value="PL">Poland 🇵🇱</option>
+                                <option value="CZ">Czech Republic (CZ)</option>
+                                <option value="SK">Slovakia (SK)</option>
+                                <option value="DE">Germany (DE)</option>
+                                <option value="AT">Austria (AT)</option>
+                                <option value="PL">Poland (PL)</option>
                                 <option value="OTHER">Other EU / World</option>
                             </select>
                         </div>
@@ -1036,7 +1129,7 @@ export default function InvoiceForm({
                         <div>
                             <label>
                                 {t.clientVat} 
-                                {viesStatus === 'valid' && <span style={{ color: '#4ade80', marginLeft: '5px', fontSize: '0.75rem' }}>✓</span>}
+                                {viesStatus === 'valid' && <Check size={12} strokeWidth={3} style={{ color: '#4ade80', marginLeft: '5px', flexShrink: 0 }} />}
                                 {viesStatus === 'invalid' && <span style={{ color: '#ef4444', marginLeft: '5px', fontSize: '0.75rem' }}>✗</span>}
                             </label>
                             <div style={{ display: 'flex', gap: '5px' }}>
@@ -1309,12 +1402,12 @@ export default function InvoiceForm({
                     <div className="summary">
                         {formData.reverseChargeText && (
                             <div style={{ padding: '8px', background: 'rgba(50, 200, 100, 0.1)', border: '1px dotted #32c864', borderRadius: '8px', marginBottom: '10px', fontSize: '0.85rem' }}>
-                                🔄 <strong>{t.reverseCharge}:</strong> {formData.reverseChargeText} (VAT 0%)
+                                <RefreshCw size={12} strokeWidth={2} style={{ display: 'inline', flexShrink: 0 }} /> <strong>{t.reverseCharge}:</strong> {formData.reverseChargeText} (VAT 0%)
                             </div>
                         )}
                         {formData.exchangeRate && formData.exchangeRate !== '1.0000' && (
                             <div style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '5px' }}>
-                                💱 {t.exchangeRate}: 1 {formData.currency} = {formData.exchangeRate} {(defaultSupplier?.region === 'SK' ? 'EUR' : 'CZK')}
+                                <ArrowLeftRight size={12} strokeWidth={2} style={{ display: 'inline', flexShrink: 0 }} /> {t.exchangeRate}: 1 {formData.currency} = {formData.exchangeRate} {(defaultSupplier?.region === 'SK' ? 'EUR' : 'CZK')}
                             </div>
                         )}
                         <div style={{ fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'left', marginTop: '20px' }}>
@@ -1326,11 +1419,14 @@ export default function InvoiceForm({
                         <button type="submit" className="primary">
                             {t.saveInvoice}
                         </button>
-                        <button type="button" onClick={(e) => { e.preventDefault(); setPreviewMode(!previewMode); }} className="secondary">
-                            👁️ {lang === 'cs' ? 'Náhled' : 'Preview'}
+                        <button type="button" onClick={(e) => { e.preventDefault(); setPreviewMode(!previewMode); }} className="secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <Eye size={ICON_MD} strokeWidth={STROKE} /> {lang === 'cs' ? 'Náhled' : 'Preview'}
                         </button>
                         <button type="button" onClick={handleDownloadPDF} disabled={isGenerating} className="secondary">
                             {isGenerating && !emailStatus ? t.alertGenerating : t.downloadPdf}
+                        </button>
+                        <button type="button" onClick={handleEmailPDF} disabled={isGenerating || !isAuthenticated} className="secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <Mail size={ICON_MD} strokeWidth={STROKE} /> {emailStatus || t.emailPdf}
                         </button>
                         <button type="button" onClick={handleMarkPaid} className="secondary" style={{ marginLeft: 'auto' }}>
                             {t.markPaid}
@@ -1340,5 +1436,6 @@ export default function InvoiceForm({
             )
             }
         </section >
+        </>
     )
 }
