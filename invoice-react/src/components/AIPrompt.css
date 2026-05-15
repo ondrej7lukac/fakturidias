@@ -1,0 +1,103 @@
+.ai-prompt-panel {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.25rem 1rem;
+    margin-bottom: 1.5rem;
+    background: var(--card2);
+}
+
+.ai-prompt-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    letter-spacing: 0.01em;
+    color: var(--accent);
+    margin-bottom: 0.875rem;
+}
+
+.ai-prompt-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin-bottom: 0.625rem;
+}
+
+.ai-prompt-textarea {
+    flex: 1;
+    resize: vertical;
+    min-height: 62px;
+    font-size: 0.875rem;
+    line-height: 1.55;
+}
+
+.ai-mic-btn {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.ai-mic-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.ai-mic-btn--active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    animation: ai-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ai-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 40%, transparent); }
+    60% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+
+.ai-prompt-samples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 0.875rem;
+}
+
+.ai-sample-chip {
+    font-size: 0.76rem;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    line-height: 1.4;
+    transition: border-color 0.15s, color 0.15s;
+    text-align: left;
+}
+
+.ai-sample-chip:hover {
+    border-color: var(--accent-2);
+    color: var(--text);
+}
+
+.ai-prompt-error {
+    font-size: 0.8rem;
+    color: var(--danger);
+    margin: 0 0 0.625rem;
+}
+
+.ai-prompt-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}

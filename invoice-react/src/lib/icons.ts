@@ -18,6 +18,8 @@ export {
   RefreshCw,
   ArrowLeftRight,
   Sparkles,
+  Mic,
+  MicOff,
 } from 'lucide-react'
 
 export const ICON_SM = 14

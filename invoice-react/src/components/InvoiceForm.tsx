@@ -2,10 +2,11 @@ import './InvoiceForm.css'
 import { useState, useEffect, useRef } from 'react'
 import { formatInvoiceNumber, addDays, formatDate, money, getUserId } from '../utils/storage'
 import { searchAres, parseAresItem } from '../utils/ares'
-import { Pencil, Eye, AlertTriangle, Cloud, FileText, RefreshCw, ArrowLeftRight, Check, ICON_MD, STROKE } from '@/lib/icons'
+import { Pencil, Eye, AlertTriangle, Cloud, FileText, RefreshCw, ArrowLeftRight, Check, Mail, ICON_MD, STROKE } from '@/lib/icons'
 
 import ItemsTable from './ItemsTable'
 import InvoicePreview from './InvoicePreview'
+import AIPrompt from './AIPrompt'
 import { generateInvoicePDF } from '../utils/pdf'
 import { BANK_CODES, calculateIban, parseIban, getCzechQrPayload } from '../utils/bank'
 import { QRCodeCanvas } from 'qrcode.react'
@@ -740,7 +741,47 @@ export default function InvoiceForm({
         setIsGenerating(false)
     }
 
-    // handleEmailPDF removed for production deployment
+    const handleEmailPDF = async () => {
+        if (!isAuthenticated) {
+            return alert(lang === 'cs'
+                ? 'Pro odeslání emailu se musíte přihlásit.'
+                : 'You must be logged in to send emails.')
+        }
+        const currentData = getCurrentInvoiceData()
+        if (!currentData.client.email) {
+            return alert(t.alertEmailMissing)
+        }
+        setIsGenerating(true)
+        setEmailStatus(lang === 'cs' ? 'Odesílám…' : 'Sending…')
+        try {
+            let qrDataUrl = null
+            try {
+                const qrPayload = getCzechQrPayload(currentData)
+                if (qrPayload) {
+                    qrDataUrl = await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: 'M', margin: 0, width: 256 })
+                }
+            } catch (err) {}
+            const pdf = await generateInvoicePDF(currentData, t, qrDataUrl)
+            const pdfBase64 = pdf.output('datauristring')
+            const response = await fetch('/api/email/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ invoice: currentData, pdfBase64, lang })
+            })
+            const result = await response.json()
+            if (response.ok) {
+                setEmailStatus(t.alertEmailSuccess)
+                setTimeout(() => setEmailStatus(''), 3000)
+            } else {
+                setEmailStatus('')
+                alert(`${t.alertEmailFailed}${result.message || result.error}`)
+            }
+        } catch (error) {
+            setEmailStatus('')
+            alert(t.alertError)
+        }
+        setIsGenerating(false)
+    }
 
     const handleBackupToDrive = async () => {
         if (!isAuthenticated) {
@@ -792,7 +833,54 @@ export default function InvoiceForm({
 
     const togglePreview = () => setPreviewMode(!previewMode)
 
+    const handleAIFill = (data: any) => {
+        setFormData(prev => ({
+            ...prev,
+            clientName: data.clientName || prev.clientName,
+            clientEmail: data.clientEmail || prev.clientEmail,
+            clientPhone: data.clientPhone || prev.clientPhone,
+            clientAddress: data.clientAddress || prev.clientAddress,
+            clientIco: data.clientIco || prev.clientIco,
+            clientVat: data.clientVat || prev.clientVat,
+            clientArea: data.clientArea || prev.clientArea,
+            currency: data.currency || prev.currency,
+            dueDate: data.dueDate || prev.dueDate,
+            issueDate: data.issueDate || prev.issueDate,
+            variableSymbol: data.variableSymbol || prev.variableSymbol,
+            paymentNote: data.paymentNote || prev.paymentNote,
+        }))
+        if (Array.isArray(data.items) && data.items.length > 0) {
+            const vatPayer = formData.isVatPayer
+            const newItems = data.items.map((item: any) => {
+                const qty = Number(item.qty) || 1
+                const price = Number(item.price) || 0
+                const taxRate = vatPayer ? 21 : 0
+                const subtotal = qty * price
+                const taxAmount = subtotal * (taxRate / 100)
+                return {
+                    id: crypto.randomUUID(),
+                    name: String(item.name || ''),
+                    qty,
+                    price,
+                    discount: 0,
+                    taxRate,
+                    subtotal,
+                    taxAmount,
+                    total: subtotal + taxAmount,
+                }
+            })
+            setItems(newItems)
+        }
+    }
+
+    const handleAIPreview = (data: any) => {
+        handleAIFill(data)
+        setPreviewMode(true)
+    }
+
     return (
+        <>
+        <AIPrompt lang={lang} onFillForm={handleAIFill} onPreviewInvoice={handleAIPreview} />
         <section className="card" style={{ position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h2 style={{ margin: 0 }}>{t.createEditInvoice}</h2>
@@ -839,6 +927,9 @@ export default function InvoiceForm({
                         </button>
                         <button type="button" onClick={handleDownloadPDF} disabled={isGenerating} className="secondary">
                             {isGenerating && !emailStatus ? t.alertGenerating : t.downloadPdf}
+                        </button>
+                        <button type="button" onClick={handleEmailPDF} disabled={isGenerating || !isAuthenticated} className="secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <Mail size={ICON_MD} strokeWidth={STROKE} /> {emailStatus || t.emailPdf}
                         </button>
                         <button type="button" onClick={handleBackupToDrive} disabled={isGenerating} className="secondary">
                             <Cloud size={ICON_MD} strokeWidth={STROKE} /> {emailStatus ? emailStatus : (lang === 'cs' ? 'Zálohovat na Drive' : 'Backup to Drive')}
@@ -1334,6 +1425,9 @@ export default function InvoiceForm({
                         <button type="button" onClick={handleDownloadPDF} disabled={isGenerating} className="secondary">
                             {isGenerating && !emailStatus ? t.alertGenerating : t.downloadPdf}
                         </button>
+                        <button type="button" onClick={handleEmailPDF} disabled={isGenerating || !isAuthenticated} className="secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <Mail size={ICON_MD} strokeWidth={STROKE} /> {emailStatus || t.emailPdf}
+                        </button>
                         <button type="button" onClick={handleMarkPaid} className="secondary" style={{ marginLeft: 'auto' }}>
                             {t.markPaid}
                         </button>
@@ -1342,5 +1436,6 @@ export default function InvoiceForm({
             )
             }
         </section >
+        </>
     )
 }
