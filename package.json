@@ -1,0 +1,22 @@
+{
+  "name": "invoice-maker-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npm install --prefix invoice-react && npm run build --prefix invoice-react",
+    "start": "node server.js",
+    "backend:check": "node -c backend/server.js && node -c backend/routes/api.js && node -e \"require('./server'); require('./backend/server'); console.log('modular-routes-ok')\""
+  },
+  "dependencies": {
+    "cookie": "^1.1.1",
+    "cookie-session": "^2.1.1",
+    "dotenv": "^17.2.3",
+    "googleapis": "^170.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.21.1",
+    "nodemailer": "^7.0.12"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}

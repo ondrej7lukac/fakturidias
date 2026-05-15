@@ -1,0 +1,12 @@
+git add "invoice-react/src/components/InvoiceForm.jsx"
+git commit -m "Update items form: resize columns, update labels, fix tax defaults
+
+- Položka column is now longest (2.5fr)
+- Changed Cena/ks to Cena (bez dane)
+- Changed Celkem to Celkem (s dani)
+- Price and Total inputs smaller with no decimal placeholders
+- DPH and Sleva minimal width (0.6fr)
+- Non-taxpayers default to 0% but can change tax
+- Taxpayers default to 21%
+- Tax rate auto-updates when VAT status changes"
+git push

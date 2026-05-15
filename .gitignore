@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+invoice-react/node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Sensitive files
+google_tokens.json
+*.pem
+*.key
+
+# Build output
+dist/
+invoice-react/dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+.cursor/
+debug.log
+skills-lock.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+.agents/
+*.swp
+*.swo
+*~
+
+# Data storage
+data/
+
+# Local Documentation & Guides
+VERCEL_SETUP_REQUIRED.md
+VERCEL_DEPLOYMENT_GUIDE.md
+VERCEL_CHECKLIST.md
+SECURITY_FIX_GUIDE.md
+MONGODB_SETUP_GUIDE.md
+GIT_GUIDE.md
+GIT_SETUP_COMPLETE.md
+
+# Local Scripts
+*.bat
+create-env.bat
+push.bat
+start.bat
+.vercel
+.env*.local
+
+# Local env override
+_env.local

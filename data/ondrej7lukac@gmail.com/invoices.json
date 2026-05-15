@@ -1,0 +1,197 @@
+[
+  {
+    "id": "e3817a39-654d-4d75-9e47-a35db83ba733",
+    "invoiceNumber": "INV-2026-001",
+    "issueDate": "2026-01-20",
+    "dueDate": "2026-01-27",
+    "taxableSupplyDate": "2026-01-20",
+    "status": "draft",
+    "category": "",
+    "client": {
+      "name": "Test Client",
+      "email": "ondrej7lukac@gmail.com",
+      "area": "Prague",
+      "ico": "",
+      "vat": "",
+      "address": ""
+    },
+    "items": [],
+    "currency": "CZK",
+    "amount": 0,
+    "payment": {
+      "iban": "",
+      "bic": "RZBC CZ PP",
+      "note": ""
+    },
+    "supplier": {
+      "name": "Alza.cz a.s.",
+      "ico": "27082440",
+      "vat": "CZ27082440",
+      "address": "Jankovcova 1522/53, Holešovice, 17000 Praha 7",
+      "registry": "Společnost je zapsána v obchodním rejstříku vedeném Městským soudem v Praze, spisová značka B 8573.",
+      "phone": "",
+      "email": "",
+      "website": ""
+    },
+    "isVatPayer": false,
+    "taxBase": "0.00",
+    "taxRate": "21",
+    "taxAmount": "0.00"
+  },
+  {
+    "id": "f7359794-4e8d-44d0-a055-331e50ccf5ca",
+    "invoiceNumber": "INV-2026-001",
+    "issueDate": "2026-01-20",
+    "dueDate": "2026-01-27",
+    "taxableSupplyDate": "2026-01-20",
+    "status": "draft",
+    "category": "",
+    "client": {
+      "name": "Test Client",
+      "email": "ondrej7lukac@gmail.com",
+      "area": "Prague",
+      "ico": "",
+      "vat": "",
+      "address": ""
+    },
+    "items": [],
+    "currency": "CZK",
+    "amount": 0,
+    "payment": {
+      "iban": "",
+      "bic": "RZBC CZ PP",
+      "note": ""
+    },
+    "supplier": {
+      "name": "Alza.cz a.s.",
+      "ico": "27082440",
+      "vat": "CZ27082440",
+      "address": "Jankovcova 1522/53, Holešovice, 17000 Praha 7",
+      "registry": "Společnost je zapsána v obchodním rejstříku vedeném Městským soudem v Praze, spisová značka B 8573.",
+      "phone": "",
+      "email": "",
+      "website": ""
+    },
+    "isVatPayer": false,
+    "taxBase": "0.00",
+    "taxRate": "21",
+    "taxAmount": "0.00"
+  },
+  {
+    "id": "b2be95f9-1ffa-41db-9cb1-ae7fcc4f30de",
+    "invoiceNumber": "INV-2026-001",
+    "issueDate": "2026-01-20",
+    "dueDate": "2026-01-27",
+    "taxableSupplyDate": "2026-01-20",
+    "status": "draft",
+    "category": "",
+    "client": {
+      "name": "",
+      "email": "ondrej7lukac@gmail.com",
+      "area": "Prague",
+      "ico": "",
+      "vat": "",
+      "address": ""
+    },
+    "items": [],
+    "currency": "CZK",
+    "amount": 0,
+    "payment": {
+      "iban": "",
+      "bic": "",
+      "note": ""
+    },
+    "supplier": {
+      "name": "Alza.cz a.s.",
+      "ico": "27082440",
+      "vat": "CZ27082440",
+      "address": "Jankovcova 1522/53, Holešovice, 17000 Praha 7",
+      "registry": "Společnost je zapsána v obchodním rejstříku vedeném Městským soudem v Praze, spisová značka B 8573.",
+      "phone": "",
+      "email": "",
+      "website": ""
+    },
+    "isVatPayer": false,
+    "taxBase": "0.00",
+    "taxRate": "21",
+    "taxAmount": "0.00"
+  },
+  {
+    "id": "0332685e-2d95-4ac4-bdd8-76d7622ec588",
+    "invoiceNumber": "INV-2026-001",
+    "issueDate": "2026-01-20",
+    "dueDate": "2026-01-27",
+    "taxableSupplyDate": "2026-01-20",
+    "status": "draft",
+    "category": "",
+    "client": {
+      "name": "Test Client",
+      "email": "ondrej7lukac@gmail.com",
+      "area": "Prague",
+      "ico": "",
+      "vat": "",
+      "address": ""
+    },
+    "items": [],
+    "currency": "CZK",
+    "amount": 0,
+    "payment": {
+      "iban": "CZ0508001234561234567890",
+      "bic": "CSAS CZ PP",
+      "note": ""
+    },
+    "supplier": {
+      "name": "Alza.cz a.s.",
+      "ico": "27082440",
+      "vat": "CZ27082440",
+      "address": "Jankovcova 1522/53, Holešovice, 17000 Praha 7",
+      "registry": "Společnost je zapsána v obchodním rejstříku vedeném Městským soudem v Praze, spisová značka B 8573.",
+      "phone": "",
+      "email": "",
+      "website": ""
+    },
+    "isVatPayer": false,
+    "taxBase": "0.00",
+    "taxRate": "21",
+    "taxAmount": "0.00"
+  },
+  {
+    "id": "cc39e8b2-e96a-4379-ad8d-87cf9722f314",
+    "invoiceNumber": "INV-2026-001",
+    "issueDate": "2026-01-20",
+    "dueDate": "2026-01-27",
+    "taxableSupplyDate": "2026-01-20",
+    "status": "draft",
+    "category": "",
+    "client": {
+      "name": "Test Client",
+      "email": "ondrej7lukac@gmail.com",
+      "area": "Prague",
+      "ico": "",
+      "vat": "",
+      "address": ""
+    },
+    "items": [],
+    "currency": "CZK",
+    "amount": 0,
+    "payment": {
+      "iban": "CZ5555000000005309657003",
+      "bic": "RZBC CZ PP",
+      "note": ""
+    },
+    "supplier": {
+      "name": "Alza.cz a.s.",
+      "ico": "27082440",
+      "vat": "CZ27082440",
+      "address": "Jankovcova 1522/53, Holešovice, 17000 Praha 7",
+      "registry": "Společnost je zapsána v obchodním rejstříku vedeném Městským soudem v Praze, spisová značka B 8573.",
+      "phone": "",
+      "email": "",
+      "website": ""
+    },
+    "isVatPayer": false,
+    "taxBase": "0.00",
+    "taxRate": "21",
+    "taxAmount": "0.00"
+  }
+]

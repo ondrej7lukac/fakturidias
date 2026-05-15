@@ -1,0 +1,16 @@
+.qr-preview-section {
+  margin-top: 20px;
+}
+
+.qr-preview-box {
+  background: #fff;
+  padding: 10px;
+  border-radius: 8px;
+  display: inline-block;
+  margin-bottom: 15px;
+}
+
+.qr-preview-payload {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}

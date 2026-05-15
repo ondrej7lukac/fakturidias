@@ -1,0 +1,251 @@
+# Invoice Maker - Full Stack Application
+
+A modern invoice management system with Google OAuth2 email integration, MongoDB storage, and Czech ARES integration.
+
+## 🚨 IMPORTANT - Security Setup Required
+
+**Before running this application**, you MUST set up your environment variables. See [SECURITY_FIX_GUIDE.md](./SECURITY_FIX_GUIDE.md) for detailed instructions.
+
+## Features
+
+- ✨ Create and manage invoices
+- 🔍 Search Czech companies via ARES API
+- 📧 Send invoices via email (Gmail OAuth2)
+- 💾 MongoDB database integration
+- 🔐 Secure Google OAuth2 authentication
+- 📱 Generate EPC QR codes for SEPA payments
+- 🌙 Dark mode support
+- 📊 Filter and search invoices
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 18+ installed
+- A Google Cloud Project with OAuth2 credentials
+- MongoDB database (optional, for cloud deployment)
+
+### 1. Install Dependencies
+
+```bash
+npm install
+cd invoice-react
+npm install
+cd ..
+```
+
+### 2. Configure Environment Variables
+
+**Option A: Use the helper script (Windows)**
+
+```bash
+create-env.bat
+```
+
+**Option B: Manual setup**
+
+Create a `.env` file in the project root:
+
+```env
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+```
+
+See [SECURITY_FIX_GUIDE.md](./SECURITY_FIX_GUIDE.md) for how to get these credentials.
+
+### 3. Run the Application
+
+**Development Mode:**
+
+```bash
+# Terminal 1: Start the backend server
+node server.js
+
+# Terminal 2: Start the React dev server
+cd invoice-react
+npm run dev
+```
+
+- Backend API: http://localhost:5500
+- Frontend: http://localhost:5173
+
+### 4. Connect Your Google Account
+
+1. Open the application in your browser
+2. Go to **Settings**
+3. Click **Connect Google Account**
+4. Authorize the application
+5. You can now send invoices via email!
+
+## Project Structure
+
+```
+.
+├── server.js                 # Compatibility entry point (delegates to backend/)
+├── backend/                  # Backend source folder
+│   ├── server.js             # Main HTTP backend handler
+│   ├── middleware/
+│   │   ├── rateLimit.js
+│   │   └── session.js
+│   ├── routes/
+│   │   ├── health.js
+│   │   ├── ares.js
+│   │   ├── auth.js
+│   │   ├── api.js
+│   │   └── static.js
+│   └── lib/
+│       ├── utils.js
+│       ├── validators.js
+│       ├── storage.js
+│       ├── auth.js
+│       ├── ares.js
+│       └── drive.js
+├── lib/                      # Compatibility wrappers for backend/lib
+├── invoice-react/            # React frontend
+│   ├── src/
+│   │   ├── components/
+│   │   ├── utils/
+│   │   └── App.jsx
+│   └── api/
+│       └── index.js          # Vercel serverless functions
+├── .env                      # Environment variables (DO NOT COMMIT)
+├── .env.example              # Template for environment variables
+├── .gitignore                # Git ignore rules
+└── SECURITY_FIX_GUIDE.md     # Security setup instructions
+```
+
+## Environment Variables
+
+### Required for Local Development
+
+- `GOOGLE_CLIENT_ID` - Your Google OAuth2 Client ID
+- `GOOGLE_CLIENT_SECRET` - Your Google OAuth2 Client Secret
+
+### Required for Vercel Deployment
+
+- `GOOGLE_CLIENT_ID` - Your Google OAuth2 Client ID
+- `GOOGLE_CLIENT_SECRET` - Your Google OAuth2 Client Secret
+- `MONGODB_URI` - MongoDB connection string (optional)
+
+### Optional Hardening Variables
+
+- `CORS_ORIGINS` - Comma-separated CORS allowlist (recommended in production)
+- `RATE_LIMIT_WINDOW_MS` - Rate-limit window in ms (default: `60000`)
+- `RATE_LIMIT_MAX` - Max requests per route+IP per window (default: `240`)
+- `MAX_BODY_BYTES` - Default max JSON body size in bytes (default: `1048576`)
+
+## Deployment
+
+### Vercel Deployment
+
+1. Push your code to GitHub (make sure `.env` is NOT committed!)
+2. Import your repository in Vercel
+3. Add environment variables in Vercel dashboard:
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+   - `MONGODB_URI` (if using MongoDB)
+4. Deploy!
+
+**Important**: Update your Google Cloud Console OAuth2 redirect URI to include your Vercel URL:
+
+```
+https://your-app.vercel.app/auth/google/callback
+```
+
+## API Endpoints
+
+### Health
+
+- `GET /healthz` - Service health and DB connectivity
+
+### ARES Integration
+
+- `POST /api/ares/search` - Search Czech companies
+- `GET /api/ares/ico?ico=<ico>` - Get company by ICO
+
+### Google OAuth
+
+- `GET /auth/google/url` - Get OAuth authorization URL
+- `GET /auth/google/callback` - OAuth callback handler
+- `GET /auth/google/status` - Check connection status
+- `POST /auth/google/disconnect` - Disconnect Google account
+
+### Invoice Management
+
+- `GET /api/invoices` - Get all invoices
+- `POST /api/invoices` - Create/update invoice
+- `DELETE /api/invoices/:id` - Delete invoice
+
+### Email
+
+- `POST /api/email/send` - Send invoice via email
+
+## Backend Hardening
+
+- Request tracing with `X-Request-Id`
+- Security headers on API and static responses
+- Route method enforcement (`405 Method Not Allowed`)
+- JSON body-size limits with route-level caps
+- Input validation for write endpoints
+- Basic in-memory rate limiting for `/api/*` and `/auth/*`
+
+Architecture details: see `BACKEND_DESIGN.md`.
+
+## Security Best Practices
+
+1. ✅ **Never commit `.env` to Git** - It's in `.gitignore`
+2. ✅ **Rotate credentials regularly**
+3. ✅ **Use environment variables for all secrets**
+4. ✅ **Enable 2FA on Google Cloud account**
+5. ✅ **Monitor your Google Cloud audit logs**
+
+## Technologies Used
+
+### Frontend
+
+- React 18
+- Vite
+- qrcode.react
+- i18next (internationalization)
+
+### Backend
+
+- Node.js
+- Express
+- nodemailer (email sending)
+- googleapis (Google OAuth2)
+- mongoose (MongoDB ORM)
+- dotenv (environment variables)
+
+## Troubleshooting
+
+### "OAuth not initialized" error
+
+- Make sure your `.env` file exists with valid credentials
+- Restart the server after creating `.env`
+
+### "Google account not connected" when sending email
+
+- Go to Settings and click "Connect Google Account"
+- Make sure you've authorized the application
+
+### ARES search not working
+
+- Make sure `server.js` is running on port 5500
+- Check that Vite proxy is configured correctly
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. **Never commit secrets or credentials**
+5. Submit a pull request
+
+## License
+
+MIT
+
+---
+
+**Need help with security setup?** See [SECURITY_FIX_GUIDE.md](./SECURITY_FIX_GUIDE.md)
