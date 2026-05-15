@@ -44,8 +44,6 @@ const { handleExchangeRate } = require('./lib/exchangeRate');
 const { generatePeppolXml } = require('./lib/peppol');
 const { uploadInvoiceToDrive } = require('./lib/drive');
 
-const port = process.env.PORT || 5500;
-
 // Session Middleware Wrapper
 const requestHandler = async (req, res) => {
     const isProd = process.env.NODE_ENV === 'production';
@@ -326,6 +324,7 @@ const handleRequest = async (req, res) => {
 };
 
 if (require.main === module) {
+    const port = process.env.PORT || 5500;
     const server = http.createServer(requestHandler);
     server.listen(port, "0.0.0.0", () => console.log(`Modular server running at http://0.0.0.0:${port}/`));
 }
