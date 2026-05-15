@@ -1,3 +1,4 @@
+import './InvoicePreview.css'
 import { QRCodeCanvas } from 'qrcode.react'
 import { getCzechQrPayload } from '../utils/bank'
 

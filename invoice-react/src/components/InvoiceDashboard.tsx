@@ -1,7 +1,9 @@
+import './InvoiceDashboard.css'
 import { useState, useMemo } from 'react'
 import { money } from '../utils/storage'
 import StatusBadge from './StatusBadge'
 import InvoiceForm from './InvoiceForm'
+import { BarChart2, X, AlertTriangle, Check, Pencil, Mail } from '@/lib/icons'
 
 const STATUS_COLORS = {
     draft: '#94a3b8',
@@ -197,7 +199,7 @@ export default function InvoiceDashboard({
             allCategories: 'Všechny kategorie',
             num: 'Číslo', client: 'Klient', issued: 'Vystaveno', due: 'Splatnost',
             value: 'Hodnota', sent: 'Odeslaná', actions: 'Akce',
-            open: 'Otevřít', remind: '📧 Připomenout', delete: 'Smazat',
+            open: 'Otevřít', remind: 'Připomenout', delete: 'Smazat',
             yes: 'Ano', no: 'Ne',
             noResults: 'Žádné faktury neodpovídají filtru.',
             revenue: 'Příjmy v čase (dle data vystavení)',
@@ -219,7 +221,7 @@ export default function InvoiceDashboard({
             allCategories: 'All categories',
             num: '#', client: 'Client', issued: 'Issued', due: 'Due',
             value: 'Value', sent: 'Sent', actions: 'Actions',
-            open: 'Open', remind: '📧 Remind', delete: 'Delete',
+            open: 'Open', remind: 'Remind', delete: 'Delete',
             yes: 'Yes', no: 'No',
             noResults: 'No invoices match the filter.',
             revenue: 'Revenue over time (by issue date)',
@@ -305,9 +307,9 @@ export default function InvoiceDashboard({
         <div className="invoice-dashboard">
             {/* Header */}
             <div className="dashboard-header">
-                <h2 style={{ margin: 0 }}>📊 {L.dashboard}</h2>
-                <button className="secondary" onClick={onClose} style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}>
-                    ✕ {L.close}
+                <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}><BarChart2 size={18} strokeWidth={2} /> {L.dashboard}</h2>
+                <button className="secondary" onClick={onClose} style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <X size={14} strokeWidth={2} /> {L.close}
                 </button>
             </div>
 
@@ -399,7 +401,7 @@ export default function InvoiceDashboard({
                                             <td style={{ whiteSpace: 'nowrap' }}>{inv.issueDate || '—'}</td>
                                             <td style={{ whiteSpace: 'nowrap', color: overdue && inv.status !== 'paid' ? 'var(--danger)' : 'inherit' }}>
                                                 {inv.dueDate || '—'}
-                                                {overdue && inv.status !== 'paid' && <span style={{ marginLeft: '4px', fontSize: '0.7rem' }}>⚠️</span>}
+                                                {overdue && inv.status !== 'paid' && <AlertTriangle size={12} strokeWidth={2} style={{ marginLeft: '4px', color: 'var(--danger)', flexShrink: 0 }} />}
                                             </td>
                                             <td style={{ whiteSpace: 'nowrap', fontWeight: '600' }}>
                                                 {inv.currency || 'CZK'} {money(inv.amount)}
@@ -414,7 +416,7 @@ export default function InvoiceDashboard({
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
                                                 {inv.status === 'sent' || inv.status === 'overdue'
-                                                    ? <span style={{ color: 'var(--accent-2)' }}>✓</span>
+                                                    ? <Check size={14} strokeWidth={2} style={{ color: 'var(--accent-2)' }} />
                                                     : <span style={{ color: 'var(--muted)' }}>—</span>
                                                 }
                                             </td>
@@ -454,7 +456,7 @@ export default function InvoiceDashboard({
                                                                     style={{ marginLeft: 'auto', padding: '0.35rem 1rem', fontSize: '0.8rem' }}
                                                                     onClick={() => setInlineEditId(null)}
                                                                 >
-                                                                    ✕ {lang === 'cs' ? 'Zrušit úpravy' : 'Cancel edit'}
+                                                                    <X size={12} strokeWidth={2} /> {lang === 'cs' ? 'Zrušit úpravy' : 'Cancel edit'}
                                                                 </button>
                                                             ) : (
                                                                 <button
@@ -462,7 +464,7 @@ export default function InvoiceDashboard({
                                                                     style={{ marginLeft: 'auto', padding: '0.35rem 1rem', fontSize: '0.8rem' }}
                                                                     onClick={() => setInlineEditId(inv.id)}
                                                                 >
-                                                                    ✏️ {lang === 'cs' ? 'Editovat' : 'Edit'}
+                                                                    <Pencil size={12} strokeWidth={2} /> {lang === 'cs' ? 'Editovat' : 'Edit'}
                                                                 </button>
                                                             )}
                                                         </div>
@@ -497,8 +499,8 @@ export default function InvoiceDashboard({
                                                                 {inv.client?.address && <div style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>{inv.client.address}</div>}
                                                                 {inv.client?.ico && <div style={{ fontSize: '0.8rem' }}>IČO: {inv.client.ico}</div>}
                                                                 {inv.client?.vat && <div style={{ fontSize: '0.8rem' }}>DIČ: {inv.client.vat}</div>}
-                                                                {inv.client?.email && <div style={{ fontSize: '0.8rem' }}>📧 {inv.client.email}</div>}
-                                                                {inv.client?.phone && <div style={{ fontSize: '0.8rem' }}>📞 {inv.client.phone}</div>}
+                                                                {inv.client?.email && <div style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Mail size={12} strokeWidth={2} />{inv.client.email}</div>}
+                                                                {inv.client?.phone && <div style={{ fontSize: '0.8rem' }}>{inv.client.phone}</div>}
                                                             </div>
                                                             {/* Dates & amounts */}
                                                             <div className="expanded-section">

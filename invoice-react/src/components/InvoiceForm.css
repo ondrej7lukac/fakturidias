@@ -1,0 +1,67 @@
+.invoice-form-container {
+  width: 100%;
+}
+
+/* Add-item form grid */
+.add-item-form,
+.form-item-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+/* Payment details grid */
+.payment-grid-mobile {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .invoice-form-container {
+    width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .add-item-form,
+  .add-item-form.form-item-grid,
+  .form-item-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 1.25rem !important;
+  }
+
+  .add-item-form > div,
+  .add-item-form.form-item-grid > div {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    margin-bottom: 0px !important;
+  }
+
+  .add-item-form label,
+  .add-item-form.form-item-grid label {
+    font-size: 0.75rem !important;
+    margin-bottom: 4px !important;
+  }
+
+  .payment-grid-mobile {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  .field-checkbox, .is-vat-payer-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    max-width: 100% !important;
+  }
+
+  .field-checkbox label {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}

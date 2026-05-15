@@ -1,0 +1,99 @@
+/* Open/Closed button system via CSS custom properties */
+button, .btn {
+  --btn-bg: rgba(255, 255, 255, 0.06);
+  --btn-color: var(--text);
+  --btn-border: transparent;
+  --btn-hover-bg: rgba(255, 255, 255, 0.10);
+  --btn-hover-shadow: var(--shadow-lg);
+  --btn-hover-filter: none;
+
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: transform 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--btn-border);
+  color: var(--btn-color);
+  background: var(--btn-bg);
+}
+
+button:hover, .btn:hover {
+  background: var(--btn-hover-bg);
+  box-shadow: var(--btn-hover-shadow);
+  filter: var(--btn-hover-filter);
+  transform: translateY(-1px);
+}
+
+button:active, .btn:active {
+  transform: translateY(0) scale(0.99);
+}
+
+/* Primary variant */
+button.primary,
+button[type="submit"]:not(.secondary),
+.btn--primary {
+  --btn-bg: radial-gradient(14px 14px at 18% 18%, rgba(255, 255, 255, 0.35), transparent 60%),
+            linear-gradient(135deg, rgba(124, 247, 212, 0.92), rgba(138, 164, 255, 0.92));
+  --btn-color: #061022;
+  --btn-border: rgba(255, 255, 255, 0.14);
+  --btn-hover-filter: saturate(1.08) brightness(1.05);
+  --btn-hover-bg: var(--btn-bg);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Soft/secondary variant */
+button.secondary, .btn--soft {
+  --btn-bg: rgba(255, 255, 255, 0.06);
+  --btn-border: var(--border);
+  --btn-hover-bg: rgba(255, 255, 255, 0.10);
+}
+
+/* Success variant */
+button.success {
+  --btn-bg: linear-gradient(135deg, var(--accent-2), #2dd7a6);
+  --btn-color: #061022;
+  --btn-hover-filter: saturate(1.1) brightness(1.05);
+  --btn-hover-bg: var(--btn-bg);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Danger variant */
+button.danger:hover {
+  background: var(--danger);
+  color: white;
+}
+
+/* Icon button variant */
+.iconBtn {
+  --btn-bg: rgba(255, 255, 255, 0.05);
+  --btn-border: var(--border);
+  width: 42px;
+  height: 42px;
+  padding: 0 !important;
+  border-radius: 14px !important;
+  flex: none;
+  min-width: 42px;
+  display: grid;
+  place-items: center;
+}
+
+.iconBtn:hover {
+  transform: translateY(-1px) scale(1.02);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-lg);
+}
+
+.iconBtn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Pill-used-as-button */
+button.pill {
+  font-family: inherit;
+  line-height: 1;
+}

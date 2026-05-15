@@ -1,0 +1,193 @@
+main {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 2rem;
+  padding: calc(var(--headerH) + 2rem) 2rem 2rem 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+main.settings-view {
+  display: block;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding-top: calc(var(--headerH) + 3rem);
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.grid.two {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.grid.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Mobile view containers */
+.invoice-form-container,
+.invoice-list-container {
+  width: 100%;
+}
+
+/* View Switch – iOS style toggle (mobile only) */
+.view-switch {
+  display: none;
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+  position: relative;
+}
+
+.switch-option {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+}
+
+.switch-option.active {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.switch-option:not(.active):hover {
+  color: var(--text);
+}
+
+/* Dashboard stretches the list column */
+main.dashboard-mode .invoice-form-container {
+  display: none;
+}
+main.dashboard-mode .invoice-list-container {
+  grid-column: 1 / -1;
+}
+
+/* Utility */
+.mobile-only-flex {
+  display: none !important;
+}
+
+@media (max-width: 1024px) {
+  main {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .mobile-only-flex {
+    display: flex !important;
+  }
+
+  .mobile-hidden {
+    display: none !important;
+  }
+
+  .view-switch {
+    display: flex;
+  }
+
+  .actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .actions button {
+    width: 100%;
+  }
+
+  .inline-actions {
+    flex-wrap: wrap;
+  }
+
+  .grid.two, .grid.three, .grid.four {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem !important;
+  }
+
+  /* Keep 2 cols on small inputs when explicitly flagged */
+  .grid.two.mobile-grid-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem;
+  }
+
+  .grid.three.mobile-grid-2 {
+    grid-template-columns: 60px 1fr 80px !important;
+    gap: 0.5rem;
+  }
+
+  main {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+    padding-top: calc(var(--headerH) + 1rem);
+    gap: 1rem;
+    width: 100%;
+    max-width: 100vw;
+  }
+
+  .invoice-form-container,
+  .invoice-list-container,
+  .invoice-dashboard,
+  main {
+    width: 100% !important;
+    max-width: 100vw !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  main {
+    padding-top: calc(var(--headerH) + 1rem) !important;
+  }
+
+  .grid > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: break-word;
+  }
+
+  .payment-grid-mobile {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  html, body {
+    overflow-x: hidden !important;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    position: relative;
+  }
+}

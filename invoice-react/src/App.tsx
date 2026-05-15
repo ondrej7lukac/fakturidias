@@ -303,25 +303,44 @@ function App() {
     }
 
     const handleLogin = async () => {
+        const width = 500, height = 600
+        const left = window.screen.width / 2 - width / 2
+        const top = window.screen.height / 2 - height / 2
+        const popup = window.open('about:blank', 'Google Login', `width=${width},height=${height},top=${top},left=${left}`)
         try {
             const res = await fetch('/auth/google/url')
             if (!res.ok) throw new Error('Failed to start login')
             const data = await res.json()
-
-            if (data.url) {
-                const width = 500
-                const height = 600
-                const left = window.screen.width / 2 - width / 2
-                const top = window.screen.height / 2 - height / 2
-                window.open(data.url, 'Google Login', `width=${width},height=${height},top=${top},left=${left}`)
+            if (data.url && popup) {
+                popup.location.href = data.url
+            } else {
+                popup?.close()
             }
         } catch (e) {
+            popup?.close()
             alert('Failed to connect to login server.')
         }
     }
 
+    const handleLogout = () => {
+        fetch('/auth/google/disconnect', { method: 'POST' })
+            .then(() => {
+                localStorage.clear()
+                window.location.reload()
+            })
+            .catch((err) => {
+                console.error('Logout error:', err)
+                localStorage.clear()
+                setUser(null)
+                setInvoices([])
+                setDefaultSupplier(null)
+                setCategories([])
+                setCurrentView('invoices')
+                setInvoiceCounter(1)
+            })
+    }
+
     const handleContinueAsGuest = () => {
-        // Just hide welcome screen, don't change auth state
         setShowWelcome(false)
     }
 
@@ -344,33 +363,18 @@ function App() {
                 setMobileView={setMobileView}
                 mobileMenuOpen={mobileMenuOpen}
                 setMobileMenuOpen={setMobileMenuOpen}
-                onLogout={() => {
-                    // Call backend to disconnect/clear session
-                    fetch('/auth/google/disconnect', { method: 'POST' })
-                        .then(() => {
-                            // Clear local storage
-                            localStorage.clear()
-                            // Reload page to ensure clean state
-                            window.location.reload()
-                        })
-                        .catch((err) => {
-                            console.error('Logout error:', err)
-                            // Still clear local data even if server call fails
-                            localStorage.clear()
-                            setUser(null)
-                            setInvoices([])
-                            setDefaultSupplier(null)
-                            setCategories([])
-                            setCurrentView('invoices')
-                            setInvoiceCounter(1)
-                        })
-                }}
+                onOpenDashboard={() => { setCurrentView('invoices'); setDashboardOpen(true) }}
+                onLogout={handleLogout}
             />
             <main className={`${dashboardOpen ? 'dashboard-mode' : ''} ${currentView === 'settings' ? 'settings-view' : ''}`}>
                 {currentView === 'settings' ? (
                     <Settings
                         lang={lang}
                         t={t}
+                        user={user}
+                        categories={categories}
+                        onLogin={handleLogin}
+                        onLogout={handleLogout}
                         defaultSupplier={defaultSupplier}
                         setDefaultSupplier={setDefaultSupplier}
                     />
