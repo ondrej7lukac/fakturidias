@@ -1,0 +1,20 @@
+[
+  {
+    "name": "aloha",
+    "price": 2200,
+    "taxRate": 21,
+    "lastUpdated": 1768925006998
+  },
+  {
+    "name": "kafe",
+    "price": 0,
+    "taxRate": 21,
+    "lastUpdated": 1768925475914
+  },
+  {
+    "name": "mlieko",
+    "price": 62,
+    "taxRate": 21,
+    "lastUpdated": 1768925883853
+  }
+]

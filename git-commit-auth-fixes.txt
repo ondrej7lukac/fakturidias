@@ -1,0 +1,9 @@
+git add "invoice-react/src/App.jsx"
+git commit -m "Fix authentication and data loading bugs
+
+- Remove isLoading check that blocked invoice reload after login
+- Update OAuth popup listener from custom event to postMessage
+- Add server sync for settings (saves to MongoDB when authenticated)
+- Invoices now load automatically after login
+- Settings persist across devices and sessions"
+git push

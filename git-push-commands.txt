@@ -1,0 +1,3 @@
+git add .
+git commit -m "feat: implement optional login with feature-based access control - Allow app usage without authentication - Require login only for email sending and database operations - Add localStorage fallback for offline invoice management - Update Header with JWT-based auth status - Improve UX with clear login prompts when needed"
+git push origin main

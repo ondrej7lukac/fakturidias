@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Invoice Maker</title>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f7fb;
+        --card: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --accent: #2563eb;
+        --accent-2: #16a34a;
+        --border: #e5e7eb;
+        --danger: #dc2626;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f172a;
+          --card: #111827;
+          --text: #f3f4f6;
+          --muted: #9ca3af;
+          --accent: #60a5fa;
+          --accent-2: #22c55e;
+          --border: #1f2937;
+          --danger: #f87171;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        background: var(--card);
+        border-bottom: 1px solid var(--border);
+        padding: 20px 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      header h1 {
+        font-size: 20px;
+        margin: 0;
+      }
+      header small {
+        color: var(--muted);
+      }
+      main {
+        display: grid;
+        grid-template-columns: minmax(300px, 1.1fr) minmax(320px, 0.9fr);
+        gap: 20px;
+        padding: 24px 28px 48px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+      }
+      .card h2 {
+        margin: 0 0 12px;
+        font-size: 16px;
+      }
+      label {
+        font-size: 12px;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 6px;
+      }
+      input,
+      select,
+      textarea,
+      button {
+        font: inherit;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--text);
+      }
+      textarea {
+        min-height: 70px;
+      }
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .inline-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .inline-actions input {
+        flex: 1;
+      }
+      .inline-actions button {
+        white-space: nowrap;
+      }
+      button {
+        padding: 9px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--accent);
+        color: white;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: transparent;
+        color: var(--text);
+      }
+      button.success {
+        background: var(--accent-2);
+      }
+      button.danger {
+        background: var(--danger);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px 6px;
+        border-bottom: 1px solid var(--border);
+        font-size: 13px;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .pill {
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: rgba(37, 99, 235, 0.12);
+        color: var(--accent);
+        font-size: 11px;
+      }
+      .pill.paid {
+        background: rgba(22, 163, 74, 0.12);
+        color: var(--accent-2);
+      }
+      .pill.overdue {
+        background: rgba(220, 38, 38, 0.12);
+        color: var(--danger);
+      }
+      .list {
+        display: grid;
+        gap: 10px;
+      }
+      .suggestions {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 6px;
+        max-height: 210px;
+        overflow: auto;
+        background: transparent;
+      }
+      .suggestion-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text);
+      }
+      .suggestion-item:hover {
+        border-color: var(--border);
+        background: rgba(37, 99, 235, 0.08);
+      }
+      .status-note {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .invoice-item {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        display: grid;
+        gap: 6px;
+      }
+      .invoice-item header {
+        padding: 0;
+        border: none;
+        background: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .invoice-meta {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      #qr {
+        display: grid;
+        place-items: center;
+        padding: 12px;
+        border: 1px dashed var(--border);
+        border-radius: 10px;
+        min-height: 150px;
+      }
+      .empty {
+        color: var(--muted);
+        font-size: 12px;
+        text-align: center;
+      }
+      @media (max-width: 980px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Invoice Maker</h1>
+        <small>Local-only MVP for invoices + banking QR</small>
+      </div>
+      <div class="actions">
+        <button id="newInvoiceBtn" class="secondary">New invoice</button>
+        <button id="exportBtn" class="secondary">Export JSON</button>
+        <button id="clearBtn" class="danger">Clear all</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>Create / Edit Invoice</h2>
+        <form id="invoiceForm" class="grid">
+          <div class="grid two">
+            <div>
+              <label for="invoiceNumber">Invoice #</label>
+              <input id="invoiceNumber" placeholder="INV-2026-001" required />
+            </div>
+            <div>
+              <label for="issueDate">Issue date</label>
+              <input id="issueDate" type="date" required />
+            </div>
+          </div>
+          <div class="grid two">
+            <div>
+              <label for="dueDate">Due date</label>
+              <input id="dueDate" type="date" />
+            </div>
+            <div>
+              <label for="status">Status</label>
+              <select id="status">
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="paid">Paid</option>
+                <option value="overdue">Overdue</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid two">
+            <div>
+              <label for="category">Category</label>
+              <select id="category"></select>
+            </div>
+            <div>
+              <label for="categoryInput">Add category</label>
+              <div class="actions">
+                <input id="categoryInput" placeholder="Consulting" />
+                <button type="button" id="addCategoryBtn" class="secondary">Add</button>
+              </div>
+            </div>
+          </div>
+
+          <h3>Client</h3>
+          <div class="grid two">
+            <div>
+              <label for="clientName">Name</label>
+              <input id="clientName" placeholder="Client name" required />
+            </div>
+            <div>
+              <label for="clientEmail">Email</label>
+              <input id="clientEmail" type="email" placeholder="client@email.com" />
+            </div>
+          </div>
+          <div class="grid three">
+            <div>
+              <label for="clientArea">Area / Region</label>
+              <input id="clientArea" placeholder="Brno, Prague, etc." />
+            </div>
+            <div>
+              <label for="clientIco">IČO</label>
+              <div class="inline-actions">
+                <input id="clientIco" placeholder="12345678" />
+                <button type="button" id="aresLookupBtn" class="secondary">ARES</button>
+              </div>
+            </div>
+            <div>
+              <label for="clientVat">VAT / Tax ID</label>
+              <input id="clientVat" placeholder="CZ12345678" />
+            </div>
+          </div>
+          <div>
+            <label for="clientAddress">Address</label>
+            <textarea id="clientAddress" placeholder="Street, City, ZIP"></textarea>
+          </div>
+          <div>
+            <div class="status-note" id="aresStatus">Start typing client name to search ARES.</div>
+            <div id="aresResults" class="suggestions" hidden></div>
+          </div>
+
+          <h3>Items</h3>
+          <div class="grid three">
+            <div>
+              <label for="itemName">Item</label>
+              <input id="itemName" placeholder="Design work" />
+            </div>
+            <div>
+              <label for="itemQty">Qty</label>
+              <input id="itemQty" type="number" min="1" step="1" value="1" />
+            </div>
+            <div>
+              <label for="itemPrice">Unit price</label>
+              <input id="itemPrice" type="number" min="0" step="0.01" value="0" />
+            </div>
+          </div>
+          <div class="actions">
+            <button type="button" id="addItemBtn" class="secondary">Add item</button>
+            <button type="button" id="clearItemsBtn" class="secondary">Clear items</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="itemsTable"></tbody>
+          </table>
+
+          <h3>Payment</h3>
+          <div class="grid two">
+            <div>
+              <label for="currency">Currency</label>
+              <select id="currency">
+                <option value="EUR">EUR</option>
+                <option value="CZK">CZK</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+            <div>
+              <label for="amount">Amount</label>
+              <input id="amount" type="number" min="0" step="0.01" value="0" />
+            </div>
+          </div>
+          <div class="grid two">
+            <div>
+              <label for="iban">IBAN</label>
+              <input id="iban" placeholder="CZ6508000000192000145399" />
+            </div>
+            <div>
+              <label for="bic">BIC</label>
+              <input id="bic" placeholder="GIBACZPX" />
+            </div>
+          </div>
+          <div>
+            <label for="paymentNote">Payment note</label>
+            <input id="paymentNote" placeholder="Invoice payment INV-2026-001" />
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="success">Save invoice</button>
+            <button type="button" id="markPaidBtn" class="secondary">Mark paid</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Invoices</h2>
+        <div class="grid two">
+          <div>
+            <label for="searchText">Search</label>
+            <input id="searchText" placeholder="Invoice #, client, area" />
+          </div>
+          <div>
+            <label for="filterStatus">Status</label>
+            <select id="filterStatus">
+              <option value="all">All</option>
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="paid">Paid</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid">
+          <div>
+            <label for="filterCategory">Category</label>
+            <select id="filterCategory">
+              <option value="all">All categories</option>
+            </select>
+          </div>
+        </div>
+        <div class="list" id="invoiceList"></div>
+      </section>
+
+      <section class="card">
+        <h2>QR Preview</h2>
+        <p class="invoice-meta">
+          This uses EPC QR (SEPA) format. Adjust IBAN/BIC and amount in the invoice.
+          ARES lookup requires running the Node server so the proxy can reach ARES.
+        </p>
+        <div id="qr"><span class="empty">Select an invoice to generate QR</span></div>
+        <div class="grid">
+          <label for="qrText">QR payload</label>
+          <textarea id="qrText" readonly></textarea>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+      const state = {
+        invoices: [],
+        selectedId: null,
+        items: [],
+        invoiceCounter: 1,
+        draftNumber: "",
+        categories: []
+      };
+
+      const storageKey = "invoiceMakerData";
+      const invoiceList = document.getElementById("invoiceList");
+      const itemsTable = document.getElementById("itemsTable");
+      const form = document.getElementById("invoiceForm");
+      const qrEl = document.getElementById("qr");
+      const qrTextEl = document.getElementById("qrText");
+      const searchText = document.getElementById("searchText");
+      const filterStatus = document.getElementById("filterStatus");
+
+      const fields = {
+        invoiceNumber: document.getElementById("invoiceNumber"),
+        issueDate: document.getElementById("issueDate"),
+        dueDate: document.getElementById("dueDate"),
+        status: document.getElementById("status"),
+        category: document.getElementById("category"),
+        clientName: document.getElementById("clientName"),
+        clientEmail: document.getElementById("clientEmail"),
+        clientArea: document.getElementById("clientArea"),
+        clientIco: document.getElementById("clientIco"),
+        clientVat: document.getElementById("clientVat"),
+        clientAddress: document.getElementById("clientAddress"),
+        currency: document.getElementById("currency"),
+        amount: document.getElementById("amount"),
+        iban: document.getElementById("iban"),
+        bic: document.getElementById("bic"),
+        paymentNote: document.getElementById("paymentNote")
+      };
+
+      const itemFields = {
+        name: document.getElementById("itemName"),
+        qty: document.getElementById("itemQty"),
+        price: document.getElementById("itemPrice")
+      };
+
+      const categoryInput = document.getElementById("categoryInput");
+      const categoryFilter = document.getElementById("filterCategory");
+      const aresStatus = document.getElementById("aresStatus");
+      const aresResults = document.getElementById("aresResults");
+      const aresLookupBtn = document.getElementById("aresLookupBtn");
+      const aresCache = new Map();
+
+      function loadData() {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) {
+          const data = JSON.parse(raw);
+          state.invoices = data.invoices || [];
+          state.invoiceCounter = data.invoiceCounter || 1;
+          state.draftNumber = data.draftNumber || "";
+          state.categories = data.categories || [];
+        }
+      }
+
+      function saveData() {
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({
+            invoices: state.invoices,
+            invoiceCounter: state.invoiceCounter,
+            draftNumber: state.draftNumber,
+            categories: state.categories
+          })
+        );
+      }
+
+      function money(value) {
+        return Number(value || 0).toFixed(2);
+      }
+
+      function renderItems() {
+        itemsTable.innerHTML = "";
+        if (!state.items.length) {
+          const row = document.createElement("tr");
+          const cell = document.createElement("td");
+          cell.colSpan = 4;
+          cell.className = "empty";
+          cell.textContent = "No items yet.";
+          row.appendChild(cell);
+          itemsTable.appendChild(row);
+          return;
+        }
+        state.items.forEach((item) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${item.name}</td>
+            <td>${item.qty}</td>
+            <td>${money(item.price)}</td>
+            <td>${money(item.total)}</td>
+          `;
+          itemsTable.appendChild(row);
+        });
+        const total = state.items.reduce((sum, item) => sum + item.total, 0);
+        fields.amount.value = money(total);
+      }
+
+      function normalizeCategory(value) {
+        return value.trim().replace(/\s+/g, " ");
+      }
+
+      function renderCategoryOptions() {
+        const value = fields.category.value;
+        fields.category.innerHTML = '<option value="">Uncategorized</option>';
+        state.categories.forEach((category) => {
+          const option = document.createElement("option");
+          option.value = category;
+          option.textContent = category;
+          fields.category.appendChild(option);
+        });
+        fields.category.value = value;
+      }
+
+      function renderCategoryFilter() {
+        const value = categoryFilter.value;
+        categoryFilter.innerHTML = '<option value="all">All categories</option>';
+        state.categories.forEach((category) => {
+          const option = document.createElement("option");
+          option.value = category;
+          option.textContent = category;
+          categoryFilter.appendChild(option);
+        });
+        categoryFilter.value = value;
+      }
+
+      function addCategory() {
+        const raw = normalizeCategory(categoryInput.value);
+        if (!raw) return;
+        const exists = state.categories.some((cat) => cat.toLowerCase() === raw.toLowerCase());
+        if (!exists) {
+          state.categories.push(raw);
+          state.categories.sort((a, b) => a.localeCompare(b));
+          saveData();
+          renderCategoryOptions();
+          renderCategoryFilter();
+        }
+        fields.category.value = raw;
+        categoryInput.value = "";
+      }
+
+      function formatInvoiceNumber(counter) {
+        const year = new Date().getFullYear();
+        const suffix = String(counter).padStart(3, "0");
+        return `INV-${year}-${suffix}`;
+      }
+
+      function getDraftInvoiceNumber() {
+        if (!state.draftNumber) {
+          state.draftNumber = formatInvoiceNumber(state.invoiceCounter);
+          saveData();
+        }
+        return state.draftNumber;
+      }
+
+      function addDays(date, days) {
+        const result = new Date(date);
+        result.setDate(result.getDate() + days);
+        return result;
+      }
+
+      function debounce(callback, wait = 400) {
+        let timeoutId;
+        return (...args) => {
+          window.clearTimeout(timeoutId);
+          timeoutId = window.setTimeout(() => callback(...args), wait);
+        };
+      }
+
+      function setAresStatus(message, isError = false) {
+        aresStatus.textContent = message;
+        aresStatus.style.color = isError ? "var(--danger)" : "var(--muted)";
+      }
+
+      function formatAresAddress(address) {
+        if (!address) return "";
+        if (address.textovaAdresa) return address.textovaAdresa;
+        const parts = [
+          address.ulice,
+          address.cisloDomovni,
+          address.cisloOrientacni ? `/${address.cisloOrientacni}` : ""
+        ]
+          .filter(Boolean)
+          .join(" ");
+        const city = address.nazevObce || address.obec || "";
+        const zip = address.psc || "";
+        return [parts.trim(), `${city} ${zip}`.trim()].filter(Boolean).join(", ");
+      }
+
+      function renderAresResults(results) {
+        aresResults.innerHTML = "";
+        if (!results.length) {
+          aresResults.hidden = true;
+          setAresStatus("No results found in ARES.");
+          return;
+        }
+        results.forEach((item) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "suggestion-item";
+          button.dataset.ico = item.ico || "";
+          button.innerHTML = `
+            <strong>${item.obchodniJmeno || item.nazev || "Unknown"}</strong><br />
+            <span class="invoice-meta">IČO ${item.ico || "n/a"} • ${
+            item.adresa || formatAresAddress(item.sidlo) || "No address"
+          }</span>
+          `;
+          aresResults.appendChild(button);
+        });
+        aresResults.hidden = false;
+      }
+
+      function getAresApiBase() {
+        const host = window.location.hostname;
+        const port = window.location.port;
+        if (window.location.protocol === "file:") {
+          return "http://localhost:5500";
+        }
+        if ((host === "localhost" || host === "127.0.0.1") && port && port !== "5500") {
+          return "http://localhost:5500";
+        }
+        return "";
+      }
+
+      async function searchAresByName(query) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/6ddf4ffa-f2d9-42ae-9315-d8b3c8b9efb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'invoicemaker.html:667',message:'ares search start',data:{queryLength:query.length,queryPreview:query.slice(0,32)},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+        // #endregion agent log
+        if (query.length < 3) {
+          aresResults.hidden = true;
+          setAresStatus("Start typing client name to search ARES.");
+          return;
+        }
+        setAresStatus("Searching ARES...");
+        try {
+          const baseUrl = getAresApiBase();
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/6ddf4ffa-f2d9-42ae-9315-d8b3c8b9efb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'invoicemaker.html:675',message:'ares api base',data:{baseUrl,origin:window.location.origin},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+          // #endregion agent log
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/6ddf4ffa-f2d9-42ae-9315-d8b3c8b9efb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'invoicemaker.html:675',message:'ares search fetch',data:{url:'/api/ares/search',hasQuery:!!query},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+          // #endregion agent log
+          const response = await fetch(`${baseUrl}/api/ares/search`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              obchodniJmeno: query,
+              pocet: 8,
+              strana: 1
+            })
+          });
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/6ddf4ffa-f2d9-42ae-9315-d8b3c8b9efb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'invoicemaker.html:686',message:'ares search response',data:{ok:response.ok,status:response.status,contentType:response.headers.get('content-type')},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+          // #endregion agent log
+          if (!response.ok) {
+            if (response.status === 405) {
+              setAresStatus(
+                "ARES proxy not running. Start node server (server.js) and open http://localhost:5500.",
+                true
+              );
+              return;
+            }
+            let message = `ARES search failed (HTTP ${response.status}).`;
+            try {
+              const errorData = await response.json();
+              if (errorData?.error) {
+                message = `ARES search failed: ${errorData.error}`;
+              }
+            } catch (_) {
+              // ignore parse errors and keep the default message
+            }
+            setAresStatus(message, true);
+            return;
+          }
+          const data = await response.json();
+          const resultsCandidate =
+            data.ekonomickeSubjekty ||
+            data.data?.ekonomickeSubjekty ||
+            data.data?.ekonomickeSubjekty?.ekonomickeSubjekty ||
+            data.ekonomickeSubjekty?.ekonomickySubjekt ||
+            data.data?.ekonomickeSubjekty?.ekonomickySubjekt ||
+            data.vysledky ||
+            [];
+          const results = Array.isArray(resultsCandidate)
+            ? resultsCandidate
+            : resultsCandidate?.ekonomickeSubjekty || [];
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/6ddf4ffa-f2d9-42ae-9315-d8b3c8b9efb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'invoicemaker.html:689',message:'ares search parsed',data:{resultsCount:Array.isArray(results)?results.length:-1,keys:Object.keys(data||{})},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H3'})}).catch(()=>{});
+          // #endregion agent log
+          renderAresResults(results);
+          if (results.length) {
+            setAresStatus("Select a company to fill client details.");
+          }
+        } catch (error) {
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/6ddf4ffa-f2d9-42ae-9315-d8b3c8b9efb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'invoicemaker.html:698',message:'ares search error',data:{name:error?.name,message:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H4'})}).catch(()=>{});
+          // #endregion agent log
+          aresResults.hidden = true;
+          setAresStatus(
+            "ARES search failed. If this keeps happening, it may be blocked by CORS.",
+            true
+          );
+        }
+      }
+
+      async function lookupAresByIco(ico) {
+        const normalized = ico.trim();
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/6ddf4ffa-f2d9-42ae-9315-d8b3c8b9efb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'invoicemaker.html:708',message:'ares ico start',data:{icoLength:normalized.length,icoPreview:normalized.slice(0,10)},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+        // #endregion agent log
+        if (!/^\d{6,10}$/.test(normalized)) {
+          setAresStatus("Enter a valid IČO before lookup.", true);
+          return;
+        }
+        if (aresCache.has(normalized)) {
+          applyAresEntity(aresCache.get(normalized));
+          return;
+        }
+        setAresStatus("Loading data from ARES...");
+        try {
+          const baseUrl = getAresApiBase();
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/6ddf4ffa-f2d9-42ae-9315-d8b3c8b9efb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'invoicemaker.html:719',message:'ares ico fetch',data:{url:`/api/ares/ico?ico=${encodeURIComponent(normalized)}`},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+          // #endregion agent log
+          const response = await fetch(
+            `${baseUrl}/api/ares/ico?ico=${encodeURIComponent(normalized)}`
+          );
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/6ddf4ffa-f2d9-42ae-9315-d8b3c8b9efb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'invoicemaker.html:721',message:'ares ico response',data:{ok:response.ok,status:response.status,contentType:response.headers.get('content-type')},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+          // #endregion agent log
+          if (!response.ok) {
+            if (response.status === 405) {
+              setAresStatus(
+                "ARES proxy not running. Start node server (server.js) and open http://localhost:5500.",
+                true
+              );
+              return;
+            }
+            let message = `ARES lookup failed (HTTP ${response.status}).`;
+            try {
+              const errorData = await response.json();
+              if (errorData?.error) {
+                message = `ARES lookup failed: ${errorData.error}`;
+              }
+            } catch (_) {
+              // ignore parse errors and keep the default message
+            }
+            setAresStatus(message, true);
+            return;
+          }
+          const data = await response.json();
+          const entity = data.ekonomickySubjekt || data;
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/6ddf4ffa-f2d9-42ae-9315-d8b3c8b9efb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'invoicemaker.html:724',message:'ares ico parsed',data:{hasEntity:!!entity,keys:Object.keys(data||{})},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H3'})}).catch(()=>{});
+          // #endregion agent log
+          aresCache.set(normalized, entity);
+          applyAresEntity(entity);
+        } catch (error) {
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/6ddf4ffa-f2d9-42ae-9315-d8b3c8b9efb8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'invoicemaker.html:728',message:'ares ico error',data:{name:error?.name,message:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H4'})}).catch(()=>{});
+          // #endregion agent log
+          setAresStatus("ARES lookup failed. You can still fill data manually.", true);
+        }
+      }
+
+      function applyAresEntity(entity) {
+        const name = entity.obchodniJmeno || entity.nazev || "";
+        const address = formatAresAddress(entity.sidlo);
+        const city = entity.sidlo?.nazevObce || entity.sidlo?.obec || "";
+        fields.clientName.value = name || fields.clientName.value;
+        fields.clientAddress.value = address || fields.clientAddress.value;
+        fields.clientIco.value = entity.ico || fields.clientIco.value;
+        fields.clientArea.value = city || fields.clientArea.value;
+        if (entity.dic) {
+          fields.clientVat.value = entity.dic;
+        }
+        setAresStatus("ARES data filled. You can edit it if needed.");
+        aresResults.hidden = true;
+      }
+
+      function addItem() {
+        const name = itemFields.name.value.trim();
+        const qty = Number(itemFields.qty.value || 0);
+        const price = Number(itemFields.price.value || 0);
+        if (!name || qty <= 0) return;
+        state.items.push({ name, qty, price, total: qty * price });
+        itemFields.name.value = "";
+        itemFields.qty.value = 1;
+        itemFields.price.value = 0;
+        renderItems();
+      }
+
+      function clearItems() {
+        state.items = [];
+        renderItems();
+      }
+
+      function getStatusClass(status) {
+        if (status === "paid") return "pill paid";
+        if (status === "overdue") return "pill overdue";
+        return "pill";
+      }
+
+      function renderInvoices() {
+        invoiceList.innerHTML = "";
+        const query = searchText.value.trim().toLowerCase();
+        const statusFilter = filterStatus.value;
+        const categoryFilterValue = categoryFilter.value;
+        const filtered = state.invoices.filter((inv) => {
+          const matchQuery =
+            !query ||
+            inv.invoiceNumber.toLowerCase().includes(query) ||
+            inv.client.name.toLowerCase().includes(query) ||
+            (inv.client.area || "").toLowerCase().includes(query);
+          const matchStatus = statusFilter === "all" || inv.status === statusFilter;
+          const matchCategory =
+            categoryFilterValue === "all" || (inv.category || "") === categoryFilterValue;
+          return matchQuery && matchStatus && matchCategory;
+        });
+        if (!filtered.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = "No invoices found.";
+          invoiceList.appendChild(empty);
+          return;
+        }
+        filtered.forEach((inv) => {
+          const item = document.createElement("div");
+          item.className = "invoice-item";
+          item.innerHTML = `
+            <header>
+              <strong>${inv.invoiceNumber}</strong>
+              <span class="${getStatusClass(inv.status)}">${inv.status}</span>
+            </header>
+            <div>${inv.client.name}</div>
+            <div class="invoice-meta">${inv.client.area || "No area"} • ${inv.category || "Uncategorized"}</div>
+            <div class="invoice-meta">Due ${inv.dueDate || "n/a"}</div>
+            <div class="invoice-meta">${inv.currency} ${money(inv.amount)}</div>
+            <div class="actions">
+              <button type="button" class="secondary" data-action="select" data-id="${inv.id}">Open</button>
+              <button type="button" class="secondary" data-action="qr" data-id="${inv.id}">QR</button>
+              <button type="button" class="danger" data-action="delete" data-id="${inv.id}">Delete</button>
+            </div>
+          `;
+          invoiceList.appendChild(item);
+        });
+      }
+
+      function fillForm(inv) {
+        fields.invoiceNumber.value = inv.invoiceNumber;
+        fields.issueDate.value = inv.issueDate;
+        fields.dueDate.value = inv.dueDate || "";
+        fields.status.value = inv.status;
+        fields.category.value = inv.category || "";
+        fields.clientName.value = inv.client.name;
+        fields.clientEmail.value = inv.client.email || "";
+        fields.clientArea.value = inv.client.area || "";
+        fields.clientIco.value = inv.client.ico || "";
+        fields.clientVat.value = inv.client.vat || "";
+        fields.clientAddress.value = inv.client.address || "";
+        fields.currency.value = inv.currency;
+        fields.amount.value = money(inv.amount);
+        fields.iban.value = inv.payment.iban || "";
+        fields.bic.value = inv.payment.bic || "";
+        fields.paymentNote.value = inv.payment.note || "";
+        state.items = inv.items || [];
+        renderItems();
+      }
+
+      function resetForm() {
+        form.reset();
+        state.items = [];
+        fields.amount.value = "0.00";
+        const today = new Date();
+        fields.issueDate.valueAsDate = today;
+        fields.dueDate.valueAsDate = addDays(today, 7);
+        fields.invoiceNumber.value = getDraftInvoiceNumber();
+        state.selectedId = null;
+        aresResults.hidden = true;
+        setAresStatus("Start typing client name to search ARES.");
+        renderItems();
+      }
+
+      function collectForm() {
+        return {
+          id: state.selectedId || crypto.randomUUID(),
+          invoiceNumber: fields.invoiceNumber.value.trim(),
+          issueDate: fields.issueDate.value,
+          dueDate: fields.dueDate.value,
+          status: fields.status.value,
+          category: fields.category.value || "",
+          client: {
+            name: fields.clientName.value.trim(),
+            email: fields.clientEmail.value.trim(),
+            area: fields.clientArea.value.trim(),
+            ico: fields.clientIco.value.trim(),
+            vat: fields.clientVat.value.trim(),
+            address: fields.clientAddress.value.trim()
+          },
+          items: state.items,
+          currency: fields.currency.value,
+          amount: Number(fields.amount.value || 0),
+          payment: {
+            iban: fields.iban.value.trim(),
+            bic: fields.bic.value.trim(),
+            note: fields.paymentNote.value.trim()
+          }
+        };
+      }
+
+      function saveInvoice(event) {
+        event.preventDefault();
+        if (!fields.invoiceNumber.value.trim() || !fields.clientName.value.trim()) return;
+        const inv = collectForm();
+        if (inv.category) {
+          const exists = state.categories.some(
+            (cat) => cat.toLowerCase() === inv.category.toLowerCase()
+          );
+          if (!exists) {
+            state.categories.push(inv.category);
+            state.categories.sort((a, b) => a.localeCompare(b));
+          }
+        }
+        const existingIndex = state.invoices.findIndex((item) => item.id === inv.id);
+        if (existingIndex >= 0) {
+          state.invoices[existingIndex] = inv;
+        } else {
+          if (!inv.invoiceNumber) {
+            inv.invoiceNumber = getDraftInvoiceNumber();
+          }
+          state.invoices.unshift(inv);
+          state.invoiceCounter += 1;
+          state.draftNumber = "";
+        }
+        state.selectedId = inv.id;
+        saveData();
+        renderCategoryOptions();
+        renderCategoryFilter();
+        renderInvoices();
+        buildQr(inv);
+      }
+
+      function deleteInvoice(id) {
+        state.invoices = state.invoices.filter((inv) => inv.id !== id);
+        if (state.selectedId === id) {
+          state.selectedId = null;
+          qrEl.innerHTML = '<span class="empty">Select an invoice to generate QR</span>';
+          qrTextEl.value = "";
+        }
+        saveData();
+        renderInvoices();
+      }
+
+      function buildEpcQr(inv) {
+        const name = inv.client.name || "CLIENT";
+        const amount = inv.amount ? `${inv.currency}${money(inv.amount)}` : "";
+        const note = inv.payment.note || inv.invoiceNumber || "";
+        return [
+          "BCD",
+          "001",
+          "1",
+          "SCT",
+          inv.payment.bic || "",
+          name,
+          inv.payment.iban || "",
+          amount,
+          "",
+          "",
+          note
+        ].join("\n");
+      }
+
+      function buildQr(inv) {
+        qrEl.innerHTML = "";
+        const payload = buildEpcQr(inv);
+        qrTextEl.value = payload;
+        new QRCode(qrEl, {
+          text: payload,
+          width: 180,
+          height: 180
+        });
+      }
+
+      function markPaid() {
+        if (!state.selectedId) return;
+        const idx = state.invoices.findIndex((inv) => inv.id === state.selectedId);
+        if (idx === -1) return;
+        state.invoices[idx].status = "paid";
+        fields.status.value = "paid";
+        saveData();
+        renderInvoices();
+      }
+
+      function exportJson() {
+        const data = JSON.stringify({ invoices: state.invoices }, null, 2);
+        const blob = new Blob([data], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "invoices.json";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function clearAll() {
+        if (!confirm("Delete all invoices?")) return;
+        state.invoices = [];
+        state.items = [];
+        state.selectedId = null;
+        saveData();
+        renderInvoices();
+        resetForm();
+        qrEl.innerHTML = '<span class="empty">Select an invoice to generate QR</span>';
+        qrTextEl.value = "";
+      }
+
+      invoiceList.addEventListener("click", (event) => {
+        const button = event.target.closest("button");
+        if (!button) return;
+        const id = button.dataset.id;
+        const action = button.dataset.action;
+        const inv = state.invoices.find((item) => item.id === id);
+        if (!inv) return;
+        if (action === "select") {
+          state.selectedId = id;
+          fillForm(inv);
+        }
+        if (action === "qr") {
+          state.selectedId = id;
+          fillForm(inv);
+          buildQr(inv);
+        }
+        if (action === "delete") {
+          deleteInvoice(id);
+        }
+      });
+
+      document.getElementById("addItemBtn").addEventListener("click", addItem);
+      document.getElementById("clearItemsBtn").addEventListener("click", clearItems);
+      document.getElementById("newInvoiceBtn").addEventListener("click", resetForm);
+      document.getElementById("exportBtn").addEventListener("click", exportJson);
+      document.getElementById("clearBtn").addEventListener("click", clearAll);
+      document.getElementById("markPaidBtn").addEventListener("click", markPaid);
+      document.getElementById("addCategoryBtn").addEventListener("click", addCategory);
+      form.addEventListener("submit", saveInvoice);
+      searchText.addEventListener("input", renderInvoices);
+      filterStatus.addEventListener("change", renderInvoices);
+      categoryFilter.addEventListener("change", renderInvoices);
+      aresLookupBtn.addEventListener("click", () => lookupAresByIco(fields.clientIco.value));
+      aresResults.addEventListener("click", (event) => {
+        const button = event.target.closest("button");
+        if (!button) return;
+        const ico = button.dataset.ico;
+        if (ico) lookupAresByIco(ico);
+      });
+      const debouncedAresSearch = debounce(() =>
+        searchAresByName(fields.clientName.value.trim())
+      );
+      fields.clientName.addEventListener("input", debouncedAresSearch);
+      categoryInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          addCategory();
+        }
+      });
+
+      loadData();
+      renderCategoryOptions();
+      renderCategoryFilter();
+      resetForm();
+      renderInvoices();
+    </script>
+  </body>
+</html>
+
