@@ -4,4 +4,5 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 RUN npm run build
+RUN ls -la dist/ || echo "No dist in root" && ls -la invoice-react/dist/ || echo "No dist in invoice-react"
 CMD ["node", "server.js"]

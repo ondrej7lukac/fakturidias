@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "npm install --prefix invoice-react && npm run build --prefix invoice-react",
+    "build": "echo 'Building invoice-react...' && npm install --prefix invoice-react && npm run build --prefix invoice-react && echo 'Build complete, checking dist...' && ls -la dist/ || echo 'dist folder not found in root' && ls -la invoice-react/dist/ || echo 'dist folder not found in invoice-react'",
     "start": "node server.js"
   },
   "dependencies": {
