@@ -103,6 +103,9 @@ export default function InvoiceForm({
     const [itemSuggestions, setItemSuggestions] = useState([])
     const [customerSuggestions, setCustomerSuggestions] = useState([])
     const [saveTimer, setSaveTimer] = useState(null)
+    const [aresConfirmResults, setAresConfirmResults] = useState<any[]>([])
+    const [pendingAiFill, setPendingAiFill] = useState<any>(null)
+    const pendingPreviewModeRef = useRef(false)
 
     // ─── Effect 1: Load invoice data when selected invoice changes ────────────
     // ONLY this effect may call setItems — prevents items being wiped by unrelated state changes
@@ -833,22 +836,7 @@ export default function InvoiceForm({
 
     const togglePreview = () => setPreviewMode(!previewMode)
 
-    const handleAIFill = (data: any) => {
-        setFormData(prev => ({
-            ...prev,
-            clientName: data.clientName || prev.clientName,
-            clientEmail: data.clientEmail || prev.clientEmail,
-            clientPhone: data.clientPhone || prev.clientPhone,
-            clientAddress: data.clientAddress || prev.clientAddress,
-            clientIco: data.clientIco || prev.clientIco,
-            clientVat: data.clientVat || prev.clientVat,
-            clientArea: data.clientArea || prev.clientArea,
-            currency: data.currency || prev.currency,
-            dueDate: data.dueDate || prev.dueDate,
-            issueDate: data.issueDate || prev.issueDate,
-            variableSymbol: data.variableSymbol || prev.variableSymbol,
-            paymentNote: data.paymentNote || prev.paymentNote,
-        }))
+    const applyAIItems = (data: any) => {
         if (Array.isArray(data.items) && data.items.length > 0) {
             const vatPayer = formData.isVatPayer
             const newItems = data.items.map((item: any) => {
@@ -873,14 +861,124 @@ export default function InvoiceForm({
         }
     }
 
+    const applyAIClientData = (data: any) => {
+        setFormData(prev => ({
+            ...prev,
+            clientName: data.clientName || prev.clientName,
+            clientEmail: data.clientEmail || prev.clientEmail,
+            clientPhone: data.clientPhone || prev.clientPhone,
+            clientAddress: data.clientAddress || prev.clientAddress,
+            clientIco: data.clientIco || prev.clientIco,
+            clientVat: data.clientVat || prev.clientVat,
+            clientArea: data.clientArea || prev.clientArea,
+        }))
+        setAresConfirmResults([])
+        setPendingAiFill(null)
+        if (pendingPreviewModeRef.current) {
+            setPreviewMode(true)
+            pendingPreviewModeRef.current = false
+        }
+    }
+
+    const handleSelectAresForAI = (entity: any) => {
+        const parsed = parseAresItem(entity)
+        setFormData(prev => ({
+            ...prev,
+            clientName: parsed.name || pendingAiFill?.clientName || prev.clientName,
+            clientAddress: parsed.address || pendingAiFill?.clientAddress || prev.clientAddress,
+            clientIco: parsed.ico || pendingAiFill?.clientIco || prev.clientIco,
+            clientArea: parsed.city || pendingAiFill?.clientArea || prev.clientArea,
+            clientVat: parsed.vat || pendingAiFill?.clientVat || prev.clientVat,
+            clientEmail: pendingAiFill?.clientEmail || prev.clientEmail,
+            clientPhone: pendingAiFill?.clientPhone || prev.clientPhone,
+        }))
+        setAresConfirmResults([])
+        setPendingAiFill(null)
+        if (pendingPreviewModeRef.current) {
+            setPreviewMode(true)
+            pendingPreviewModeRef.current = false
+        }
+    }
+
+    const handleAIFill = async (data: any) => {
+        setFormData(prev => ({
+            ...prev,
+            currency: data.currency || prev.currency,
+            dueDate: data.dueDate || prev.dueDate,
+            issueDate: data.issueDate || prev.issueDate,
+            variableSymbol: data.variableSymbol || prev.variableSymbol,
+            paymentNote: data.paymentNote || prev.paymentNote,
+        }))
+        applyAIItems(data)
+
+        if (data.clientName) {
+            setPendingAiFill(data)
+            try {
+                const results = await searchAres(data.clientName)
+                if (results.length > 0) {
+                    setAresConfirmResults(results)
+                    return
+                }
+            } catch { /* fall through to direct apply */ }
+        }
+        applyAIClientData(data)
+    }
+
     const handleAIPreview = (data: any) => {
+        pendingPreviewModeRef.current = true
         handleAIFill(data)
-        setPreviewMode(true)
     }
 
     return (
         <>
         <AIPrompt lang={lang} onFillForm={handleAIFill} onPreviewInvoice={handleAIPreview} />
+
+        {aresConfirmResults.length > 0 && (
+            <div className="card" style={{ marginBottom: '1rem' }}>
+                <div style={{ fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>{lang === 'cs' ? 'Vyberte firmu z ARES' : 'Select company from ARES'}</span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--muted)', fontWeight: 400 }}>
+                        {lang === 'cs' ? `– nalezeno pro "${pendingAiFill?.clientName}"` : `– found for "${pendingAiFill?.clientName}"`}
+                    </span>
+                </div>
+                <div style={{ display: 'grid', gap: '8px', marginBottom: '12px' }}>
+                    {aresConfirmResults.map((entity, i) => {
+                        const parsed = parseAresItem(entity)
+                        return (
+                            <button
+                                key={i}
+                                type="button"
+                                onClick={() => handleSelectAresForAI(entity)}
+                                style={{
+                                    textAlign: 'left',
+                                    padding: '12px',
+                                    borderRadius: '12px',
+                                    background: 'rgba(255,255,255,0.05)',
+                                    border: '1px solid var(--border)',
+                                    cursor: 'pointer',
+                                    width: '100%',
+                                }}
+                            >
+                                <div style={{ fontWeight: 600 }}>{parsed.name}</div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+                                    {parsed.ico && `IČO: ${parsed.ico}`}
+                                    {parsed.address && ` • ${parsed.address}`}
+                                </div>
+                            </button>
+                        )
+                    })}
+                </div>
+                <button
+                    type="button"
+                    className="secondary"
+                    style={{ fontSize: '0.85rem' }}
+                    onClick={() => applyAIClientData(pendingAiFill)}
+                >
+                    {lang === 'cs' ? 'Použít data z AI bez ověření' : 'Use AI data without verification'}
+                </button>
+            </div>
+        )}
+
         <section className="card" style={{ position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h2 style={{ margin: 0 }}>{t.createEditInvoice}</h2>
