@@ -3,14 +3,14 @@ import { Sparkles, Mic, MicOff, X, ICON_MD, ICON_LG, ICON_SM, STROKE } from '@/l
 
 const SAMPLES = {
     cs: [
-        '12 hodin práce pro Acme Studio za 1500 Kč',
-        'Konzultace UX, 3 hodiny, 2000 Kč/h, klient Tektonic',
-        'Měsíční paušál 30000 Kč, Pražský Sklep, splatnost 14 dní',
+        'Faktura pro Novák s.r.o. za 3 hodiny konzultace po 2000 Kč, 21% DPH, splatnost 14 dní',
+        'Webdesign pro e-shop, paušál 25 000 Kč, klient Jan Dvořák, splatnost konec měsíce',
+        '5 hodin programování, 1500 Kč/h, bez DPH',
     ],
     en: [
-        '12 hours of work for Acme Studio at 1500 CZK',
-        'UX consulting, 3 hours, 2000 CZK/h, client Tektonic',
-        'Monthly retainer 30000 CZK, Pražský Sklep, due in 14 days',
+        'Invoice Acme Studio for 3h UX consulting at 2000 CZK, 21% VAT, due in 14 days',
+        'Monthly retainer for social media management, 15000 CZK, client John Smith',
+        '5 hours of development work at 1500 CZK/h, no VAT',
     ],
 }
 

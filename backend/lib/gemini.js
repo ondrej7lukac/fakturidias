@@ -6,42 +6,57 @@ function buildSystemPrompt(lang = 'en') {
     const today = new Date().toISOString().split('T')[0];
     const outputLang = lang === 'cs' ? 'Czech' : 'English';
     return `You are an invoice data extractor for a Czech/Slovak invoice application.
-Extract invoice information from the user's natural language description and return ONLY a valid JSON object.
+Extract invoice information from the user's natural language description.
 
 Today's date is ${today}. Use this when computing relative dates like "due in 14 days" or "due end of month".
 
-Return exactly this JSON structure (use null for unknown fields, never omit keys):
-{
-  "supplierName": "issuer/supplier company name if explicitly mentioned in the prompt, or null",
-  "supplierIco": "issuer/supplier IČO if explicitly mentioned, or null",
-  "clientName": "client/recipient company or person name",
-  "clientEmail": "email address or null",
-  "clientPhone": "phone number or null",
-  "clientAddress": "full street address or null",
-  "clientIco": "IČO/ICO company registration number or null",
-  "clientVat": "VAT/DIČ tax ID or null",
-  "clientArea": "city or region or null",
-  "clientCountry": "CZ or SK — default CZ",
-  "currency": "CZK or EUR — default CZK",
-  "issueDate": "${today}",
-  "dueDate": "YYYY-MM-DD",
-  "variableSymbol": "numeric payment variable symbol or null",
-  "paymentNote": "payment note or null",
-  "items": [
-    { "name": "item description", "qty": 1, "price": 0, "taxRate": 0 }
-  ]
-}
-
 Rules:
-- supplierName / supplierIco: only set if the prompt explicitly names the issuing company (e.g. "from ABC s.r.o." or "Invoice by XYZ"); otherwise null
-- clientCountry: CZ for Czech clients, SK for Slovak clients, default CZ
-- currency: CZK unless EUR is explicitly mentioned
+- supplierName / supplierIco: only set if the prompt explicitly names the issuing company (e.g. "from ABC s.r.o." or "Invoice by XYZ"); otherwise return empty string
+- clientCountry: "CZ" for Czech clients, "SK" for Slovak clients, default "CZ"
+- currency: "CZK" unless EUR is explicitly mentioned
 - prices are plain numbers, no currency symbols
 - qty is a plain number
 - taxRate per item: 0 if VAT not mentioned, otherwise 21 (CZ standard rate)
 - dueDate: calculate from today (${today}) — "due in 14 days" → add 14 days; default to 14 days if not mentioned
-- Return ONLY the JSON object, no markdown, no code fences, no explanation
-- Text field values (item names, paymentNote) in ${outputLang}. Structured fields stay in their natural format.`;
+- Text field values (item names, paymentNote) must be in ${outputLang}`;
+}
+
+function buildResponseSchema() {
+    return {
+        type: 'object',
+        properties: {
+            supplierName: { type: 'string', description: 'Issuer company name if explicitly mentioned, else empty string' },
+            supplierIco: { type: 'string', description: 'Issuer IČO if explicitly mentioned, else empty string' },
+            clientName: { type: 'string', description: 'Client or recipient company/person name' },
+            clientEmail: { type: 'string', description: 'Client email address, empty string if unknown' },
+            clientPhone: { type: 'string', description: 'Client phone number, empty string if unknown' },
+            clientAddress: { type: 'string', description: 'Full client street address, empty string if unknown' },
+            clientIco: { type: 'string', description: 'Client IČO/ICO registration number, empty string if unknown' },
+            clientVat: { type: 'string', description: 'Client VAT/DIČ tax ID, empty string if unknown' },
+            clientArea: { type: 'string', description: 'Client city or region, empty string if unknown' },
+            clientCountry: { type: 'string', enum: ['CZ', 'SK', 'DE', 'AT', 'PL', 'OTHER'], description: 'Client country code, default CZ' },
+            currency: { type: 'string', enum: ['CZK', 'EUR', 'USD'], description: 'Invoice currency, default CZK' },
+            issueDate: { type: 'string', description: 'Issue date in YYYY-MM-DD format' },
+            dueDate: { type: 'string', description: 'Due date in YYYY-MM-DD format, default 14 days from today' },
+            variableSymbol: { type: 'string', description: 'Numeric payment variable symbol, empty string if unknown' },
+            paymentNote: { type: 'string', description: 'Payment note or memo, empty string if none' },
+            items: {
+                type: 'array',
+                description: 'Invoice line items',
+                items: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string', description: 'Item description' },
+                        qty: { type: 'number', description: 'Quantity' },
+                        price: { type: 'number', description: 'Unit price, plain number without currency symbol' },
+                        taxRate: { type: 'number', description: 'VAT rate: 0 if not mentioned, otherwise 21' }
+                    },
+                    required: ['name', 'qty', 'price', 'taxRate']
+                }
+            }
+        },
+        required: ['clientName', 'clientCountry', 'currency', 'issueDate', 'dueDate', 'items']
+    };
 }
 
 function callGeminiApi(prompt, lang = 'en') {
@@ -51,14 +66,17 @@ function callGeminiApi(prompt, lang = 'en') {
     if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
 
     const payload = JSON.stringify({
+        system_instruction: { parts: [{ text: buildSystemPrompt(lang) }] },
         contents: [{
             role: 'user',
-            parts: [
-                { text: buildSystemPrompt(lang) },
-                { text: `Invoice description: ${prompt}` }
-            ]
+            parts: [{ text: `Invoice description: ${prompt}` }]
         }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 1024 }
+        generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 1024,
+            responseMimeType: 'application/json',
+            responseSchema: buildResponseSchema()
+        }
     });
 
     return new Promise((resolve, reject) => {
@@ -81,9 +99,7 @@ function callGeminiApi(prompt, lang = 'en') {
                     if (parsed.error) return reject(new Error(parsed.error.message || 'Gemini API error'));
                     const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (!text) return reject(new Error('Empty response from Gemini API'));
-                    const match = text.match(/\{[\s\S]*\}/);
-                    if (!match) return reject(new Error('No JSON found in Gemini API response'));
-                    resolve(JSON.parse(match[0]));
+                    resolve(JSON.parse(text));
                 } catch (err) {
                     reject(new Error('Failed to parse Gemini API response: ' + err.message));
                 }
