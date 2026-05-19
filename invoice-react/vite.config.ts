@@ -169,6 +169,7 @@ function makeAresRequest(options, body = null) {
 
 export default defineConfig({
     plugins: [react(), tailwindcss(), aresProxyPlugin()],
+    envDir: '../',  // read VITE_* vars from root .env alongside backend vars
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src')

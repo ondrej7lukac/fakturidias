@@ -117,10 +117,8 @@ export default function Header({
 
           {/* User avatar with dropdown */}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className={`ap-avatar${user ? ' ap-avatar--active' : ''}`} aria-label="User menu">
-                {user ? user.email[0].toUpperCase() : 'G'}
-              </button>
+            <DropdownMenuTrigger className={`ap-avatar${user ? ' ap-avatar--active' : ''}`} aria-label="User menu">
+              {user ? user.email[0].toUpperCase() : 'G'}
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" sideOffset={8} className="user-dropdown">

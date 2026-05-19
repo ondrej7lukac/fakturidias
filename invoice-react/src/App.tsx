@@ -4,6 +4,7 @@ import InvoiceForm from './components/InvoiceForm'
 import InvoiceList from './components/InvoiceList'
 import Settings from './components/Settings'
 import WelcomeScreen from './components/WelcomeScreen'
+import CookieBanner from './components/CookieBanner'
 import { getNextInvoiceCounter, loadApiData, loadLocalData, saveApiInvoice, saveLocalInvoice, deleteApiInvoice, deleteLocalInvoice } from './utils/storage'
 import { generateInvoicePDF } from './utils/pdf'
 import { getCzechQrPayload } from './utils/bank'
@@ -351,6 +352,7 @@ function App() {
 
     return (
         <>
+            <CookieBanner lang={lang} />
             <Header
                 onNewInvoice={handleNewInvoice}
                 lang={lang}

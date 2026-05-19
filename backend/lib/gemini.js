@@ -38,29 +38,32 @@ Today's date is ${today}. Use this when computing relative dates like "due in 14
 Return exactly this JSON structure (use null for unknown fields, never omit keys):
 {
   "clientName": "company or person name",
-  "clientEmail": "email address",
-  "clientPhone": "phone number",
-  "clientAddress": "full street address",
-  "clientIco": "IČO company registration number",
-  "clientVat": "VAT/DIČ tax ID",
-  "clientArea": "city or region",
-  "currency": "CZK",
-  "dueDate": "YYYY-MM-DD",
+  "clientEmail": "email address or null",
+  "clientPhone": "phone number or null",
+  "clientAddress": "full street address or null",
+  "clientIco": "IČO/ICO company registration number or null",
+  "clientVat": "VAT/DIČ tax ID or null",
+  "clientArea": "city or region or null",
+  "clientCountry": "CZ or SK — default CZ",
+  "currency": "CZK or EUR — default CZK",
   "issueDate": "${today}",
-  "variableSymbol": "numeric payment variable symbol",
-  "paymentNote": "any payment notes",
+  "dueDate": "YYYY-MM-DD",
+  "variableSymbol": "numeric payment variable symbol or null",
+  "paymentNote": "payment note or null",
   "items": [
-    { "name": "item description", "qty": 1, "price": 0 }
+    { "name": "item description", "qty": 1, "price": 0, "taxRate": 0 }
   ]
 }
 
 Rules:
-- Default currency to CZK if not mentioned
-- prices are plain numbers without currency symbols
+- clientCountry: CZ for Czech clients, SK for Slovak clients, default CZ
+- currency: CZK unless EUR is explicitly mentioned
+- prices are plain numbers, no currency symbols
 - qty is a plain number
-- For dueDate: calculate from today (${today}) — e.g. "due in 14 days" = add 14 days
+- taxRate per item: 0 if VAT not mentioned, otherwise 21 (CZ standard rate)
+- dueDate: calculate from today (${today}) — "due in 14 days" → add 14 days; default to 14 days if not mentioned
 - Return ONLY the JSON object, no markdown, no code fences, no explanation
-- IMPORTANT: The user may write in any language. Always return text field values (item names, paymentNote) in ${outputLang}. Structured fields (dates, currency, email, phone, address, IČO, VAT numbers) stay in their natural format.`;
+- Text field values (item names, paymentNote) in ${outputLang}. Structured fields stay in their natural format.`;
 }
 
 async function callGemini(prompt, lang = 'en') {
@@ -124,7 +127,6 @@ async function handleGeminiInvoice(req, res, body) {
     }
     try {
         const data = await callGemini(prompt.trim(), lang || 'en');
-        await enrichWithAres(data);
         return sendJson(res, 200, { success: true, data });
     } catch (err) {
         return sendJson(res, 500, { error: 'AI processing failed' });

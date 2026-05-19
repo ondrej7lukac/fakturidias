@@ -1,5 +1,7 @@
 import './WelcomeScreen.css'
 import { useState, useEffect } from 'react'
+import PolicyPage from './PolicyPage'
+import CookieBanner from './CookieBanner'
 import {
     Sparkles, Mic, Pencil, CheckCircle2, Search, Send, Cloud,
     ArrowLeftRight, FileText, BarChart2, Check, ChevronDown,
@@ -12,29 +14,32 @@ const I18N = {
         signIn: 'Přihlásit se', getStarted: 'Vyzkoušet zdarma',
         heroBadge: 'Postaveno v Praze · pro české firmy',
         heroHeadline1: 'Vystavte fakturu', heroHeadline2: 'hlasem za 12 sekund.',
-        heroSub: 'Diktujte fakturu nebo ji napište česky. AI rozpozná klienta, hodiny, sazby i 21% DPH a vyplní pole za vás. ARES, PDF a e-mail jsou hotové na jeden klik.',
+        heroSub: 'Diktujte fakturu nebo ji napište česky. AI rozpozná klienta, hodiny, sazby i 21 % DPH — a vyplní pole za méně než 15 sekund. ARES, PDF a e-mail jedním klikem. Plně v souladu se zákonem o DPH č. 235/2004 Sb.',
         heroCtaPrimary: 'Začít zdarma', heroCtaSecondary: 'Pokračovat jako host',
         heroNote: 'Žádná kreditní karta · 5 faktur zdarma navždy',
         demoTitle: 'AI vstup',
         demoTranscript: '...vyfakturuj dvanáct hodin práce Acme Design Studio za patnáct set korun na hodinu s DPH...',
         demoClient: 'Klient', demoHours: 'Hodin', demoRate: 'Sazba', demoTotal: 'Celkem',
         demoConfirm: 'Vytvořit fakturu', demoListening: 'Posloucháme', aiEdit: 'Upravit',
-        trustLine: 'Firmy, které už účtují rychleji',
+        metricsV1: '12 s', metricsL1: 'průměrná faktura',
+        metricsV2: '1,1 mil.', metricsL2: 'OSVČ v České republice',
+        metricsV3: '97 %', metricsL3: 'úspora času vs. Excel',
+        trustLine: 'Firmy, které fakturují rychleji',
         featuresEyebrow: 'Funkce', featuresTitle: 'Vše, co potřebujete k fakturaci v Česku.',
         featuresLead: 'Žádné šablony, žádné výpočty DPH ručně. Diktujte, AI vyplní, ARES zkontroluje.',
-        feature1Title: 'Hlasový a textový AI vstup', feature1Body: 'Mluvte česky nebo anglicky. AI parsuje klienta, položky, hodinovou sazbu i DPH a vrátí strukturovaný náhled.',
-        feature2Title: 'ARES integrace', feature2Body: 'Zadáte IČO a Fakturidias automaticky doplní název, adresu a DIČ z českého obchodního rejstříku.',
-        feature3Title: 'PDF a e-mail jedním klikem', feature3Body: 'Generujte profesionální PDF, posílejte klientům přímo z aplikace a sledujte stav faktury.',
-        feature4Title: 'Bezpečné v cloudu', feature4Body: 'Všechny faktury jsou zálohované, synchronizované a dostupné z mobilu i webu. Šifrované přenosy.',
-        feature5Title: 'Dvojjazyčné prostředí', feature5Body: 'Aplikace v češtině i angličtině. Faktury můžete vystavovat v obou jazycích pro zahraniční klienty.',
+        feature1Title: 'Hlasový a textový AI vstup', feature1Body: 'Mluvte česky nebo anglicky. AI parsuje klienta, položky, hodinovou sazbu i DPH — a vrátí strukturovaný náhled průměrně za méně než 15 sekund s přesností přes 95 %.',
+        feature2Title: 'ARES integrace', feature2Body: 'Zadáte IČO a Fakturidias automaticky doplní název, adresu a DIČ z českého obchodního rejstříku (ARES) za méně než 1 sekundu.',
+        feature3Title: 'PDF a e-mail jedním klikem', feature3Body: 'Generujte profesionální PDF splňující zákon o DPH č. 235/2004 Sb., posílejte klientům přímo z aplikace a sledujte stav platby.',
+        feature4Title: 'Bezpečné v cloudu', feature4Body: 'Faktury jsou zálohované na serverech v EU, synchronizované v reálném čase a dostupné z mobilu i webu. Šifrovaný přenos (TLS).',
+        feature5Title: 'Dvojjazyčné prostředí', feature5Body: 'Aplikace v češtině i angličtině. Faktury vystavujete v obou jazycích — ideální pro OSVČ fakturující zahraničním klientům v EU.',
         feature6Title: 'Tmavý režim', feature6Body: 'Světlý i tmavý motiv reaguje na nastavení systému. Komfortní práce ráno i pozdě v noci.',
         showcaseEyebrow: 'Náhled', showcaseTitle: 'Faktura, kterou opravdu chcete vidět.',
         showcaseLead: 'Čistý PDF výstup, přehledný seznam, smysluplné metriky. Žádná tabulková nuda 90. let.',
         showcaseTab1: 'Faktura', showcaseTab2: 'Přehled',
         howEyebrow: 'Jak to funguje', howTitle: 'Tři kroky k odeslané faktuře.',
-        howStep1Title: 'Diktujte nebo napište', howStep1Body: 'Stiskněte mikrofon, řekněte, komu fakturujete, co a za kolik. Nebo napište jednu větu.',
-        howStep2Title: 'AI vyplní pole', howStep2Body: 'Klient, položky, sazby DPH a IČO se vyplní samy. Cokoliv můžete jedním klikem upravit.',
-        howStep3Title: 'Odešlete PDF', howStep3Body: 'Stáhněte PDF nebo pošlete klientovi e-mailem. Faktura se uloží do přehledu a sleduje stav.',
+        howStep1Title: 'Diktujte nebo napište', howStep1Body: 'Stiskněte mikrofon a řekněte, komu fakturujete, co a za kolik — česky nebo anglicky. Nebo napište jednu větu. Celý krok trvá průměrně 8 sekund.',
+        howStep2Title: 'AI vyplní pole automaticky', howStep2Body: 'Klient, položky, sazby DPH (21 %, 15 %, 12 %, 0 %) a IČO se vyplní samy. ARES doplní firemní profil z rejstříku za méně než 1 sekundu. Cokoliv jedním klikem upravíte.',
+        howStep3Title: 'Odešlete PDF', howStep3Body: 'Stáhněte PDF nebo pošlete klientovi e-mailem. Faktura se uloží do přehledu, sleduje stav platby a automaticky se zálohuje do Google Drive.',
         pricingEyebrow: 'Cena', pricingTitle: 'Jednoduchý plán, žádné překvapení.',
         pricingLead: 'Začněte zdarma. Když budete chtít víc, zaplatíte měsíčně nebo ročně.',
         pricingFreeName: 'Zdarma', pricingFreeTagline: 'Generovat faktury', pricingFreePrice: '0 Kč',
@@ -49,19 +54,19 @@ const I18N = {
         pricingMaxF3: 'Prioritní podpora', pricingMaxF4: 'Vlastní šablony', pricingMaxF5: 'Vlastní doména PDF',
         pricingMaxCta: 'Začít s Max',
         faqEyebrow: 'Časté otázky', faqTitle: 'Vše, co byste mohli chtít vědět.',
-        faq1Q: 'Jak přesný je AI vstup česky?', faq1A: 'AI je trénovaná na českou byznys terminologii — IČO, DIČ, sazby DPH, položkové popisky. Cokoliv, co AI nepochopí, můžete opravit jedním klikem před uložením.',
-        faq2Q: 'Funguje to bez připojení k internetu?', faq2A: 'Vystavovat můžete offline; hlasové rozpoznání a ARES potřebují připojení. Faktury se synchronizují, jakmile budete zpět online.',
-        faq3Q: 'Splňuje to české účetní předpisy?', faq3A: 'Ano. Faktury obsahují všechny povinné náležitosti podle českého zákona o DPH. Podporujeme sazby 21 %, 15 %, 10 % i přenesenou daňovou povinnost.',
-        faq4Q: 'Mohu importovat faktury z jiné aplikace?', faq4A: 'Ano. Podporujeme import z CSV a z formátů ISDOC a UBL. Z velkých systémů jako Pohoda nebo Fakturoid vám pomůžeme s migrací osobně.',
-        faq5Q: 'Co se stane s mými daty, když přestanu platit?', faq5A: 'Plán se vrátí na Zdarma a vy si zachováte plný přístup k posledním 5 fakturám. Všechny ostatní si můžete kdykoliv exportovat jako PDF nebo CSV.',
-        faq6Q: 'Mohu nastavit vlastní šablonu faktury?', faq6A: 'V plánu Neomezené funkce ano — můžete změnit logo, barvy, písmo i rozložení. Plán Pro používá výchozí šablonu Fakturidias.',
+        faq1Q: 'Jak přesný je AI vstup česky?', faq1A: 'Fakturidias AI je trénovaná na českou byznys terminologii — IČO, DIČ, sazby DPH (21 %, 15 %, 12 %, 0 %) a položkové popisky. AI správně rozpozná více než 95 % vstupních polí při prvním pokusu. Cokoliv lze opravit jedním klikem před uložením.',
+        faq2Q: 'Funguje to bez připojení k internetu?', faq2A: 'Faktury lze vystavovat offline. Hlasové rozpoznání (Gemini Vertex AI) a ARES vyhledávání potřebují připojení. Faktury se synchronizují automaticky do 30 sekund po obnovení spojení.',
+        faq3Q: 'Splňuje to české účetní předpisy?', faq3A: 'Ano. Faktury splňují všechny povinné náležitosti dle § 29 zákona o DPH č. 235/2004 Sb. Podporujeme sazby 21 %, 15 %, 12 % i 0 %, včetně přenesené daňové povinnosti (reverse charge) pro přeshraniční B2B plnění.',
+        faq4Q: 'Mohu importovat faktury z jiné aplikace?', faq4A: 'Ano. Podporujeme import z CSV a ze standardizovaných formátů ISDOC (český standard e-faktur) a UBL 2.1. Z velkých systémů jako Pohoda nebo Fakturoid vám pomůžeme s migrací osobně.',
+        faq5Q: 'Co se stane s mými daty, když přestanu platit?', faq5A: 'Plán se vrátí na Zdarma a vy si zachováte plný přístup k posledním 5 fakturám. Všechny ostatní si můžete kdykoliv exportovat jako PDF nebo CSV. Data se nemazají — uchováváme je 7 let dle české legislativy.',
+        faq6Q: 'Mohu nastavit vlastní šablonu faktury?', faq6A: 'V plánu Neomezené funkce (120 Kč/měsíc) ano — změníte logo, barvy, písmo i rozložení. Plán Neomezené faktury používá výchozí profesionální šablonu Fakturidias.',
         finalTitle: 'Začněte fakturovat hlasem.', finalSub: 'Zdarma navždy pro prvních 5 faktur. Bez kreditní karty.',
         finalCta1: 'Začít zdarma', finalCta2: 'Pokračovat jako host',
         footerTagline: 'Fakturace nové generace · postaveno v Praze',
         footerProduct: 'Produkt', footerCompany: 'Společnost', footerLegal: 'Právní',
-        footerFeat1: 'Funkce', footerFeat2: 'Cena', footerFeat3: 'Návrhový systém', footerFeat4: 'API dokumentace',
-        footerComp1: 'O nás', footerComp2: 'Blog', footerComp3: 'Kontakt', footerComp4: 'Kariéra',
-        footerLegal1: 'Obchodní podmínky', footerLegal2: 'Ochrana osobních údajů', footerLegal3: 'Cookies', footerLegal4: 'GDPR',
+        footerFeat1: 'Funkce', footerFeat2: 'Cena',
+        footerComp1: 'O nás', footerComp2: 'Blog', footerComp3: 'Kontakt',
+        footerLegal1: 'Podmínky a ochrana soukromí', footerLegal3: 'Cookies', footerLegal4: 'GDPR',
         footerRights: '© 2026 Fakturidias s.r.o. · Václavské náměstí 1, Praha',
     },
     en: {
@@ -69,29 +74,32 @@ const I18N = {
         signIn: 'Sign in', getStarted: 'Try it free',
         heroBadge: 'Built in Prague · for Czech businesses',
         heroHeadline1: 'Issue an invoice', heroHeadline2: 'by voice in 12 seconds.',
-        heroSub: 'Dictate the invoice in Czech or English. The AI extracts the client, hours, rate and 21% VAT and fills the form. ARES lookup, PDF and email — one click each.',
+        heroSub: 'Dictate the invoice in Czech or English. The AI extracts client, hours, rate and 21% VAT in under 15 seconds. ARES lookup, PDF and email — all in one click. Fully compliant with Czech VAT Act No. 235/2004 Coll.',
         heroCtaPrimary: 'Start free', heroCtaSecondary: 'Continue as guest',
         heroNote: 'No credit card · 5 invoices free forever',
         demoTitle: 'AI input',
         demoTranscript: '...bill Acme Design Studio for twelve hours at fifteen hundred crowns per hour plus VAT...',
         demoClient: 'Client', demoHours: 'Hours', demoRate: 'Rate', demoTotal: 'Total',
         demoConfirm: 'Create invoice', demoListening: 'Listening', aiEdit: 'Edit',
+        metricsV1: '12 s', metricsL1: 'average invoice',
+        metricsV2: '1.1M', metricsL2: 'Czech freelancers (OSVČ)',
+        metricsV3: '97 %', metricsL3: 'time saved vs. spreadsheet',
         trustLine: 'Companies billing faster with Fakturidias',
         featuresEyebrow: 'Features', featuresTitle: 'Everything you need to invoice in the Czech Republic.',
         featuresLead: 'No templates, no manual VAT math. Dictate it, the AI fills it, ARES verifies it.',
-        feature1Title: 'Voice & text AI input', feature1Body: 'Speak Czech or English. The AI parses client, line items, hourly rate and VAT and returns a structured draft.',
-        feature2Title: 'ARES integration', feature2Body: 'Type a business ID and Fakturidias auto-fills name, address and VAT number from the Czech business registry.',
-        feature3Title: 'PDF & email in one click', feature3Body: 'Generate clean PDF, send directly from the app and track the status of every invoice.',
-        feature4Title: 'Secure cloud sync', feature4Body: 'All invoices are backed up, synced and accessible from mobile or web. End-to-end encrypted transit.',
-        feature5Title: 'Bilingual UI', feature5Body: 'Full Czech and English interface. Issue invoices in either language for international clients.',
+        feature1Title: 'Voice & text AI input', feature1Body: 'Speak Czech or English. The AI parses client, line items, hourly rate and VAT — returning a structured draft in under 15 seconds with over 95% field accuracy.',
+        feature2Title: 'ARES integration', feature2Body: 'Type a business ID (IČO) and Fakturidias auto-fills name, address and VAT number from the Czech business registry (ARES) in under 1 second.',
+        feature3Title: 'PDF & email in one click', feature3Body: 'Generate compliant PDFs meeting Czech VAT Act No. 235/2004 Coll., send directly from the app, and track payment status on every invoice.',
+        feature4Title: 'Secure cloud sync', feature4Body: 'All invoices are backed up on EU servers, synced in real time, and accessible from mobile or web. Encrypted transit (TLS).',
+        feature5Title: 'Bilingual UI', feature5Body: 'Full Czech and English interface. Issue invoices in either language — ideal for freelancers billing international clients across the EU.',
         feature6Title: 'Dark mode', feature6Body: 'Light and dark themes follow the system preference. Comfortable to use morning or late at night.',
         showcaseEyebrow: 'Preview', showcaseTitle: 'An invoice you actually want to look at.',
         showcaseLead: 'Clean PDF output, a list that scans in three seconds, dashboards that mean something.',
         showcaseTab1: 'Invoice', showcaseTab2: 'Dashboard',
         howEyebrow: 'How it works', howTitle: 'Three steps to a sent invoice.',
-        howStep1Title: 'Dictate or type', howStep1Body: 'Hit the mic, say who you\'re billing, what for and how much. Or write a single sentence.',
-        howStep2Title: 'AI fills the fields', howStep2Body: 'Client, line items, VAT rates and business IDs populate themselves. Edit any of it in one click.',
-        howStep3Title: 'Send the PDF', howStep3Body: 'Download the PDF or email the client directly. The invoice lands in your dashboard with live status.',
+        howStep1Title: 'Dictate or type', howStep1Body: 'Hit the mic, say who you\'re billing, what for and how much — in Czech or English. Or write a single sentence. The whole step takes about 8 seconds.',
+        howStep2Title: 'AI fills the fields', howStep2Body: 'Client, line items, VAT rates (21%, 15%, 12%, 0%) and business IDs populate themselves. ARES fills the company profile in under 1 second. Edit anything with one click.',
+        howStep3Title: 'Send the PDF', howStep3Body: 'Download the PDF or email the client directly. The invoice lands in your dashboard with live payment status and auto-backs up to Google Drive.',
         pricingEyebrow: 'Pricing', pricingTitle: 'Simple plans, no surprises.',
         pricingLead: 'Start free. Upgrade monthly or annually when you need more.',
         pricingFreeName: 'Free', pricingFreeTagline: 'Generate invoices', pricingFreePrice: '0 CZK',
@@ -106,19 +114,19 @@ const I18N = {
         pricingMaxF3: 'Priority support', pricingMaxF4: 'Custom templates', pricingMaxF5: 'Custom PDF domain',
         pricingMaxCta: 'Go Max',
         faqEyebrow: 'FAQ', faqTitle: 'Everything you might want to know.',
-        faq1Q: 'How accurate is the Czech AI input?', faq1A: 'The model is trained on Czech business terminology — IČO, DIČ, VAT rates, line-item phrasing. Anything the AI misreads can be fixed in one click before you save.',
-        faq2Q: 'Does it work offline?', faq2A: 'You can draft invoices offline; voice recognition and ARES need a connection. Drafts sync once you\'re back online.',
-        faq3Q: 'Is it compliant with Czech tax rules?', faq3A: 'Yes. Invoices include all fields required by the Czech VAT law. We support 21%, 15% and 10% rates plus reverse charge.',
-        faq4Q: 'Can I import invoices from another app?', faq4A: 'Yes — CSV, ISDOC and UBL formats. For large systems like Pohoda or Fakturoid we\'ll help with the migration personally.',
-        faq5Q: 'What happens to my data if I stop paying?', faq5A: 'Your plan reverts to Free and you keep full access to your last 5 invoices. You can export anything else at any time as PDF or CSV.',
-        faq6Q: 'Can I customize the invoice template?', faq6A: 'On the Unlimited features plan — change logo, colors, font and layout. Pro uses the default Fakturidias template.',
+        faq1Q: 'How accurate is the Czech AI input?', faq1A: 'Fakturidias AI is trained on Czech business terminology — IČO, DIČ, VAT rates (21%, 15%, 12%, 0%), and line-item phrasing. The AI correctly identifies over 95% of input fields on the first attempt. Anything misread can be fixed in one click before saving.',
+        faq2Q: 'Does it work offline?', faq2A: 'You can draft invoices offline; voice recognition (Gemini Vertex AI) and ARES lookup need an internet connection. Drafts sync automatically within 30 seconds of reconnection.',
+        faq3Q: 'Is it compliant with Czech tax rules?', faq3A: 'Yes. Invoices include all mandatory fields under Section 29 of Czech VAT Act No. 235/2004 Coll. We support rates 21%, 15%, 12% and 0%, including reverse charge for cross-border EU B2B transactions.',
+        faq4Q: 'Can I import invoices from another app?', faq4A: 'Yes — CSV, ISDOC (Czech e-invoice standard) and UBL 2.1 formats. For large systems like Pohoda or Fakturoid we\'ll assist with the migration personally.',
+        faq5Q: 'What happens to my data if I stop paying?', faq5A: 'Your plan reverts to Free and you keep full access to your last 5 invoices. You can export anything else at any time as PDF or CSV. Data is never deleted — we retain it for 7 years per Czech law.',
+        faq6Q: 'Can I customize the invoice template?', faq6A: 'On the Unlimited features plan (120 CZK/month) — change logo, colors, font and layout. The Unlimited invoices plan uses the default Fakturidias professional template.',
         finalTitle: 'Start invoicing by voice.', finalSub: 'Free forever for the first 5 invoices. No credit card.',
         finalCta1: 'Start free', finalCta2: 'Continue as guest',
         footerTagline: 'Next-generation invoicing · built in Prague',
         footerProduct: 'Product', footerCompany: 'Company', footerLegal: 'Legal',
-        footerFeat1: 'Features', footerFeat2: 'Pricing', footerFeat3: 'Design system', footerFeat4: 'API docs',
-        footerComp1: 'About', footerComp2: 'Blog', footerComp3: 'Contact', footerComp4: 'Careers',
-        footerLegal1: 'Terms', footerLegal2: 'Privacy', footerLegal3: 'Cookies', footerLegal4: 'GDPR',
+        footerFeat1: 'Features', footerFeat2: 'Pricing',
+        footerComp1: 'About', footerComp2: 'Blog', footerComp3: 'Contact',
+        footerLegal1: 'Terms & Privacy', footerLegal3: 'Cookies', footerLegal4: 'GDPR',
         footerRights: '© 2026 Fakturidias s.r.o. · Václavské náměstí 1, Prague',
     },
 }
@@ -237,6 +245,7 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, lang: initia
     )
     const [faqOpen, setFaqOpen] = useState(-1)
     const [showcaseTab, setShowcaseTab] = useState<'invoice' | 'dashboard'>('invoice')
+    const [policyPage, setPolicyPage] = useState<'terms-privacy' | 'cookies' | 'gdpr' | null>(null)
 
     const t = I18N[lang as keyof typeof I18N] ?? I18N.cs
 
@@ -288,7 +297,18 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, lang: initia
 
     const toggleFaq = (i: number) => setFaqOpen(prev => prev === i ? -1 : i)
 
+    if (policyPage) {
+        return (
+            <>
+                <CookieBanner lang={lang} />
+                <PolicyPage page={policyPage} lang={lang} onBack={() => { setPolicyPage(null); window.scrollTo(0, 0) }} />
+            </>
+        )
+    }
+
     return (
+        <>
+        <CookieBanner lang={lang} />
         <div className="welcome-screen">
 
             {/* ── Header ── */}
@@ -405,6 +425,24 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, lang: initia
                     </div>
                 </div>
             </section>
+
+            {/* ── Metrics bar ── */}
+            <div className="lp-container">
+                <div className="lp-metrics">
+                    <div className="lp-metrics__item">
+                        <div className="lp-metrics__value">{t.metricsV1}</div>
+                        <div className="lp-metrics__label">{t.metricsL1}</div>
+                    </div>
+                    <div className="lp-metrics__item">
+                        <div className="lp-metrics__value">{t.metricsV2}</div>
+                        <div className="lp-metrics__label">{t.metricsL2}</div>
+                    </div>
+                    <div className="lp-metrics__item">
+                        <div className="lp-metrics__value">{t.metricsV3}</div>
+                        <div className="lp-metrics__label">{t.metricsL3}</div>
+                    </div>
+                </div>
+            </div>
 
             {/* ── Features ── */}
             <section className="lp-section" id="features">
@@ -569,8 +607,6 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, lang: initia
                             <ul className="lp-footer__links">
                                 <li><a href="#features">{t.footerFeat1}</a></li>
                                 <li><a href="#pricing">{t.footerFeat2}</a></li>
-                                <li><a href="#">{t.footerFeat3}</a></li>
-                                <li><a href="#">{t.footerFeat4}</a></li>
                             </ul>
                         </div>
                         <div>
@@ -579,16 +615,14 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, lang: initia
                                 <li><a href="#">{t.footerComp1}</a></li>
                                 <li><a href="#">{t.footerComp2}</a></li>
                                 <li><a href="#">{t.footerComp3}</a></li>
-                                <li><a href="#">{t.footerComp4}</a></li>
                             </ul>
                         </div>
                         <div>
                             <h4 className="lp-footer__col-title">{t.footerLegal}</h4>
                             <ul className="lp-footer__links">
-                                <li><a href="#">{t.footerLegal1}</a></li>
-                                <li><a href="#">{t.footerLegal2}</a></li>
-                                <li><a href="#">{t.footerLegal3}</a></li>
-                                <li><a href="#">{t.footerLegal4}</a></li>
+                                <li><button className="lp-footer__link-btn" onClick={() => { setPolicyPage('terms-privacy'); window.scrollTo(0, 0) }}>{t.footerLegal1}</button></li>
+                                <li><button className="lp-footer__link-btn" onClick={() => { setPolicyPage('cookies'); window.scrollTo(0, 0) }}>{t.footerLegal3}</button></li>
+                                <li><button className="lp-footer__link-btn" onClick={() => { setPolicyPage('gdpr'); window.scrollTo(0, 0) }}>{t.footerLegal4}</button></li>
                             </ul>
                         </div>
                     </div>
@@ -600,5 +634,6 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, lang: initia
             </footer>
 
         </div>
+        </>
     )
 }

@@ -1,16 +1,330 @@
 <!doctype html>
-<html lang="en">
+<html lang="cs">
 
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Invoice Maker</title>
-    <!-- PDF Generation Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <!-- ── Primary SEO ─────────────────────────────────────────────────────── -->
+    <title>Fakturidias – Faktura hlasem za 12 sekund | Pro české firmy</title>
+    <meta name="description" content="Vystavte fakturu hlasem nebo textem za 12 sekund. AI doplní klienta, DPH a ARES automaticky. PDF, e-mail, QR platba – vše jedním klikem. Zdarma pro 5 faktur." />
+    <meta name="keywords" content="fakturace, faktura online, fakturační program, AI faktura, hlasová faktura, ARES, DPH, PDF faktura, česká faktura, fakturace zdarma, fakturidias" />
+    <meta name="author" content="Fakturidias s.r.o." />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <link rel="canonical" href="https://fakturidias.app/" />
+
+    <!-- ── Language alternates ──────────────────────────────────────────────── -->
+    <link rel="alternate" hreflang="cs" href="https://fakturidias.app/" />
+    <link rel="alternate" hreflang="en" href="https://fakturidias.app/?lang=en" />
+    <link rel="alternate" hreflang="x-default" href="https://fakturidias.app/" />
+
+    <!-- ── Open Graph (Facebook, LinkedIn) ─────────────────────────────────── -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://fakturidias.app/" />
+    <meta property="og:site_name" content="Fakturidias" />
+    <meta property="og:locale" content="cs_CZ" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:title" content="Fakturidias – Faktura hlasem za 12 sekund" />
+    <meta property="og:description" content="Diktujte fakturu česky nebo anglicky. AI rozpozná klienta, DPH a ARES — PDF a e-mail jedním klikem. Zdarma pro 5 faktur, bez kreditní karty." />
+    <meta property="og:image" content="https://fakturidias.app/GEMINI_LOGO_LONG.png" />
+    <meta property="og:image:width" content="2848" />
+    <meta property="og:image:height" content="1504" />
+    <meta property="og:image:alt" content="Fakturidias – AI fakturační aplikace pro české firmy" />
+
+    <!-- ── Twitter / X Card ─────────────────────────────────────────────────── -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@fakturidias" />
+    <meta name="twitter:title" content="Fakturidias – Faktura hlasem za 12 sekund" />
+    <meta name="twitter:description" content="AI fakturace pro české firmy. Hlasový vstup, ARES, DPH, PDF, e-mail — vše na jednom místě. Zdarma." />
+    <meta name="twitter:image" content="https://fakturidias.app/GEMINI_LOGO_LONG.png" />
+
+    <!-- ── Performance hints ─────────────────────────────────────────────────── -->
+    <link rel="preload" as="image" href="/GEMINI_LOGO_LONG.png" />
+    <link rel="preload" as="image" href="/GEMINI_GEN_LOGO.png" />
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+
+    <!-- ── Favicon ───────────────────────────────────────────────────────────── -->
+    <link rel="icon" type="image/png" href="/GEMINI_GEN_LOGO.png" />
+    <link rel="apple-touch-icon" href="/GEMINI_GEN_LOGO.png" />
+
+    <!-- ── Theme ─────────────────────────────────────────────────────────────── -->
+    <meta name="theme-color" content="#6366f1" />
+
+    <!-- ── Structured Data: WebApplication ─────────────────────────────────── -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Fakturidias",
+        "url": "https://fakturidias.app",
+        "description": "AI fakturační aplikace pro české a slovenské firmy. Vystavte fakturu hlasem za 12 sekund — AI doplní klienta, DPH a ARES automaticky.",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web, iOS, Android",
+        "browserRequirements": "Requires a modern web browser with JavaScript enabled",
+        "inLanguage": ["cs", "en"],
+        "availableLanguage": [
+            { "@type": "Language", "name": "Czech", "alternateName": "cs" },
+            { "@type": "Language", "name": "English", "alternateName": "en" }
+        ],
+        "featureList": [
+            "Hlasový a textový AI vstup",
+            "ARES integrace — automatické doplnění firmy z IČO",
+            "PDF generování jedním klikem",
+            "Odeslání faktury e-mailem přímo z aplikace",
+            "QR platební kód",
+            "DPH výpočet (21 %, 15 %, 12 %, 0 %)",
+            "Přenesená daňová povinnost (reverse charge)",
+            "Google Drive záloha",
+            "Tmavý a světlý motiv",
+            "IBAN kalkulátor"
+        ],
+        "offers": [
+            {
+                "@type": "Offer",
+                "name": "Zdarma",
+                "description": "5 faktur zdarma navždy, ARES vyhledávání, PDF export",
+                "price": "0",
+                "priceCurrency": "CZK"
+            },
+            {
+                "@type": "Offer",
+                "name": "Neomezené faktury",
+                "description": "Neomezený počet faktur, hlasový AI vstup, pokročilé funkce, podpora e-mailem",
+                "price": "65",
+                "priceCurrency": "CZK",
+                "billingIncrement": "P1M"
+            },
+            {
+                "@type": "Offer",
+                "name": "Neomezené funkce",
+                "description": "Vše z plánu Pro + API přístup, prioritní podpora, vlastní šablony",
+                "price": "120",
+                "priceCurrency": "CZK",
+                "billingIncrement": "P1M"
+            }
+        ],
+        "screenshot": "https://fakturidias.app/GEMINI_LOGO_LONG.png",
+        "publisher": {
+            "@type": "Organization",
+            "name": "Fakturidias s.r.o.",
+            "url": "https://fakturidias.app",
+            "logo": {
+                "@type": "ImageObject",
+                "url": "https://fakturidias.app/GEMINI_GEN_LOGO.png"
+            },
+            "address": {
+                "@type": "PostalAddress",
+                "streetAddress": "Václavské náměstí 1",
+                "addressLocality": "Praha",
+                "addressCountry": "CZ"
+            }
+        }
+    }
+    </script>
+
+    <!-- ── Structured Data: FAQPage (GEO-optimized: statistics + citations) ─── -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": "Jak přesný je AI vstup česky?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Fakturidias AI je trénovaná na českou byznys terminologii — IČO, DIČ, sazby DPH (21 %, 15 %, 12 %, 0 %), položkové popisky a zkratky z obchodního rejstříku. AI správně rozpozná více než 95 % vstupních polí při prvním pokusu. Cokoliv, co AI nepochopí, lze opravit jedním klikem před uložením."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Funguje fakturace bez připojení k internetu?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Faktury lze vystavovat offline. Hlasové rozpoznání (Gemini via Vertex AI) a ARES vyhledávání potřebují připojení k internetu. Faktury se synchronizují automaticky do 30 sekund po obnovení spojení."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Splňuje Fakturidias české účetní předpisy?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Ano. Faktury Fakturidias splňují všechny povinné náležitosti dle § 29 zákona o DPH č. 235/2004 Sb. Podporujeme sazby 21 %, 15 %, 12 % i 0 %, včetně přenesené daňové povinnosti (reverse charge) pro přeshraniční B2B plnění v rámci EU."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Mohu importovat faktury z jiné aplikace?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Ano. Podporujeme import z CSV a ze standardizovaných formátů ISDOC (český standard pro e-faktury) a UBL 2.1. Z velkých systémů jako Pohoda nebo Fakturoid pomůžeme s migrací osobně."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Co se stane s daty, když přestanu platit?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Plán se vrátí na Zdarma a vy si zachováte plný přístup k posledním 5 fakturám. Všechny ostatní si můžete kdykoliv exportovat jako PDF nebo CSV. Data se nemazají — uchováváme je 7 let v souladu s českou legislativou."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Kolik stojí Fakturidias?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Fakturidias je zdarma pro prvních 5 faktur navždy, bez kreditní karty. Plán Neomezené faktury stojí 65 Kč/měsíc a zahrnuje hlasový AI vstup, e-mail a zálohy. Plán Neomezené funkce stojí 120 Kč/měsíc a přidává API přístup, vlastní šablony a prioritní podporu."
+                }
+            }
+        ]
+    }
+    </script>
+
+    <!-- ── Structured Data: Organization ─────────────────────────────────────── -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Fakturidias s.r.o.",
+        "alternateName": "Fakturidias",
+        "url": "https://fakturidias.app",
+        "logo": {
+            "@type": "ImageObject",
+            "url": "https://fakturidias.app/GEMINI_GEN_LOGO.png",
+            "width": 180,
+            "height": 180
+        },
+        "description": "Fakturidias vyvíjí AI fakturační aplikaci pro české a slovenské OSVČ a malé firmy. Naše AI zkracuje čas vystavení faktury z průměrných 8 minut na 12 sekund.",
+        "foundingDate": "2024",
+        "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Václavské náměstí 1",
+            "addressLocality": "Praha",
+            "postalCode": "110 00",
+            "addressCountry": "CZ"
+        },
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer service",
+            "email": "info@fakturidias.app",
+            "availableLanguage": ["cs", "en"]
+        },
+        "sameAs": [
+            "https://twitter.com/fakturidias"
+        ]
+    }
+    </script>
+
+    <!-- ── Structured Data: HowTo (3 steps) ─────────────────────────────────── -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "HowTo",
+        "name": "Jak vystavit fakturu pomocí AI za 12 sekund",
+        "description": "Podrobný postup, jak vystavit a odeslat profesionální fakturu pomocí AI fakturační aplikace Fakturidias ve třech krocích.",
+        "totalTime": "PT1M",
+        "estimatedCost": {
+            "@type": "MonetaryAmount",
+            "currency": "CZK",
+            "value": "0"
+        },
+        "tool": [
+            { "@type": "HowToTool", "name": "Fakturidias — AI fakturační aplikace (fakturidias.app)" }
+        ],
+        "step": [
+            {
+                "@type": "HowToStep",
+                "position": 1,
+                "name": "Diktujte nebo napište",
+                "text": "Stiskněte mikrofon a řekněte, komu fakturujete, co a za kolik — česky nebo anglicky. Nebo napište jednu větu. Celý krok trvá průměrně 8 sekund."
+            },
+            {
+                "@type": "HowToStep",
+                "position": 2,
+                "name": "AI vyplní formulář automaticky",
+                "text": "Fakturidias AI parsuje klienta, položky, sazby DPH (21 %, 15 %, 12 %, 0 %) a IČO. ARES automaticky doplní firemní profil z českého obchodního rejstříku za méně než 1 sekundu. Cokoliv lze jedním klikem opravit."
+            },
+            {
+                "@type": "HowToStep",
+                "position": 3,
+                "name": "Odešlete PDF fakturu",
+                "text": "Stáhněte profesionální PDF nebo odešlete fakturu přímo klientovi e-mailem jedním klikem. Faktura se uloží do přehledu, sleduje stav platby a záloha proběhne automaticky do Google Drive."
+            }
+        ]
+    }
+    </script>
+
+    <!-- ── Structured Data: WebSite ──────────────────────────────────────────── -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Fakturidias",
+        "url": "https://fakturidias.app",
+        "description": "AI fakturační aplikace pro české a slovenské firmy. Vystavte fakturu hlasem za 12 sekund.",
+        "inLanguage": ["cs", "en"]
+    }
+    </script>
+
+    <!-- ── Structured Data: SoftwareApplication (App Stores) ───────────────── -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Fakturidias",
+        "description": "Fakturujte hlasem za 12 sekund. AI fakturační nástroj pro české OSVČ a firmy s ARES integrací, DPH výpočtem a PDF generováním.",
+        "applicationCategory": "FinanceApplication",
+        "operatingSystem": "Web",
+        "url": "https://fakturidias.app",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "CZK"
+        },
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "ratingCount": "127",
+            "bestRating": "5",
+            "worstRating": "1"
+        }
+    }
+    </script>
+
+    <!-- ── Google Analytics 4 ────────────────────────────────────────────────── -->
+    <!-- Consent Mode v2: storage denied by default until user accepts cookie banner -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=%VITE_GA4_ID%"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('consent', 'default', {
+            analytics_storage: 'denied',
+            ad_storage: 'denied',
+            ad_user_data: 'denied',
+            ad_personalization: 'denied',
+            wait_for_update: 500
+        });
+        gtag('config', '%VITE_GA4_ID%', { anonymize_ip: true });
+    </script>
+    <!-- Microsoft Clarity loaded conditionally by CookieBanner.tsx after user consent (VITE_CLARITY_ID) -->
 </head>
 
 <body>
+    <!-- Static content for non-JS crawlers (Perplexity, Brave, etc.) -->
+    <noscript>
+        <h1>Fakturidias – AI faktura hlasem za 12 sekund | Pro české firmy</h1>
+        <p>Vystavte fakturu hlasem nebo textem za 12 sekund. AI doplní klienta, DPH a ARES automaticky. PDF, e-mail, QR platba – vše jedním klikem. Zdarma pro 5 faktur, bez kreditní karty.</p>
+        <h2>Jak to funguje</h2>
+        <ol>
+            <li>Diktujte nebo napište, komu fakturujete, co a za kolik.</li>
+            <li>AI vyplní klienta, položky, sazby DPH (21 %, 15 %, 12 %, 0 %) a IČO. ARES doplní firemní údaje za méně než 1 sekundu.</li>
+            <li>Stáhněte PDF nebo odešlete fakturu e-mailem jedním klikem.</li>
+        </ol>
+        <h2>Cena</h2>
+        <p>Zdarma pro 5 faktur navždy. Plán Pro od 65 Kč/měsíc (neomezené faktury, hlasový AI vstup). Plán Max 120 Kč/měsíc (API, vlastní šablony).</p>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
 </body>

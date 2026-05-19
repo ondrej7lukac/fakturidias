@@ -1,16 +1,26 @@
 import './InvoiceForm.css'
 import { useState, useEffect, useRef } from 'react'
 import { formatInvoiceNumber, addDays, formatDate, money, getUserId } from '../utils/storage'
-import { searchAres, parseAresItem } from '../utils/ares'
+import { searchAres, parseAresItem, lookupAresByIco } from '../utils/ares'
 import { Pencil, Eye, AlertTriangle, Cloud, FileText, RefreshCw, ArrowLeftRight, Check, Mail, Contact, Wallet, Search, X, Send, Save, ICON_MD, ICON_SM, STROKE } from '@/lib/icons'
 
 import ItemsTable from './ItemsTable'
 import InvoicePreview from './InvoicePreview'
 import AIPrompt from './AIPrompt'
-import { generateInvoicePDF } from '../utils/pdf'
+import { generateInvoicePDF, downloadPDF, pdfBlobToDataUri } from '../utils/pdf'
 import { BANK_CODES, calculateIban, parseIban, getCzechQrPayload } from '../utils/bank'
 import { QRCodeCanvas } from 'qrcode.react'
 import QRCode from 'qrcode'
+
+function randomUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
 
 
 export default function InvoiceForm({
@@ -87,6 +97,9 @@ export default function InvoiceForm({
             if (itemSuggestionsRef.current && !itemSuggestionsRef.current.contains(event.target)) {
                 setItemSuggestions([])
             }
+            if (supplierSuggestionsRef.current && !supplierSuggestionsRef.current.contains(event.target)) {
+                setSupplierSuggestions([])
+            }
         }
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -102,11 +115,13 @@ export default function InvoiceForm({
     const [savedCustomers, setSavedCustomers] = useState([])
     const [itemSuggestions, setItemSuggestions] = useState([])
     const [customerSuggestions, setCustomerSuggestions] = useState([])
+    const [supplierSuggestions, setSupplierSuggestions] = useState([])
     const [saveTimer, setSaveTimer] = useState(null)
-    const [aresConfirmResults, setAresConfirmResults] = useState<any[]>([])
-    const [pendingAiFill, setPendingAiFill] = useState<any>(null)
     const [aresAutoFilled, setAresAutoFilled] = useState(false)
+    const [supplierAresAutoFilled, setSupplierAresAutoFilled] = useState(false)
     const pendingPreviewModeRef = useRef(false)
+    const supplierSuggestionsRef = useRef(null)
+    const supplierAresDebounceRef = useRef(null)
 
     // ─── Effect 1: Load invoice data when selected invoice changes ────────────
     // ONLY this effect may call setItems — prevents items being wiped by unrelated state changes
@@ -163,7 +178,7 @@ export default function InvoiceForm({
         } else {
             // Switching to new invoice mode — reset everything
             if (!newInvoiceIdRef.current) {
-                newInvoiceIdRef.current = crypto.randomUUID()
+                newInvoiceIdRef.current = randomUUID()
             }
             const today = new Date()
             setFormData(prev => ({
@@ -568,6 +583,51 @@ export default function InvoiceForm({
         setCustomerSuggestions([])
     }
 
+    const handleSupplierNameChange = (e) => {
+        const value = e.target.value
+        setFormData(prev => ({ ...prev, supplierName: value }))
+        setSupplierAresAutoFilled(false)
+        if (value.trim().length >= 3) {
+            if (supplierAresDebounceRef.current) clearTimeout(supplierAresDebounceRef.current)
+            supplierAresDebounceRef.current = setTimeout(async () => {
+                const results = await searchAres(value)
+                setSupplierSuggestions(results.map(item => ({ ...parseAresItem(item), source: 'ares' })).slice(0, 5))
+            }, 500)
+        } else {
+            setSupplierSuggestions([])
+        }
+    }
+
+    const handleSupplierIcoChange = async (e) => {
+        const value = e.target.value
+        setFormData(prev => ({ ...prev, supplierIco: value }))
+        if (/^\d{8}$/.test(value.trim())) {
+            const entity = await lookupAresByIco(value.trim())
+            if (entity) {
+                const parsed = parseAresItem(entity)
+                setFormData(prev => ({
+                    ...prev,
+                    supplierName: parsed.name || prev.supplierName,
+                    supplierVat: parsed.vat || prev.supplierVat,
+                    supplierAddress: parsed.address || prev.supplierAddress,
+                }))
+                setSupplierAresAutoFilled(true)
+            }
+        }
+    }
+
+    const handleSelectSupplier = (entity) => {
+        setFormData(prev => ({
+            ...prev,
+            supplierName: entity.name || prev.supplierName,
+            supplierIco: entity.ico || prev.supplierIco,
+            supplierVat: entity.vat || prev.supplierVat,
+            supplierAddress: entity.address || prev.supplierAddress,
+        }))
+        setSupplierSuggestions([])
+        setSupplierAresAutoFilled(true)
+    }
+
     const handleInputBlur = () => {
         handleBlurSave()
     }
@@ -587,7 +647,7 @@ export default function InvoiceForm({
         const total = subtotal + taxAmount
 
         const newItem = {
-            id: crypto.randomUUID(),
+            id: randomUUID(),
             name: itemInput.name.trim(),
             qty,
             price: basePrice,
@@ -662,7 +722,7 @@ export default function InvoiceForm({
 
     const addItem = () => {
         setItems(prev => [...prev, {
-            id: crypto.randomUUID(),
+            id: randomUUID(),
             name: '',
             qty: 1,
             unit: 'h',
@@ -768,7 +828,7 @@ export default function InvoiceForm({
             } catch (err) { }
 
             const pdf = await generateInvoicePDF(currentData, t, qrDataUrl)
-            pdf.save(`${currentData.invoiceNumber}.pdf`)
+            downloadPDF(pdf, `${currentData.invoiceNumber}.pdf`)
         } catch (error) {
             alert('Failed to generate PDF')
         }
@@ -795,8 +855,8 @@ export default function InvoiceForm({
                     qrDataUrl = await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: 'M', margin: 0, width: 256 })
                 }
             } catch (err) {}
-            const pdf = await generateInvoicePDF(currentData, t, qrDataUrl)
-            const pdfBase64 = pdf.output('datauristring')
+            const pdfBlob = await generateInvoicePDF(currentData, t, qrDataUrl)
+            const pdfBase64 = await pdfBlobToDataUri(pdfBlob)
             const response = await fetch('/api/email/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -841,8 +901,8 @@ export default function InvoiceForm({
                 }
             } catch (err) { }
 
-            const pdf = await generateInvoicePDF(currentData, t, qrDataUrl)
-            const pdfBase64 = pdf.output('datauristring')
+            const pdfBlob = await generateInvoicePDF(currentData, t, qrDataUrl)
+            const pdfBase64 = await pdfBlobToDataUri(pdfBlob)
 
             const response = await fetch('/api/drive/backup', {
                 method: 'POST',
@@ -867,32 +927,7 @@ export default function InvoiceForm({
 
     const togglePreview = () => setPreviewMode(!previewMode)
 
-    const applyAIItems = (data: any) => {
-        if (Array.isArray(data.items) && data.items.length > 0) {
-            const vatPayer = formData.isVatPayer
-            const newItems = data.items.map((item: any) => {
-                const qty = Number(item.qty) || 1
-                const price = Number(item.price) || 0
-                const taxRate = vatPayer ? 21 : 0
-                const subtotal = qty * price
-                const taxAmount = subtotal * (taxRate / 100)
-                return {
-                    id: crypto.randomUUID(),
-                    name: String(item.name || ''),
-                    qty,
-                    price,
-                    discount: 0,
-                    taxRate,
-                    subtotal,
-                    taxAmount,
-                    total: subtotal + taxAmount,
-                }
-            })
-            setItems(newItems)
-        }
-    }
-
-    const applyAIClientData = (data: any) => {
+    const handleAIFill = (data: any) => {
         setFormData(prev => ({
             ...prev,
             clientName: data.clientName || prev.clientName,
@@ -902,57 +937,28 @@ export default function InvoiceForm({
             clientIco: data.clientIco || prev.clientIco,
             clientVat: data.clientVat || prev.clientVat,
             clientArea: data.clientArea || prev.clientArea,
-        }))
-        setAresConfirmResults([])
-        setPendingAiFill(null)
-        if (pendingPreviewModeRef.current) {
-            setPreviewMode(true)
-            pendingPreviewModeRef.current = false
-        }
-    }
-
-    const handleSelectAresForAI = (entity: any) => {
-        const parsed = parseAresItem(entity)
-        setFormData(prev => ({
-            ...prev,
-            clientName: parsed.name || pendingAiFill?.clientName || prev.clientName,
-            clientAddress: parsed.address || pendingAiFill?.clientAddress || prev.clientAddress,
-            clientIco: parsed.ico || pendingAiFill?.clientIco || prev.clientIco,
-            clientArea: parsed.city || pendingAiFill?.clientArea || prev.clientArea,
-            clientVat: parsed.vat || pendingAiFill?.clientVat || prev.clientVat,
-            clientEmail: pendingAiFill?.clientEmail || prev.clientEmail,
-            clientPhone: pendingAiFill?.clientPhone || prev.clientPhone,
-        }))
-        setAresConfirmResults([])
-        setPendingAiFill(null)
-        if (pendingPreviewModeRef.current) {
-            setPreviewMode(true)
-            pendingPreviewModeRef.current = false
-        }
-    }
-
-    const handleAIFill = async (data: any) => {
-        setFormData(prev => ({
-            ...prev,
+            clientCountry: data.clientCountry || prev.clientCountry,
             currency: data.currency || prev.currency,
             dueDate: data.dueDate || prev.dueDate,
             issueDate: data.issueDate || prev.issueDate,
             variableSymbol: data.variableSymbol || prev.variableSymbol,
             paymentNote: data.paymentNote || prev.paymentNote,
         }))
-        applyAIItems(data)
-
-        if (data.clientName) {
-            setPendingAiFill(data)
-            try {
-                const results = await searchAres(data.clientName)
-                if (results.length > 0) {
-                    setAresConfirmResults(results)
-                    return
-                }
-            } catch { /* fall through to direct apply */ }
+        if (Array.isArray(data.items) && data.items.length > 0) {
+            const vatPayer = formData.isVatPayer
+            setItems(data.items.map((item: any) => {
+                const qty = Number(item.qty) || 1
+                const price = Number(item.price) || 0
+                const taxRate = item.taxRate != null ? Number(item.taxRate) : (vatPayer ? 21 : 0)
+                const subtotal = qty * price
+                const taxAmount = subtotal * (taxRate / 100)
+                return { id: randomUUID(), name: String(item.name || ''), qty, price, discount: 0, taxRate, subtotal, taxAmount, total: subtotal + taxAmount }
+            }))
         }
-        applyAIClientData(data)
+        if (pendingPreviewModeRef.current) {
+            setPreviewMode(true)
+            pendingPreviewModeRef.current = false
+        }
     }
 
     const handleAIPreview = (data: any) => {
@@ -968,14 +974,54 @@ export default function InvoiceForm({
                 {lang === 'cs' ? 'Dodavatel' : 'Supplier'}
             </h3>
             <div className="ap-grid">
-                <div className="ap-field">
+                <div className="ap-field" ref={supplierSuggestionsRef} style={{ position: 'relative' }}>
                     <label>{lang === 'cs' ? 'Jméno / Název' : 'Name / Company'}</label>
-                    <input className="ap-input" name="supplierName" value={formData.supplierName} onChange={handleChange} onBlur={handleInputBlur} placeholder="Vaše firma s.r.o." />
+                    <input
+                        className="ap-input"
+                        name="supplierName"
+                        value={formData.supplierName}
+                        onChange={handleSupplierNameChange}
+                        onBlur={handleInputBlur}
+                        placeholder={lang === 'cs' ? 'Vyhledat firmu nebo zadat IČO...' : 'Search company or enter business ID...'}
+                        autoComplete="off"
+                    />
+                    {supplierSuggestions.length > 0 && (
+                        <ul style={{
+                            position: 'absolute', top: '100%', left: 0, right: 0,
+                            background: 'var(--bg)', border: '1px solid var(--border)',
+                            borderRadius: '12px', zIndex: 10,
+                            listStyle: 'none', padding: '4px', margin: '4px 0 0 0',
+                            maxHeight: '200px', overflowY: 'auto',
+                            boxShadow: 'var(--shadow-lg)'
+                        }}>
+                            {supplierSuggestions.map((s, i) => (
+                                <li
+                                    key={i}
+                                    onClick={() => handleSelectSupplier(s)}
+                                    style={{ padding: '9px 12px', cursor: 'pointer', borderRadius: '8px', transition: 'background 0.1s' }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--card)')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = '')}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                                        <span style={{ fontWeight: 600, fontSize: 13 }}>{s.name}</span>
+                                        <small style={{ color: 'var(--accent)', fontSize: 10.5, fontWeight: 600 }}>ARES</small>
+                                    </div>
+                                    <small style={{ color: 'var(--muted)', fontSize: 12 }}>{s.ico && `IČO: ${s.ico}`}{s.address && ` · ${s.address}`}</small>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
+                {supplierAresAutoFilled && (
+                    <div className="ap-ares-banner">
+                        <Check size={ICON_SM} strokeWidth={STROKE} />
+                        <strong>ARES</strong> · {lang === 'cs' ? 'Automaticky vyplněno z ARES' : 'Auto-filled from ARES'}
+                    </div>
+                )}
                 <div className="ap-grid ap-grid--2">
                     <div className="ap-field">
                         <label>{lang === 'cs' ? 'IČO' : 'Business ID'}</label>
-                        <input className="ap-input" name="supplierIco" value={formData.supplierIco} onChange={handleChange} onBlur={handleInputBlur} placeholder="12345678" />
+                        <input className="ap-input" name="supplierIco" value={formData.supplierIco} onChange={handleSupplierIcoChange} onBlur={handleInputBlur} placeholder="12345678" />
                     </div>
                     <div className="ap-field">
                         <label>{lang === 'cs' ? 'DIČ' : 'VAT ID'}</label>
@@ -1088,40 +1134,6 @@ export default function InvoiceForm({
 
                     {/* AI dictation card */}
                     <AIPrompt lang={lang} onFillForm={handleAIFill} onPreviewInvoice={handleAIPreview} />
-
-                    {/* ARES confirm modal */}
-                    {aresConfirmResults.length > 0 && (
-                        <div className="ap-card">
-                            <div style={{ fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span>{lang === 'cs' ? 'Vyberte firmu z ARES' : 'Select company from ARES'}</span>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--muted)', fontWeight: 400 }}>
-                                    {lang === 'cs' ? `– nalezeno pro "${pendingAiFill?.clientName}"` : `– found for "${pendingAiFill?.clientName}"`}
-                                </span>
-                            </div>
-                            <div style={{ display: 'grid', gap: '8px', marginBottom: '12px' }}>
-                                {aresConfirmResults.map((entity, i) => {
-                                    const parsed = parseAresItem(entity)
-                                    return (
-                                        <button
-                                            key={i}
-                                            type="button"
-                                            onClick={() => handleSelectAresForAI(entity)}
-                                            className="ap-ai__hint"
-                                            style={{ textAlign: 'left' }}
-                                        >
-                                            <div style={{ fontWeight: 600, marginBottom: 2 }}>{parsed.name}</div>
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-                                                {parsed.ico && `IČO: ${parsed.ico}`}{parsed.address && ` · ${parsed.address}`}
-                                            </div>
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                            <button type="button" className="ap-btn ap-btn--ghost" style={{ fontSize: '0.85rem' }} onClick={() => applyAIClientData(pendingAiFill)}>
-                                {lang === 'cs' ? 'Použít data z AI bez ověření' : 'Use AI data without verification'}
-                            </button>
-                        </div>
-                    )}
 
                     {/* Region/Tax Warning */}
                     {defaultSupplier?.region === 'CZ' && defaultSupplier?.taxStatus === 'non-payer' && formData.clientCountry !== 'CZ' && (
