@@ -12,7 +12,9 @@ Today's date is ${today}. Use this when computing relative dates like "due in 14
 
 Return exactly this JSON structure (use null for unknown fields, never omit keys):
 {
-  "clientName": "company or person name",
+  "supplierName": "issuer/supplier company name if explicitly mentioned in the prompt, or null",
+  "supplierIco": "issuer/supplier IČO if explicitly mentioned, or null",
+  "clientName": "client/recipient company or person name",
   "clientEmail": "email address or null",
   "clientPhone": "phone number or null",
   "clientAddress": "full street address or null",
@@ -31,6 +33,7 @@ Return exactly this JSON structure (use null for unknown fields, never omit keys
 }
 
 Rules:
+- supplierName / supplierIco: only set if the prompt explicitly names the issuing company (e.g. "from ABC s.r.o." or "Invoice by XYZ"); otherwise null
 - clientCountry: CZ for Czech clients, SK for Slovak clients, default CZ
 - currency: CZK unless EUR is explicitly mentioned
 - prices are plain numbers, no currency symbols
@@ -117,9 +120,25 @@ async function enrichWithAres(data) {
     if (city) data.clientArea = city;
 }
 
+async function enrichSupplierWithAres(data) {
+    const ico = data.supplierIco ? String(data.supplierIco).trim() : null;
+    const name = data.supplierName ? String(data.supplierName).trim() : null;
+    if (!ico && !name) return;
+    const entity = ico ? await fetchAresByIco(ico) : await fetchAresByName(name);
+    if (!entity) return;
+    if (entity.obchodniJmeno) data.supplierName = entity.obchodniJmeno;
+    if (entity.ico) data.supplierIco = String(entity.ico);
+    if (entity.dic) data.supplierVat = entity.dic;
+    const addr = aresAddress(entity);
+    if (addr) data.supplierAddress = addr;
+}
+
 async function parseInvoiceWithAI(prompt, lang = 'en') {
     const data = await callGeminiApi(prompt, lang);
-    await enrichWithAres(data).catch(() => {});
+    await Promise.all([
+        enrichWithAres(data).catch(() => {}),
+        enrichSupplierWithAres(data).catch(() => {})
+    ]);
     return data;
 }
 

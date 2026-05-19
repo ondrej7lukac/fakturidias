@@ -943,6 +943,10 @@ export default function InvoiceForm({
             issueDate: data.issueDate || prev.issueDate,
             variableSymbol: data.variableSymbol || prev.variableSymbol,
             paymentNote: data.paymentNote || prev.paymentNote,
+            ...(data.supplierName ? { supplierName: data.supplierName } : {}),
+            ...(data.supplierIco ? { supplierIco: data.supplierIco } : {}),
+            ...(data.supplierVat ? { supplierVat: data.supplierVat } : {}),
+            ...(data.supplierAddress ? { supplierAddress: data.supplierAddress } : {}),
         }))
         if (Array.isArray(data.items) && data.items.length > 0) {
             const vatPayer = formData.isVatPayer
