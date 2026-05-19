@@ -6,6 +6,7 @@ invoice-react/node_modules/
 .env
 .env.local
 .env.*.local
+.env.keys
 
 # Sensitive files
 google_tokens.json

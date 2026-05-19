@@ -73,7 +73,6 @@ export default function Header({
   }
 
   const isCz = lang === 'cs'
-  const isSettings = currentView === 'settings'
 
   return (
     <header className="lp-header lp-header--app">
@@ -84,23 +83,17 @@ export default function Header({
           <img src="/GEMINI_LOGO_LONG.png" alt="Fakturidias" className="lp-logo" />
         </button>
 
-        {/* Desktop nav */}
-        <nav className="lp-nav">
-          <button
-            className={`lp-nav__link lp-nav__link--btn${!isSettings ? ' lp-nav__link--active' : ''}`}
-            onClick={onOpenDashboard}
-          >
+        {/* Desktop segment: Invoice overview + New invoice */}
+        <div className="ap-seg header-seg-desktop">
+          <button className="ap-seg__btn" onClick={onOpenDashboard}>
             <BarChart2 size={ICON_SM} strokeWidth={STROKE} />
-            {isCz ? 'Přehled faktur' : 'Invoices'}
+            <span className="seg-label-long">{isCz ? 'Přehled faktur' : 'Invoice overview'}</span>
           </button>
-          <button
-            className={`lp-nav__link lp-nav__link--btn${isSettings ? ' lp-nav__link--active' : ''}`}
-            onClick={() => onViewChange('settings')}
-          >
-            <Settings2 size={ICON_SM} strokeWidth={STROKE} />
-            {isCz ? 'Nastavení' : 'Settings'}
+          <button className="ap-seg__btn ap-seg__btn--primary" onClick={onNewInvoice}>
+            <Plus size={ICON_SM} strokeWidth={STROKE} />
+            {isCz ? 'Nová faktura' : 'New invoice'}
           </button>
-        </nav>
+        </div>
 
         {/* Actions */}
         <div className="lp-header__actions">
@@ -118,14 +111,8 @@ export default function Header({
             aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
           >
             {theme === 'dark'
-              ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-              : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>}
-          </button>
-
-          {/* New invoice — desktop */}
-          <button className="lp-btn lp-btn--primary header-new-desktop" onClick={onNewInvoice}>
-            <Plus size={ICON_SM} strokeWidth={STROKE} />
-            {isCz ? 'Nová faktura' : 'New invoice'}
+              ? <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+              : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>}
           </button>
 
           {/* User avatar with dropdown */}
@@ -205,7 +192,7 @@ export default function Header({
               onClick={() => { onOpenDashboard(); setMobileMenuOpen(false) }}
             >
               <BarChart2 size={ICON_SM} strokeWidth={STROKE} />
-              {isCz ? 'Přehled faktur' : 'Invoices'}
+              {isCz ? 'Přehled faktur' : 'Invoice overview'}
             </button>
             <button
               className="lp-btn lp-btn--primary"
@@ -214,14 +201,6 @@ export default function Header({
             >
               <Plus size={ICON_SM} strokeWidth={STROKE} />
               {isCz ? 'Nová faktura' : 'New invoice'}
-            </button>
-            <button
-              className="lp-btn lp-btn--secondary"
-              style={{ justifyContent: 'flex-start', width: '100%' }}
-              onClick={() => { onViewChange('settings'); setMobileMenuOpen(false) }}
-            >
-              <Settings2 size={ICON_SM} strokeWidth={STROKE} />
-              {isCz ? 'Nastavení' : 'Settings'}
             </button>
           </div>
 

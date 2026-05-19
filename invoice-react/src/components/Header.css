@@ -42,6 +42,14 @@
   gap: 7px;
 }
 
+/* Segment toggle (Invoice overview + New invoice) in app header */
+.header-seg-desktop {
+  margin-left: 16px !important; /* override ap-seg's auto margin */
+}
+@media (max-width: 700px) {
+  .header-seg-desktop { display: none !important; }
+}
+
 /* Language toggle — hide on small screens */
 @media (max-width: 700px) {
   .header-lang-desktop { display: none !important; }

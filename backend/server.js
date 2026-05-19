@@ -3,7 +3,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const cookieSession = require('cookie-session');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+require('@dotenvx/dotenvx').config({ path: path.join(__dirname, '..', '.env') });
 
 const { logDebug, sendJson, sendNotFound, SECURITY_HEADERS } = require('./lib/utils');
 const { connectDB } = require('./lib/storage');
@@ -51,6 +51,7 @@ const STATIC_MIMES = {
 
 // Build dispatch tables once at startup
 const publicRouter = createRouter();
+publicRouter.add('GET', '/health', ({ res }) => sendJson(res, 200, { status: 'ok' }));
 require('./routes/ares').attach(publicRouter);
 require('./routes/rpo').attach(publicRouter);
 require('./routes/vat').attach(publicRouter);

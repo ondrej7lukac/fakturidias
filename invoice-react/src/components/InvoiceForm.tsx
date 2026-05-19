@@ -990,6 +990,18 @@ export default function InvoiceForm({
         </div>
     )
 
+    const getDueInDays = () => {
+        if (!formData.dueDate) return null
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const due = new Date(formData.dueDate)
+        due.setHours(0, 0, 0, 0)
+        const days = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        if (days < 0) return lang === 'cs' ? `Po splatnosti (${Math.abs(days)} dní)` : `Overdue by ${Math.abs(days)} days`
+        if (days === 0) return lang === 'cs' ? 'Splatno dnes' : 'Due today'
+        return lang === 'cs' ? `Splatnost za ${days} dní` : `Due in ${days} days`
+    }
+
     // Summary sidebar card
     const summaryCard = (
         <div className="ap-card" style={{
@@ -1005,16 +1017,16 @@ export default function InvoiceForm({
                     <span style={{ fontFamily: 'var(--font-secondary, inherit)', fontWeight: 500 }}>{formData.taxBase} {formData.currency}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                    <span style={{ color: 'var(--muted)' }}>{lang === 'cs' ? 'DPH' : 'VAT'}</span>
+                    <span style={{ color: 'var(--muted)' }}>{lang === 'cs' ? `DPH ${formData.taxRate} %` : `VAT ${formData.taxRate} %`}</span>
                     <span style={{ fontFamily: 'var(--font-secondary, inherit)', fontWeight: 500 }}>{formData.taxAmount} {formData.currency}</span>
                 </div>
                 <div className="ap-summary-total">
-                    <span style={{ fontWeight: 600 }}>{lang === 'cs' ? 'Celkem k úhradě' : 'Total due'}</span>
+                    <span style={{ fontWeight: 600 }}>{lang === 'cs' ? 'Celkem k úhradě' : 'Total to be paid'}</span>
                     <span className="amount">{formData.amount}</span>
                 </div>
                 <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
                     <span className={`ap-pill ${formData.status}`}>{t[formData.status] || formData.status}</span>
-                    <span style={{ color: 'var(--muted)' }}>{formData.currency}</span>
+                    {getDueInDays() && <span style={{ color: 'var(--muted)' }}>{getDueInDays()}</span>}
                 </div>
             </div>
         </div>
@@ -1161,17 +1173,17 @@ export default function InvoiceForm({
                         </div>
                     </div>
 
-                    {/* Client / Bill To */}
+                    {/* Client / Subscriber */}
                     <div className="ap-card">
                         <h3 className="ap-card__title">
                             <Contact size={ICON_MD} strokeWidth={STROKE} />
-                            {lang === 'cs' ? 'Odběratel' : 'Bill to'}
+                            {lang === 'cs' ? 'Odběratel' : 'Subscriber'}
                         </h3>
 
                         {/* Name search — full width */}
-                        <div style={{ marginBottom: 14 }}>
-                            <div className="ap-field">
-                                <label>{lang === 'cs' ? 'Jméno / Název' : 'Name / Company'}</label>
+                        <div className="ap-grid ap-grid--2" style={{ marginBottom: 14 }}>
+                            <div className="ap-field" style={{ gridColumn: 'span 2' }}>
+                                <label>{lang === 'cs' ? 'Jméno / Název' : 'Name / Title'}</label>
                                 <div className="ap-input-wrap" style={{ position: 'relative' }}>
                                     <Search size={ICON_SM} strokeWidth={STROKE} />
                                     <input
@@ -1295,14 +1307,14 @@ export default function InvoiceForm({
                     <div className="ap-card">
                         <h3 className="ap-card__title">
                             <Wallet size={ICON_MD} strokeWidth={STROKE} />
-                            {lang === 'cs' ? 'Položky' : 'Line items'}
+                            {lang === 'cs' ? 'Položky' : 'Items'}
                         </h3>
 
                         <div className="ap-items">
                             {/* Header row */}
                             <div className="ap-items__row">
-                                <div>{lang === 'cs' ? 'Popis položky' : 'Line description'}</div>
-                                <div>{lang === 'cs' ? 'Množství' : 'Qty'}</div>
+                                <div>{lang === 'cs' ? 'Popis položky' : 'Item description'}</div>
+                                <div>{lang === 'cs' ? 'Množství' : 'Amount'}</div>
                                 <div>{lang === 'cs' ? 'Jedn.' : 'Unit'}</div>
                                 <div style={{ textAlign: 'right' }}>{lang === 'cs' ? 'Jedn. cena' : 'Unit price'}</div>
                                 <div style={{ textAlign: 'right' }}>{lang === 'cs' ? 'DPH %' : 'VAT %'}</div>
@@ -1329,7 +1341,7 @@ export default function InvoiceForm({
                                         onChange={e => updateItem(i, 'unit', e.target.value)}
                                     >
                                         <option value="h">{lang === 'cs' ? 'h' : 'h'}</option>
-                                        <option value="ks">{lang === 'cs' ? 'ks' : 'pc'}</option>
+                                        <option value="ks">{lang === 'cs' ? 'ks' : 'pcs'}</option>
                                         <option value="m">{lang === 'cs' ? 'měsíc' : 'month'}</option>
                                     </select>
                                     <input
@@ -1377,7 +1389,7 @@ export default function InvoiceForm({
                                 <span className="num">{formData.taxAmount}</span>
                             </div>
                             <div className="ap-totals__row ap-totals__row--grand">
-                                <span>{lang === 'cs' ? 'Celkem k úhradě' : 'Total due'}</span>
+                                <span>{lang === 'cs' ? 'Celkem k úhradě' : 'Total to be paid'}</span>
                                 <span className="num">{formData.amount} {formData.currency}</span>
                             </div>
                         </div>
@@ -1443,7 +1455,7 @@ export default function InvoiceForm({
                     </div>
 
                     {/* Action bar */}
-                    <div className="ap-action-bar">
+                    <div className="ap-action-bar ap-action-bar--mobile-stack">
                         <button type="button" onClick={() => setFormData(prev => ({ ...prev, status: 'draft' }))} className="ap-btn ap-btn--ghost">
                             {lang === 'cs' ? 'Uložit jako rozepsanou' : 'Save as draft'}
                         </button>
