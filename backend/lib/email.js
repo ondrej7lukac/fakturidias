@@ -1,3 +1,4 @@
+'use strict';
 const https = require('https');
 const { sendJson } = require('./utils');
 
@@ -60,16 +61,16 @@ async function handleEmailSend(req, res, body) {
                 try {
                     const parsed = JSON.parse(raw);
                     if (response.statusCode >= 400) {
-                        return resolve(sendJson(res, 502, { error: 'Resend error', message: parsed.message || raw }));
+                        return resolve(sendJson(res, 502, { error: 'Email delivery failed' }));
                     }
                     resolve(sendJson(res, 200, { success: true, id: parsed.id }));
-                } catch (err) {
-                    resolve(sendJson(res, 500, { error: 'Failed to parse Resend response' }));
+                } catch {
+                    resolve(sendJson(res, 500, { error: 'Failed to parse email service response' }));
                 }
             });
         });
 
-        req.on('error', (err) => resolve(sendJson(res, 500, { error: err.message })));
+        req.on('error', () => resolve(sendJson(res, 500, { error: 'Email delivery unavailable' })));
         req.write(payload);
         req.end();
     });

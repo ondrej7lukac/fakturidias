@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "npm install --prefix invoice-react && npm run build --prefix invoice-react",
-    "start": "node server.js"
+    "start": "node backend/server.js"
   },
   "dependencies": {
     "cookie": "^1.1.1",

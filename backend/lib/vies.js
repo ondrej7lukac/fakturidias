@@ -1,17 +1,10 @@
+'use strict';
 const https = require('https');
 const { sendJson } = require('./utils');
 
-/**
- * EU VIES VAT Validation Service
- * REST API: https://ec.europa.eu/taxation_customs/vies/rest-api/ms/
- */
-
 async function validateVat(ms, vatNumber) {
     return new Promise((resolve, reject) => {
-        const payload = JSON.stringify({
-            countryCode: ms,
-            vatNumber: vatNumber
-        });
+        const payload = JSON.stringify({ countryCode: ms, vatNumber });
 
         const options = {
             hostname: 'ec.europa.eu',
@@ -29,7 +22,6 @@ async function validateVat(ms, vatNumber) {
             res.on('end', () => {
                 try {
                     const parsed = JSON.parse(data);
-                    // Standard response includes: isValid, requestDate, userError, name, address
                     resolve({
                         ok: res.statusCode === 200,
                         isValid: parsed.isValid,
@@ -38,7 +30,7 @@ async function validateVat(ms, vatNumber) {
                         requestDate: parsed.requestDate,
                         error: parsed.userError || null
                     });
-                } catch (e) {
+                } catch {
                     resolve({ ok: false, error: 'Invalid response from VIES' });
                 }
             });
@@ -54,7 +46,6 @@ async function handleVatValidate(req, res, body) {
     const fullVat = String(body.vat || '').trim().toUpperCase().replace(/\s/g, '');
     if (!fullVat) return sendJson(res, 400, { error: 'Missing VAT number' });
 
-    // Extract country code (first 2 chars) and number
     const ms = fullVat.slice(0, 2);
     const vatNumber = fullVat.slice(2);
 
@@ -70,10 +61,8 @@ async function handleVatValidate(req, res, body) {
             sendJson(res, 502, { error: 'VIES validation failed', details: result.error });
         }
     } catch (error) {
-        sendJson(res, 502, { error: 'VIES service unavailable', details: error.message });
+        sendJson(res, 502, { error: 'VIES service unavailable' });
     }
 }
 
-module.exports = {
-    handleVatValidate
-};
+module.exports = { handleVatValidate };

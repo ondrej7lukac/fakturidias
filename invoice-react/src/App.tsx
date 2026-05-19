@@ -422,6 +422,7 @@ function App() {
                                     isAuthenticated={!!user}
                                     dashboardOpen={dashboardOpen}
                                     setDashboardOpen={setDashboardOpen}
+                                    onNewInvoice={handleNewInvoice}
                                     // Props for inline editing:
                                     onSave={handleSaveInvoice}
                                     onAddCategory={handleAddCategory}

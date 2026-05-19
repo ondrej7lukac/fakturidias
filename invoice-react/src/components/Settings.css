@@ -1,0 +1,59 @@
+/* Settings-specific styles — ap-* base classes come from ap-design.css */
+
+.settings-tab-body {
+  display: grid;
+  gap: 18px;
+}
+
+/* Label row with optional "Edit" unlock button */
+.settings-fld-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.settings-fld-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.settings-unlock {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.settings-unlock:hover { color: var(--text); }
+
+/* Span 2 columns in ap-grid--2 */
+.settings-span-2 { grid-column: span 2; }
+@media (max-width: 700px) {
+  .settings-span-2 { grid-column: span 1; }
+}
+
+/* Account number + bank code inline row */
+.settings-account-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-slash {
+  color: var(--muted);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.settings-bank-code {
+  max-width: 90px;
+  flex-shrink: 0;
+}

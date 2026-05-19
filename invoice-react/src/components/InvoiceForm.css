@@ -18,6 +18,52 @@
   gap: 1rem;
 }
 
+.form-warning-banner {
+  padding: 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+  color: var(--warn);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vat-valid {
+  color: var(--accent);
+  margin-left: 5px;
+  flex-shrink: 0;
+}
+
+.vat-invalid {
+  color: var(--danger);
+  margin-left: 5px;
+  font-size: 0.75rem;
+}
+
+.item-suggestion {
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 6px;
+  margin-bottom: 2px;
+  transition: background 0.15s ease;
+}
+
+.item-suggestion:hover {
+  background: var(--accent2-soft);
+}
+
+.form-info-banner {
+  padding: 8px;
+  background: var(--success-bg);
+  border: 1px dotted var(--success-border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+}
+
 @media (max-width: 768px) {
   .invoice-form-container {
     width: 100% !important;

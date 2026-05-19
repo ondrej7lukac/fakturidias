@@ -2,6 +2,22 @@
   margin-bottom: 1.5rem;
 }
 
+.ares-results-list {
+  margin-top: 1rem;
+  display: grid;
+  gap: 8px;
+}
+
+.ares-result-item {
+  text-align: left;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  width: 100%;
+}
+
 .ares-v3-root {
   width: 100%;
 }
@@ -9,8 +25,8 @@
 .ares-v3-box {
   margin-bottom: 3rem;
   padding: 2rem;
-  background: rgba(124, 247, 212, 0.03);
-  border: 1px solid rgba(124, 247, 212, 0.1);
+  background: var(--glass-sm);
+  border: 1px solid var(--accent-soft);
   border-radius: 20px;
 }
 
@@ -18,7 +34,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(16, 185, 129, 0.05);
+  background: var(--success-bg);
   border: 1px solid var(--accent-2);
   border-radius: var(--radius);
   padding: 1rem;
@@ -71,12 +87,12 @@
 }
 
 .settings-v3-nav-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass);
   color: var(--text);
 }
 
 .settings-v3-nav-item.active {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-md);
   color: var(--accent);
 }
 
@@ -155,34 +171,9 @@
 }
 
 .settings-v3-input-locked {
-  background: rgba(0, 0, 0, 0.2) !important;
+  background: var(--overlay) !important;
   color: var(--muted) !important;
   cursor: default;
-}
-
-.settings-v3-action-bar {
-  margin-top: 4rem;
-  padding-top: 2rem;
-  border-top: 1px solid var(--border);
-  display: flex;
-  justify-content: flex-end;
-}
-
-.settings-v3-save-btn {
-  background: var(--accent);
-  color: #0b1022;
-  border: none;
-  padding: 16px 48px;
-  border-radius: 14px;
-  font-weight: 700;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.settings-v3-save-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(124, 247, 212, 0.25);
 }
 
 @media (max-width: 1024px) {

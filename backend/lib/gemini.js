@@ -1,3 +1,4 @@
+'use strict';
 const https = require('https');
 const { sendJson } = require('./utils');
 const { fetchAresByIco, fetchAresByName } = require('./ares');
@@ -126,7 +127,7 @@ async function handleGeminiInvoice(req, res, body) {
         await enrichWithAres(data);
         return sendJson(res, 200, { success: true, data });
     } catch (err) {
-        return sendJson(res, 500, { error: 'AI processing failed', message: err.message });
+        return sendJson(res, 500, { error: 'AI processing failed' });
     }
 }
 

@@ -1,5 +1,5 @@
 import './Header.css'
-import { Button } from '@/components/ui/button'
+import { useState } from 'react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +13,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { Settings2, X, Menu, FileText, Check } from '@/lib/icons'
+import { BarChart2, Plus, Settings2, X, Menu, Check, ICON_SM, STROKE } from '@/lib/icons'
 
 interface HeaderProps {
   onNewInvoice: () => void
@@ -41,11 +41,19 @@ export default function Header({
   onOpenDashboard,
   user,
   onLogout,
-  mobileView,
-  setMobileView,
   mobileMenuOpen,
   setMobileMenuOpen,
 }: HeaderProps) {
+  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
+    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  )
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    document.documentElement.classList.remove('theme-light', 'theme-dark')
+    document.documentElement.classList.add(`theme-${next}`)
+    setTheme(next)
+  }
 
   const handleLogin = async () => {
     const w = 500, h = 600
@@ -56,93 +64,88 @@ export default function Header({
       const res = await fetch('/auth/google/url')
       if (!res.ok) throw new Error('Failed to start login')
       const data = await res.json()
-      if (data.url && popup) {
-        popup.location.href = data.url
-      } else {
-        popup?.close()
-      }
+      if (data.url && popup) popup.location.href = data.url
+      else popup?.close()
     } catch {
       popup?.close()
       alert('Failed to connect to login server.')
     }
   }
 
+  const isCz = lang === 'cs'
+  const isSettings = currentView === 'settings'
+
   return (
-    <header className="header">
-      <div className="header__inner">
+    <header className="lp-header lp-header--app">
+      <div className="lp-header__inner lp-header__inner--app">
 
         {/* Brand */}
-        <div className="brand" onClick={() => onViewChange('invoices')} role="button" tabIndex={0}>
-          <img src="/GEMINI_GEN_LOGO.png" alt="Fakturidias" className="brand__mark" />
-          <div className="brand__text">
-            <span className="brand__name">Fakturidias</span>
-            <span className="brand__sub">Invoices & Proforma</span>
-          </div>
-        </div>
+        <button className="lp-brand lp-brand--btn" onClick={() => onViewChange('invoices')}>
+          <img src="/GEMINI_LOGO_LONG.png" alt="Fakturidias" className="lp-logo" />
+        </button>
 
-        {/* ── Desktop nav ────────────────────────────────────── */}
-        <div className="header__nav">
-          <Button
-            variant="outline"
-            size="sm"
+        {/* Desktop nav */}
+        <nav className="lp-nav">
+          <button
+            className={`lp-nav__link lp-nav__link--btn${!isSettings ? ' lp-nav__link--active' : ''}`}
             onClick={onOpenDashboard}
-            className={currentView === 'invoices' ? 'border-border' : 'border-transparent'}
-            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text)' }}
           >
-            {lang === 'cs' ? 'Přehled faktur' : 'Invoices'}
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={onNewInvoice}
-            style={{
-              background: 'linear-gradient(135deg, rgba(124,247,212,0.92), rgba(138,164,255,0.92))',
-              color: '#061022',
-              border: '1px solid rgba(255,255,255,0.14)',
-              fontWeight: 700,
-            }}
+            <BarChart2 size={ICON_SM} strokeWidth={STROKE} />
+            {isCz ? 'Přehled faktur' : 'Invoices'}
+          </button>
+          <button
+            className={`lp-nav__link lp-nav__link--btn${isSettings ? ' lp-nav__link--active' : ''}`}
+            onClick={() => onViewChange('settings')}
           >
-            + {lang === 'cs' ? 'Vytvořit fakturu' : 'New Invoice'}
-          </Button>
+            <Settings2 size={ICON_SM} strokeWidth={STROKE} />
+            {isCz ? 'Nastavení' : 'Settings'}
+          </button>
+        </nav>
 
-          {/* Language toggle — CS / EN inline */}
-          <div className="lang-toggle">
-            <button
-              className={`lang-toggle__btn${lang === 'cs' ? ' lang-toggle__btn--active' : ''}`}
-              onClick={() => setLang('cs')}
-            >CS</button>
-            <button
-              className={`lang-toggle__btn${lang === 'en' ? ' lang-toggle__btn--active' : ''}`}
-              onClick={() => setLang('en')}
-            >EN</button>
+        {/* Actions */}
+        <div className="lp-header__actions">
+
+          {/* Language toggle */}
+          <div className="lp-lang header-lang-desktop">
+            <button className={`lp-lang__btn${lang === 'cs' ? ' lp-lang__btn--active' : ''}`} onClick={() => setLang('cs')}>CS</button>
+            <button className={`lp-lang__btn${lang === 'en' ? ' lp-lang__btn--active' : ''}`} onClick={() => setLang('en')}>EN</button>
           </div>
 
-          {/* User menu */}
+          {/* Theme toggle */}
+          <button
+            className="lp-icon-toggle"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          >
+            {theme === 'dark'
+              ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+              : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>}
+          </button>
+
+          {/* New invoice — desktop */}
+          <button className="lp-btn lp-btn--primary header-new-desktop" onClick={onNewInvoice}>
+            <Plus size={ICON_SM} strokeWidth={STROKE} />
+            {isCz ? 'Nová faktura' : 'New invoice'}
+          </button>
+
+          {/* User avatar with dropdown */}
           <DropdownMenu>
-            <DropdownMenuTrigger className="user-trigger" aria-label="User menu">
-              <span className={`user-avatar${user ? ' user-avatar--active' : ''}`}>
+            <DropdownMenuTrigger asChild>
+              <button className={`ap-avatar${user ? ' ap-avatar--active' : ''}`} aria-label="User menu">
                 {user ? user.email[0].toUpperCase() : 'G'}
-              </span>
+              </button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent
-              align="end"
-              sideOffset={8}
-              className="user-dropdown"
-              style={{ background: 'rgba(10,13,28,0.96)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: '16px', padding: 0, minWidth: '220px', boxShadow: 'var(--shadow)' }}
-            >
-              {/* User info card */}
+            <DropdownMenuContent align="end" sideOffset={8} className="user-dropdown">
               {user ? (
                 <div className="user-dropdown__card">
-                  <div className="user-dropdown__avatar">
-                    {user.email[0].toUpperCase()}
-                  </div>
+                  <div className="user-dropdown__avatar">{user.email[0].toUpperCase()}</div>
                   <div className="user-dropdown__info">
                     <div className="user-dropdown__name">{user.email.split('@')[0]}</div>
                     <div className="user-dropdown__email">{user.email}</div>
                     <div className="user-dropdown__badge">
                       <Check size={10} strokeWidth={3} />
-                      {lang === 'cs' ? 'Přihlášen' : 'Signed in'}
+                      {isCz ? 'Přihlášen' : 'Signed in'}
                     </div>
                   </div>
                 </div>
@@ -150,140 +153,92 @@ export default function Header({
                 <div className="user-dropdown__signin-prompt">
                   <div className="user-dropdown__google-icon">G</div>
                   <div>
-                    <div className="user-dropdown__prompt-title">{lang === 'cs' ? 'Nejste přihlášeni' : 'Not signed in'}</div>
-                    <div className="user-dropdown__prompt-sub">{lang === 'cs' ? 'Přihlaste se pro ukládání faktur' : 'Sign in to save invoices'}</div>
+                    <div className="user-dropdown__prompt-title">{isCz ? 'Nejste přihlášeni' : 'Not signed in'}</div>
+                    <div className="user-dropdown__prompt-sub">{isCz ? 'Přihlaste se pro ukládání faktur' : 'Sign in to save invoices'}</div>
                   </div>
                 </div>
               )}
-
-              <DropdownMenuSeparator style={{ background: 'var(--border)', margin: 0 }} />
-
-              {/* Actions */}
-              <div style={{ padding: '6px' }}>
-                <DropdownMenuItem
-                  onClick={() => onViewChange('settings')}
-                  className="user-dropdown__item"
-                  style={{ borderRadius: '10px', padding: '9px 12px', cursor: 'pointer', color: 'var(--text)', gap: '10px' }}
-                >
-                  <Settings2 size={15} strokeWidth={2} style={{ color: 'var(--muted)', flexShrink: 0 }} />
-                  <span>{t.settings || 'Settings'}</span>
+              <DropdownMenuSeparator className="user-dropdown__separator" />
+              <div className="user-dropdown__actions">
+                <DropdownMenuItem onClick={() => onViewChange('settings')} className="user-dropdown__item">
+                  <Settings2 size={15} strokeWidth={2} className="user-dropdown__item-icon" />
+                  <span>{isCz ? 'Nastavení' : 'Settings'}</span>
                 </DropdownMenuItem>
-
-                <DropdownMenuSeparator style={{ background: 'var(--border)', margin: '4px 0' }} />
-
+                <DropdownMenuSeparator className="user-dropdown__separator--inner" />
                 {user ? (
-                  <DropdownMenuItem
-                    onClick={onLogout}
-                    className="user-dropdown__item user-dropdown__item--danger"
-                    style={{ borderRadius: '10px', padding: '9px 12px', cursor: 'pointer', color: 'var(--danger)', gap: '10px' }}
-                  >
+                  <DropdownMenuItem onClick={onLogout} className="user-dropdown__item user-dropdown__item--danger">
                     <X size={15} strokeWidth={2} style={{ flexShrink: 0 }} />
-                    <span>{lang === 'cs' ? 'Odhlásit se' : 'Sign out'}</span>
+                    <span>{isCz ? 'Odhlásit se' : 'Sign out'}</span>
                   </DropdownMenuItem>
                 ) : (
-                  <DropdownMenuItem
-                    onClick={handleLogin}
-                    className="user-dropdown__item user-dropdown__item--signin"
-                    style={{ borderRadius: '10px', padding: '10px 12px', cursor: 'pointer', gap: '10px',
-                      background: 'linear-gradient(135deg, rgba(124,247,212,0.12), rgba(138,164,255,0.12))',
-                      border: '1px solid rgba(124,247,212,0.2)',
-                      color: 'var(--accent)', fontWeight: 700 }}
-                  >
-                    <span style={{ fontWeight: 800, fontSize: '14px', flexShrink: 0, width: 15, textAlign: 'center' }}>G</span>
-                    <span>{lang === 'cs' ? 'Přihlásit se přes Google' : 'Sign in with Google'}</span>
+                  <DropdownMenuItem onClick={handleLogin} className="user-dropdown__item user-dropdown__item--signin">
+                    <span className="user-dropdown__signin-letter">G</span>
+                    <span>{isCz ? 'Přihlásit se přes Google' : 'Sign in with Google'}</span>
                   </DropdownMenuItem>
                 )}
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
 
-        {/* ── Mobile controls ─────────────────────────────────── */}
-        <div className="header__mobile">
-          <div className="view-switch">
-            <button
-              className={`switch-option ${mobileView === 'list' ? 'active' : ''}`}
-              onClick={() => setMobileView('list')}
-            >
-              {lang === 'cs' ? 'Seznam' : 'List'}
-            </button>
-            <button
-              className={`switch-option ${mobileView === 'form' ? 'active' : ''}`}
-              onClick={() => setMobileView('form')}
-            >
-              {lang === 'cs' ? 'Faktura' : 'Invoice'}
-            </button>
-          </div>
-
-          <Button
-            variant="outline"
-            size="icon"
+          {/* Mobile hamburger */}
+          <button
+            className="lp-icon-toggle header-mobile-menu"
             onClick={() => setMobileMenuOpen(true)}
-            className="w-9 h-9"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', color: 'var(--text)' }}
+            aria-label="Menu"
           >
             <Menu size={18} strokeWidth={2} />
-          </Button>
+          </button>
         </div>
       </div>
 
-      {/* ── Mobile Sheet menu ────────────────────────────────── */}
+      {/* Mobile Sheet */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent
-          side="right"
-          className="flex flex-col gap-0 p-0 w-[300px]"
-          style={{ background: 'rgba(10,12,25,0.92)', backdropFilter: 'blur(20px)', borderLeft: '1px solid var(--border)', color: 'var(--text)' }}
-        >
+        <SheetContent side="right" className="flex flex-col gap-0 p-0 w-[300px] header__sheet">
           <SheetHeader className="px-6 py-5 border-b" style={{ borderColor: 'var(--border)' }}>
             <SheetTitle style={{ color: 'var(--text)', fontWeight: 700 }}>Menu</SheetTitle>
           </SheetHeader>
 
           <div className="flex flex-col gap-3 px-6 py-6 flex-1">
-            <Button
-              onClick={() => { onNewInvoice(); setMobileMenuOpen(false) }}
-              className="w-full justify-center text-base py-6"
-              style={{
-                background: 'linear-gradient(135deg, rgba(124,247,212,0.92), rgba(138,164,255,0.92))',
-                color: '#061022',
-                border: '1px solid rgba(255,255,255,0.14)',
-                fontWeight: 700,
-              }}
-            >
-              + {t.newInvoice || 'New Invoice'}
-            </Button>
-
-            <Button
-              variant="outline"
+            <button
+              className="lp-btn lp-btn--secondary"
+              style={{ justifyContent: 'flex-start', width: '100%' }}
               onClick={() => { onOpenDashboard(); setMobileMenuOpen(false) }}
-              className="w-full justify-center"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)' }}
             >
-              <FileText size={16} strokeWidth={2} className="mr-2" /> {t.invoices || 'Invoices'}
-            </Button>
-
-            <Button
-              variant="outline"
+              <BarChart2 size={ICON_SM} strokeWidth={STROKE} />
+              {isCz ? 'Přehled faktur' : 'Invoices'}
+            </button>
+            <button
+              className="lp-btn lp-btn--primary"
+              style={{ justifyContent: 'flex-start', width: '100%' }}
+              onClick={() => { onNewInvoice(); setMobileMenuOpen(false) }}
+            >
+              <Plus size={ICON_SM} strokeWidth={STROKE} />
+              {isCz ? 'Nová faktura' : 'New invoice'}
+            </button>
+            <button
+              className="lp-btn lp-btn--secondary"
+              style={{ justifyContent: 'flex-start', width: '100%' }}
               onClick={() => { onViewChange('settings'); setMobileMenuOpen(false) }}
-              className="w-full justify-center"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)' }}
             >
-              <Settings2 size={16} strokeWidth={2} className="mr-2" /> {t.settings || 'Settings'}
-            </Button>
+              <Settings2 size={ICON_SM} strokeWidth={STROKE} />
+              {isCz ? 'Nastavení' : 'Settings'}
+            </button>
           </div>
 
           <div className="flex flex-col gap-4 px-6 py-6 border-t" style={{ borderColor: 'var(--border)' }}>
-            {/* Language toggle in mobile menu */}
             <div>
               <p className="text-xs font-semibold mb-2 text-center opacity-60 uppercase tracking-wider">
-                {lang === 'cs' ? 'Jazyk' : 'Language'}
+                {isCz ? 'Jazyk' : 'Language'}
               </p>
-              <div className="lang-toggle lang-toggle--mobile">
+              <div className="lp-lang" style={{ width: '100%', borderRadius: 12 }}>
                 <button
-                  className={`lang-toggle__btn${lang === 'cs' ? ' lang-toggle__btn--active' : ''}`}
+                  className={`lp-lang__btn${lang === 'cs' ? ' lp-lang__btn--active' : ''}`}
+                  style={{ flex: 1, textAlign: 'center', padding: '8px 0' }}
                   onClick={() => { setLang('cs'); setMobileMenuOpen(false) }}
                 >CS — Čeština</button>
                 <button
-                  className={`lang-toggle__btn${lang === 'en' ? ' lang-toggle__btn--active' : ''}`}
+                  className={`lp-lang__btn${lang === 'en' ? ' lp-lang__btn--active' : ''}`}
+                  style={{ flex: 1, textAlign: 'center', padding: '8px 0' }}
                   onClick={() => { setLang('en'); setMobileMenuOpen(false) }}
                 >EN — English</button>
               </div>
@@ -291,24 +246,19 @@ export default function Header({
 
             {user && (
               <p className="text-xs text-center opacity-60">
-                {lang === 'cs' ? 'Přihlášen jako' : 'Logged in as'}: <strong>{user.email}</strong>
+                {isCz ? 'Přihlášen jako' : 'Logged in as'}: <strong>{user.email}</strong>
               </p>
             )}
 
-            <Button
+            <button
+              className={`lp-btn lp-btn--lg ${user ? 'header__mobile-auth--logout' : 'lp-btn--primary'}`}
+              style={{ justifyContent: 'center', width: '100%' }}
               onClick={() => { user ? onLogout() : handleLogin(); setMobileMenuOpen(false) }}
-              className="w-full justify-center py-6"
-              style={{
-                background: user ? 'rgba(255,91,122,0.15)' : 'linear-gradient(135deg, rgba(124,247,212,0.92), rgba(138,164,255,0.92))',
-                border: user ? '1px solid var(--danger)' : '1px solid rgba(255,255,255,0.14)',
-                color: user ? 'var(--danger)' : '#061022',
-                fontWeight: 700,
-              }}
             >
               {user
-                ? <><X size={16} strokeWidth={2} className="mr-2" /> {lang === 'cs' ? 'Odhlásit se' : 'Log out'}</>
-                : <><span className="font-bold mr-2">G</span> {lang === 'cs' ? 'Přihlásit se přes Google' : 'Sign in with Google'}</>}
-            </Button>
+                ? <><X size={ICON_SM} strokeWidth={2} /> {isCz ? 'Odhlásit se' : 'Log out'}</>
+                : <><span style={{ fontWeight: 800, marginRight: 6 }}>G</span> {isCz ? 'Přihlásit se přes Google' : 'Sign in with Google'}</>}
+            </button>
           </div>
         </SheetContent>
       </Sheet>
