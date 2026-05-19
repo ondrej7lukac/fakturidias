@@ -1,6 +1,6 @@
 'use strict';
 
-const { sendJson, readJsonBody } = require('../lib/utils');
+const { sendJson, parseBody } = require('../lib/utils');
 const {
     getUserInvoices,
     saveSingleInvoice,
@@ -15,25 +15,26 @@ function attach(router) {
         return sendJson(res, 200, { invoices });
     });
 
-    router.add('POST', '/api/invoices', ({ req, res, userEmail }) => {
-        readJsonBody(req, async (err, body) => {
-            if (err) return sendJson(res, 400, { error: 'Invalid JSON body' });
-            const { invoice } = body;
-            if (!invoice || !invoice.id) return sendJson(res, 400, { error: 'Invalid data' });
+    router.add('POST', '/api/invoices', async ({ req, res, userEmail }) => {
+        let body;
+        try { body = await parseBody(req); }
+        catch { return sendJson(res, 400, { error: 'Invalid request body' }); }
 
-            let success = false;
-            if (isConnected()) {
-                success = await saveSingleInvoice(userEmail, invoice);
-            } else {
-                const invoices = await getUserInvoices(userEmail);
-                const idx = invoices.findIndex(inv => inv.id === invoice.id);
-                if (idx >= 0) invoices[idx] = invoice; else invoices.push(invoice);
-                success = saveUserInvoices_FS(userEmail, invoices);
-            }
-            return success
-                ? sendJson(res, 200, { success: true, invoice })
-                : sendJson(res, 500, { error: 'Failed to save' });
-        });
+        const { invoice } = body;
+        if (!invoice?.id) return sendJson(res, 400, { error: 'Invoice id is required' });
+
+        let success = false;
+        if (isConnected()) {
+            success = await saveSingleInvoice(userEmail, invoice);
+        } else {
+            const invoices = await getUserInvoices(userEmail);
+            const idx = invoices.findIndex(inv => inv.id === invoice.id);
+            if (idx >= 0) invoices[idx] = invoice; else invoices.push(invoice);
+            success = saveUserInvoices_FS(userEmail, invoices);
+        }
+        return success
+            ? sendJson(res, 200, { success: true, invoice })
+            : sendJson(res, 500, { error: 'Failed to save' });
     });
 
     router.add('DELETE', '/api/invoices/:id', async ({ res, userEmail, params }) => {
@@ -41,14 +42,13 @@ function attach(router) {
         if (isConnected()) {
             await InvoiceModel.deleteOne({ userEmail, id });
             return sendJson(res, 200, { success: true });
-        } else {
-            const invoices = await getUserInvoices(userEmail);
-            const filtered = invoices.filter(inv => inv.id !== id);
-            const success = saveUserInvoices_FS(userEmail, filtered);
-            return success
-                ? sendJson(res, 200, { success: true })
-                : sendJson(res, 500, { error: 'Failed to delete' });
         }
+        const invoices = await getUserInvoices(userEmail);
+        const filtered = invoices.filter(inv => inv.id !== id);
+        const success = saveUserInvoices_FS(userEmail, filtered);
+        return success
+            ? sendJson(res, 200, { success: true })
+            : sendJson(res, 500, { error: 'Failed to delete' });
     });
 }
 

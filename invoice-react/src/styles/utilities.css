@@ -33,6 +33,9 @@
   --overlay: rgba(0, 0, 0, 0.2);
   --header-bg: rgba(10, 12, 25, 0.55);
   --header-bg-light: rgba(246, 247, 255, 0.66);
+  --font-display: 'Bricolage Grotesque', 'Outfit', system-ui, sans-serif;
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -168,6 +171,24 @@ html, body {
 @keyframes scale-up {
   0%   { transform: scale(0); }
   100% { transform: scale(1); }
+}
+
+/* Entrance animation — fade + rise */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Entrance animation — fade + scale */
+@keyframes fade-in-scale {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Shimmer sweep for highlight elements */
+@keyframes shimmer-sweep {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 @media (max-width: 768px) {

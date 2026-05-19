@@ -325,19 +325,10 @@ function App() {
 
     const handleLogout = () => {
         fetch('/auth/google/disconnect', { method: 'POST' })
+            .catch(err => console.error('Logout error:', err))
             .then(() => {
                 localStorage.clear()
                 window.location.reload()
-            })
-            .catch((err) => {
-                console.error('Logout error:', err)
-                localStorage.clear()
-                setUser(null)
-                setInvoices([])
-                setDefaultSupplier(null)
-                setCategories([])
-                setCurrentView('invoices')
-                setInvoiceCounter(1)
             })
     }
 

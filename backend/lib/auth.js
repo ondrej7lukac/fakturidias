@@ -138,7 +138,7 @@ async function handleAuthDisconnect(req, res) {
     const userEmail = await getCurrentUserEmail(req);
     req.session = null;
     if (isConnected() && userEmail) {
-        await TokenModel.deleteOne({ userEmail });
+        try { await TokenModel.deleteOne({ userEmail }); } catch {}
     }
     return sendJson(res, 200, { success: true });
 }

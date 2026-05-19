@@ -1,31 +1,6 @@
 'use strict';
 const https = require('https');
-const { sendJson } = require('./utils');
 const { fetchAresByIco, fetchAresByName } = require('./ares');
-
-function aresAddress(entity) {
-    const s = entity.sidlo || {};
-    if (s.textovaAdresa) return s.textovaAdresa;
-    const street = [s.nazevUlice || s.ulice, s.cisloDomovni, s.cisloOrientacni ? `/${s.cisloOrientacni}` : ''].filter(Boolean).join(' ');
-    const city = s.nazevObce || s.obec || '';
-    const zip = s.psc ? String(s.psc) : '';
-    return [street.trim(), `${city} ${zip}`.trim()].filter(Boolean).join(', ');
-}
-
-async function enrichWithAres(data) {
-    const ico = data.clientIco ? String(data.clientIco).trim() : null;
-    const name = data.clientName ? String(data.clientName).trim() : null;
-    if (!ico && !name) return;
-    const entity = ico ? await fetchAresByIco(ico) : await fetchAresByName(name);
-    if (!entity) return;
-    if (entity.obchodniJmeno) data.clientName = entity.obchodniJmeno;
-    if (entity.ico) data.clientIco = String(entity.ico);
-    if (entity.dic) data.clientVat = entity.dic;
-    const addr = aresAddress(entity);
-    if (addr) data.clientAddress = addr;
-    const city = entity.sidlo?.nazevObce || entity.sidlo?.obec || '';
-    if (city) data.clientArea = city;
-}
 
 function buildSystemPrompt(lang = 'en') {
     const today = new Date().toISOString().split('T')[0];
@@ -66,7 +41,7 @@ Rules:
 - Text field values (item names, paymentNote) in ${outputLang}. Structured fields stay in their natural format.`;
 }
 
-async function callGemini(prompt, lang = 'en') {
+function callGeminiApi(prompt, lang = 'en') {
     const apiKey = process.env.GEMINI_API_KEY;
     const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
@@ -100,9 +75,7 @@ async function callGemini(prompt, lang = 'en') {
             response.on('end', () => {
                 try {
                     const parsed = JSON.parse(raw);
-                    if (parsed.error) {
-                        return reject(new Error(parsed.error.message || 'Gemini API error'));
-                    }
+                    if (parsed.error) return reject(new Error(parsed.error.message || 'Gemini API error'));
                     const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (!text) return reject(new Error('Empty response from Gemini API'));
                     const match = text.match(/\{[\s\S]*\}/);
@@ -120,17 +93,34 @@ async function callGemini(prompt, lang = 'en') {
     });
 }
 
-async function handleGeminiInvoice(req, res, body) {
-    const { prompt, lang } = body;
-    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
-        return sendJson(res, 400, { error: 'prompt is required' });
-    }
-    try {
-        const data = await callGemini(prompt.trim(), lang || 'en');
-        return sendJson(res, 200, { success: true, data });
-    } catch (err) {
-        return sendJson(res, 500, { error: 'AI processing failed' });
-    }
+function aresAddress(entity) {
+    const s = entity.sidlo || {};
+    if (s.textovaAdresa) return s.textovaAdresa;
+    const street = [s.nazevUlice || s.ulice, s.cisloDomovni, s.cisloOrientacni ? `/${s.cisloOrientacni}` : ''].filter(Boolean).join(' ');
+    const city = s.nazevObce || s.obec || '';
+    const zip = s.psc ? String(s.psc) : '';
+    return [street.trim(), `${city} ${zip}`.trim()].filter(Boolean).join(', ');
 }
 
-module.exports = { handleGeminiInvoice };
+async function enrichWithAres(data) {
+    const ico = data.clientIco ? String(data.clientIco).trim() : null;
+    const name = data.clientName ? String(data.clientName).trim() : null;
+    if (!ico && !name) return;
+    const entity = ico ? await fetchAresByIco(ico) : await fetchAresByName(name);
+    if (!entity) return;
+    if (entity.obchodniJmeno) data.clientName = entity.obchodniJmeno;
+    if (entity.ico) data.clientIco = String(entity.ico);
+    if (entity.dic) data.clientVat = entity.dic;
+    const addr = aresAddress(entity);
+    if (addr) data.clientAddress = addr;
+    const city = entity.sidlo?.nazevObce || entity.sidlo?.obec || '';
+    if (city) data.clientArea = city;
+}
+
+async function parseInvoiceWithAI(prompt, lang = 'en') {
+    const data = await callGeminiApi(prompt, lang);
+    await enrichWithAres(data).catch(() => {});
+    return data;
+}
+
+module.exports = { parseInvoiceWithAI };

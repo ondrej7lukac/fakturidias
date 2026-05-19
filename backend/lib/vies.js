@@ -1,11 +1,9 @@
 'use strict';
 const https = require('https');
-const { sendJson } = require('./utils');
 
-async function validateVat(ms, vatNumber) {
+function validateVatWithVies(ms, vatNumber) {
     return new Promise((resolve, reject) => {
         const payload = JSON.stringify({ countryCode: ms, vatNumber });
-
         const options = {
             hostname: 'ec.europa.eu',
             path: '/taxation_customs/vies/rest-api/check-vat-number',
@@ -15,7 +13,6 @@ async function validateVat(ms, vatNumber) {
                 'Content-Length': Buffer.byteLength(payload)
             }
         };
-
         const req = https.request(options, (res) => {
             let data = '';
             res.on('data', chunk => data += chunk);
@@ -35,34 +32,37 @@ async function validateVat(ms, vatNumber) {
                 }
             });
         });
-
-        req.on('error', (e) => reject(e));
+        req.on('error', reject);
         req.write(payload);
         req.end();
     });
 }
 
-async function handleVatValidate(req, res, body) {
-    const fullVat = String(body.vat || '').trim().toUpperCase().replace(/\s/g, '');
-    if (!fullVat) return sendJson(res, 400, { error: 'Missing VAT number' });
+async function checkVatNumber(vat) {
+    const fullVat = String(vat || '').trim().toUpperCase().replace(/\s/g, '');
+    if (!fullVat) {
+        const err = new Error('Missing VAT number');
+        err.statusCode = 400;
+        throw err;
+    }
 
     const ms = fullVat.slice(0, 2);
     const vatNumber = fullVat.slice(2);
 
     if (!/^[A-Z]{2}$/.test(ms) || !vatNumber) {
-        return sendJson(res, 400, { error: 'Invalid VAT format (expected CC12345678)' });
+        const err = new Error('Invalid VAT format (expected CC12345678)');
+        err.statusCode = 400;
+        throw err;
     }
 
-    try {
-        const result = await validateVat(ms, vatNumber);
-        if (result.ok) {
-            sendJson(res, 200, result);
-        } else {
-            sendJson(res, 502, { error: 'VIES validation failed', details: result.error });
-        }
-    } catch (error) {
-        sendJson(res, 502, { error: 'VIES service unavailable' });
+    const result = await validateVatWithVies(ms, vatNumber);
+    if (!result.ok) {
+        const err = new Error('VIES validation failed');
+        err.statusCode = 502;
+        err.details = result.error;
+        throw err;
     }
+    return result;
 }
 
-module.exports = { handleVatValidate };
+module.exports = { checkVatNumber };

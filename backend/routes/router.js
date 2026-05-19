@@ -29,7 +29,7 @@ function createRouter() {
                 if (route.method !== method) continue;
                 ctx.params = {};
             }
-            route.handler(ctx);
+            await route.handler(ctx);
             return true;
         }
         return false;

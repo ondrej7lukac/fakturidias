@@ -291,9 +291,11 @@ button.lp-btn, button.lp-nav__link, button.lp-brand {
   background: var(--card);
   border: 1px solid var(--border);
   font-size: 12.5px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--muted);
   margin-bottom: 28px;
+  backdrop-filter: blur(8px);
 }
 .lp-eyebrow::before {
   content: "";
@@ -301,16 +303,19 @@ button.lp-btn, button.lp-nav__link, button.lp-brand {
   height: 6px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 30%, transparent);
+  animation: pulse 2.4s ease-in-out infinite;
 }
 
 .lp-hero h1 {
-  font-size: clamp(40px, 6vw, 76px);
-  line-height: 1.02;
-  letter-spacing: -0.035em;
-  font-weight: 600;
-  margin: 0 auto 22px;
-  max-width: 12ch;
+  font-family: var(--font-display);
+  font-size: clamp(44px, 7vw, 86px);
+  line-height: 1.0;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+  font-optical-sizing: auto;
+  margin: 0 auto 24px;
+  max-width: 11ch;
   text-wrap: balance;
   color: var(--text);
 }
@@ -568,10 +573,11 @@ button.lp-btn, button.lp-nav__link, button.lp-brand {
 }
 .lp-metrics__item:last-child { border-right: none; }
 .lp-metrics__value {
-  font-size: clamp(22px, 3vw, 30px);
+  font-size: clamp(24px, 3vw, 32px);
   font-weight: 800;
-  font-family: var(--font-secondary);
-  letter-spacing: -0.02em;
+  font-family: var(--font-display, var(--font-secondary));
+  letter-spacing: -0.03em;
+  font-optical-sizing: auto;
   margin-bottom: 4px;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   -webkit-background-clip: text;
@@ -617,10 +623,12 @@ button.lp-btn, button.lp-nav__link, button.lp-brand {
   margin-bottom: 16px;
 }
 .lp-section__title {
-  font-size: clamp(28px, 4vw, 44px);
-  line-height: 1.1;
-  letter-spacing: -0.025em;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4vw, 46px);
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+  font-optical-sizing: auto;
   margin: 0 0 14px;
   text-wrap: balance;
   color: var(--text);
@@ -648,9 +656,15 @@ button.lp-btn, button.lp-nav__link, button.lp-brand {
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 24px;
-  transition: border-color 0.15s;
+  transition: transform 0.25s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)),
+              border-color 0.2s ease,
+              box-shadow 0.25s ease;
 }
-.lp-feature:hover { border-color: var(--border-strong); }
+.lp-feature:hover {
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--border));
+  transform: translateY(-5px);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.14), 0 0 0 1px color-mix(in oklab, var(--accent) 22%, transparent);
+}
 .lp-feature__icon {
   width: 44px;
   height: 44px;
@@ -660,6 +674,15 @@ button.lp-btn, button.lp-nav__link, button.lp-brand {
   display: grid;
   place-items: center;
   margin-bottom: 18px;
+  transition: transform 0.25s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)),
+              background 0.2s ease;
+}
+.lp-feature:hover .lp-feature__icon {
+  transform: scale(1.1) rotate(-4deg);
+  background: color-mix(in oklab, var(--accent) 28%, transparent);
+}
+.lp-feature:hover .lp-feature__icon--alt {
+  background: color-mix(in oklab, var(--accent-2) 30%, transparent);
 }
 .lp-feature__icon--alt {
   background: color-mix(in oklab, var(--accent-2) 22%, transparent);
@@ -952,11 +975,12 @@ button.lp-btn, button.lp-nav__link, button.lp-brand {
   padding: 28px;
 }
 .lp-step__num {
-  font-family: var(--font-secondary);
-  font-size: 60px;
-  font-weight: 600;
+  font-family: var(--font-display, var(--font-secondary));
+  font-size: 72px;
+  font-weight: 800;
   line-height: 1;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.05em;
+  font-optical-sizing: auto;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   -webkit-background-clip: text;
   background-clip: text;
@@ -999,15 +1023,32 @@ button.lp-btn, button.lp-nav__link, button.lp-brand {
   flex-direction: column;
   gap: 18px;
   position: relative;
+  transition: transform 0.25s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)),
+              box-shadow 0.25s ease,
+              border-color 0.2s ease;
+}
+.lp-price-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+  border-color: var(--border-strong);
 }
 .lp-price-card--featured {
   background:
     radial-gradient(closest-side at 100% 0%, rgba(88, 105, 255, 0.16), transparent 60%),
-    linear-gradient(180deg, rgba(124, 247, 212, 0.08), rgba(88, 105, 255, 0.06));
-  border-color: rgba(124, 247, 212, 0.4);
+    linear-gradient(180deg, rgba(124, 247, 212, 0.10), rgba(88, 105, 255, 0.07));
+  border-color: rgba(124, 247, 212, 0.45);
   box-shadow:
     0 0 0 1px rgba(124, 247, 212, 0.18),
+    0 24px 56px rgba(45, 215, 166, 0.12),
     var(--shadow);
+}
+.lp-price-card--featured:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    0 0 0 1px rgba(124, 247, 212, 0.28),
+    0 32px 64px rgba(45, 215, 166, 0.18),
+    var(--shadow);
+  border-color: rgba(124, 247, 212, 0.6);
 }
 .lp-price-card__badge {
   position: absolute;
@@ -1039,10 +1080,10 @@ button.lp-btn, button.lp-nav__link, button.lp-brand {
   margin: -10px 0 0;
 }
 .lp-price-card__price {
-  font-family: var(--font-secondary);
-  font-size: 44px;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  font-family: var(--font-display, var(--font-secondary));
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
   line-height: 1;
   display: flex;
   align-items: baseline;
@@ -1150,10 +1191,12 @@ button.lp-btn, button.lp-nav__link, button.lp-brand {
   overflow: hidden;
 }
 .lp-final__title {
-  font-size: clamp(26px, 3.6vw, 40px);
-  line-height: 1.1;
-  letter-spacing: -0.025em;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3.6vw, 44px);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+  font-optical-sizing: auto;
   margin: 0 0 12px;
   text-wrap: balance;
   color: var(--text);

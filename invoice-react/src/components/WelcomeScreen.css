@@ -5,3 +5,92 @@ body:has(.welcome-screen) {
   overflow-y: auto;
   background: var(--bg);
 }
+
+/* ── Hero entrance animations ──────────────────────────────── */
+.welcome-screen .lp-eyebrow {
+  animation: fade-in-up 0.6s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+.welcome-screen .lp-hero h1 {
+  animation: fade-in-up 0.75s 0.08s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+.welcome-screen .lp-hero__sub {
+  animation: fade-in-up 0.65s 0.18s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+.welcome-screen .lp-hero__ctas {
+  animation: fade-in-up 0.65s 0.26s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+.welcome-screen .lp-hero__note {
+  animation: fade-in-up 0.5s 0.34s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+.welcome-screen .lp-demo {
+  animation: fade-in-up 0.85s 0.42s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+/* ── Metrics bar stagger ───────────────────────────────────── */
+.welcome-screen .lp-metrics__item {
+  animation: fade-in-up 0.55s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+.welcome-screen .lp-metrics__item:nth-child(2) { animation-delay: 0.07s; }
+.welcome-screen .lp-metrics__item:nth-child(3) { animation-delay: 0.14s; }
+
+/* ── Feature cards stagger ─────────────────────────────────── */
+.welcome-screen .lp-feature {
+  animation: fade-in-up 0.6s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+.welcome-screen .lp-feature:nth-child(2) { animation-delay: 0.06s; }
+.welcome-screen .lp-feature:nth-child(3) { animation-delay: 0.12s; }
+.welcome-screen .lp-feature:nth-child(4) { animation-delay: 0.18s; }
+.welcome-screen .lp-feature:nth-child(5) { animation-delay: 0.24s; }
+.welcome-screen .lp-feature:nth-child(6) { animation-delay: 0.30s; }
+
+/* ── How-it-works steps stagger ────────────────────────────── */
+.welcome-screen .lp-step {
+  animation: fade-in-up 0.6s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+.welcome-screen .lp-step:nth-child(2) { animation-delay: 0.1s; }
+.welcome-screen .lp-step:nth-child(3) { animation-delay: 0.2s; }
+
+/* ── Pricing cards stagger ─────────────────────────────────── */
+.welcome-screen .lp-price-card {
+  animation: fade-in-up 0.6s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+.welcome-screen .lp-price-card:nth-child(2) { animation-delay: 0.1s; }
+.welcome-screen .lp-price-card:nth-child(3) { animation-delay: 0.2s; }
+
+/* ── FAQ items stagger ─────────────────────────────────────── */
+.welcome-screen .lp-faq__item {
+  animation: fade-in-up 0.5s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+.welcome-screen .lp-faq__item:nth-child(2) { animation-delay: 0.05s; }
+.welcome-screen .lp-faq__item:nth-child(3) { animation-delay: 0.10s; }
+.welcome-screen .lp-faq__item:nth-child(4) { animation-delay: 0.15s; }
+.welcome-screen .lp-faq__item:nth-child(5) { animation-delay: 0.20s; }
+.welcome-screen .lp-faq__item:nth-child(6) { animation-delay: 0.25s; }
+
+/* ── Final CTA block ───────────────────────────────────────── */
+.welcome-screen .lp-final {
+  animation: fade-in-scale 0.7s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+/* ── Respect reduced motion ────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .welcome-screen .lp-eyebrow,
+  .welcome-screen .lp-hero h1,
+  .welcome-screen .lp-hero__sub,
+  .welcome-screen .lp-hero__ctas,
+  .welcome-screen .lp-hero__note,
+  .welcome-screen .lp-demo,
+  .welcome-screen .lp-metrics__item,
+  .welcome-screen .lp-feature,
+  .welcome-screen .lp-step,
+  .welcome-screen .lp-price-card,
+  .welcome-screen .lp-faq__item,
+  .welcome-screen .lp-final {
+    animation: none;
+  }
+}

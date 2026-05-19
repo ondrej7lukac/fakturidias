@@ -1,8 +1,7 @@
 'use strict';
 const https = require('https');
-const { sendJson } = require('./utils');
 
-async function fetchCnbRate(dateStr, currency = 'EUR') {
+function fetchCnbRate(dateStr, currency = 'EUR') {
     return new Promise((resolve, reject) => {
         const url = `https://www.cnb.cz/cs/financni-trhy/devizovy-trh/kurzy-devizoveho-trhu/kurzy-devizoveho-trhu/denni_kurz.txt?date=${dateStr}`;
         https.get(url, (res) => {
@@ -10,8 +9,7 @@ async function fetchCnbRate(dateStr, currency = 'EUR') {
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
                 if (res.statusCode !== 200) return resolve(null);
-                const lines = data.split('\n');
-                const line = lines.find(l => l.includes(`|${currency}|`));
+                const line = data.split('\n').find(l => l.includes(`|${currency}|`));
                 if (line) {
                     const parts = line.split('|');
                     const amount = parseFloat(parts[2].replace(',', '.'));
@@ -25,7 +23,7 @@ async function fetchCnbRate(dateStr, currency = 'EUR') {
     });
 }
 
-async function fetchEcbRate(currency = 'CZK') {
+function fetchEcbRate(currency = 'CZK') {
     return new Promise((resolve, reject) => {
         https.get('https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml', (res) => {
             let data = '';
@@ -40,24 +38,17 @@ async function fetchEcbRate(currency = 'CZK') {
     });
 }
 
-async function handleExchangeRate(req, res, url) {
-    const source = url.searchParams.get('source') || 'CNB';
-    const target = url.searchParams.get('target') || 'EUR';
-    const date = url.searchParams.get('date');
+async function getExchangeRate(source, target, date) {
+    const rate = source.toUpperCase() === 'CNB'
+        ? await fetchCnbRate(date || '', target)
+        : await fetchEcbRate(target);
 
-    try {
-        const rate = source.toUpperCase() === 'CNB'
-            ? await fetchCnbRate(date || '', target)
-            : await fetchEcbRate(target);
-
-        if (rate) {
-            sendJson(res, 200, { source, target, date, rate });
-        } else {
-            sendJson(res, 404, { error: 'Rate not found for given parameters' });
-        }
-    } catch {
-        sendJson(res, 502, { error: 'Failed to fetch exchange rate' });
+    if (!rate) {
+        const err = new Error('Rate not found for given parameters');
+        err.statusCode = 404;
+        throw err;
     }
+    return { source, target, date, rate };
 }
 
-module.exports = { handleExchangeRate, fetchCnbRate, fetchEcbRate };
+module.exports = { getExchangeRate, fetchCnbRate, fetchEcbRate };

@@ -237,10 +237,20 @@
     linear-gradient(135deg, rgba(124, 247, 212, 0.92), rgba(138, 164, 255, 0.92));
   color: #061022;
   font-weight: 600;
-  box-shadow: 0 8px 18px rgba(45, 215, 166, 0.20);
+  box-shadow: 0 8px 18px rgba(45, 215, 166, 0.22);
   border-color: transparent;
+  transition: filter 0.18s ease, transform 0.18s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)),
+              box-shadow 0.18s ease;
 }
-.ap-btn--primary:hover { filter: brightness(1.07); }
+.ap-btn--primary:hover {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(45, 215, 166, 0.32);
+}
+.ap-btn--primary:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 4px 12px rgba(45, 215, 166, 0.18);
+}
 .ap-btn--ghost { background: transparent; border-color: transparent; }
 .ap-btn--ghost:hover { background: var(--card); }
 .ap-btn--icon {
@@ -262,6 +272,14 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 22px;
+  transition: transform 0.22s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)),
+              box-shadow 0.22s ease,
+              border-color 0.18s ease;
+}
+.ap-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: color-mix(in oklab, var(--border) 60%, var(--accent) 40%);
 }
 @media (max-width: 700px) { .ap-card { padding: 16px; border-radius: 16px; } }
 .ap-card__title {
@@ -602,7 +620,13 @@
   font-size: 16px;
   font-weight: 600;
 }
-.ap-totals__row--grand .num { font-size: 22px; color: var(--accent); }
+.ap-totals__row--grand .num {
+  font-family: var(--font-display, 'Geist', sans-serif);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--accent);
+}
 
 /* ── CREATE INVOICE LAYOUT ───────────────────────────────────── */
 .ap-create {
@@ -657,6 +681,12 @@
   padding: 16px;
   display: grid;
   gap: 4px;
+  transition: transform 0.2s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)),
+              box-shadow 0.2s ease;
+}
+.ap-metric:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 .ap-metric__label {
   font-size: 10.5px;
@@ -666,10 +696,10 @@
   color: var(--muted);
 }
 .ap-metric__value {
-  font-family: 'Geist', sans-serif;
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  font-family: var(--font-display, 'Geist', sans-serif);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
   line-height: 1.15;
 }
 .ap-metric__delta {
@@ -731,7 +761,7 @@
   align-items: center;
   border-top: 1px solid var(--border);
   font-size: 13.5px;
-  transition: background 0.15s;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
 .ap-list__row:first-child {
   border-top: 0;
@@ -743,7 +773,11 @@
   background: var(--card2);
   padding: 11px 18px;
 }
-.ap-list__row:hover:not(:first-child) { background: var(--card2); cursor: pointer; }
+.ap-list__row:hover:not(:first-child) {
+  background: var(--card2);
+  cursor: pointer;
+  transform: translateX(2px);
+}
 .ap-list__num {
   font-family: 'Geist Mono', 'JetBrains Mono', monospace;
   font-size: 12.5px;
@@ -932,8 +966,9 @@
   border-top: 1px solid var(--border);
 }
 .ap-summary-total .amount {
-  font-family: 'Geist', sans-serif;
-  font-weight: 600;
-  font-size: 22px;
+  font-family: var(--font-display, 'Geist', sans-serif);
+  font-weight: 800;
+  font-size: 24px;
+  letter-spacing: -0.025em;
   color: var(--accent);
 }

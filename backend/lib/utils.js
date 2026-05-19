@@ -76,11 +76,18 @@ function readJsonBody(req, callback) {
     req.on('error', (err) => done(err));
 }
 
+function parseBody(req) {
+    return new Promise((resolve, reject) => {
+        readJsonBody(req, (err, body) => (err ? reject(err) : resolve(body)));
+    });
+}
+
 module.exports = {
     logDebug,
     sendJson,
     sendCors,
     sendNotFound,
     readJsonBody,
+    parseBody,
     SECURITY_HEADERS
 };

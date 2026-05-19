@@ -1,6 +1,5 @@
 'use strict';
 const https = require('https');
-const { sendJson } = require('./utils');
 
 function slugifyCompanyName(name = '') {
     return name
@@ -10,13 +9,62 @@ function slugifyCompanyName(name = '') {
         .slice(0, 30) || 'invoices';
 }
 
-async function handleEmailSend(req, res, body) {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) return sendJson(res, 500, { error: 'RESEND_API_KEY not configured' });
+function callResend(apiKey, payload) {
+    return new Promise((resolve, reject) => {
+        const body = JSON.stringify(payload);
+        const options = {
+            hostname: 'api.resend.com',
+            path: '/emails',
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(body)
+            }
+        };
+        const req = https.request(options, (res) => {
+            let raw = '';
+            res.on('data', chunk => raw += chunk);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (res.statusCode >= 400) {
+                        const err = new Error('Email delivery failed');
+                        err.statusCode = 502;
+                        return reject(err);
+                    }
+                    resolve(parsed);
+                } catch {
+                    const err = new Error('Failed to parse email service response');
+                    err.statusCode = 500;
+                    reject(err);
+                }
+            });
+        });
+        req.on('error', () => {
+            const err = new Error('Email delivery unavailable');
+            err.statusCode = 500;
+            reject(err);
+        });
+        req.write(body);
+        req.end();
+    });
+}
 
-    const { invoice, pdfBase64, lang } = body;
+async function sendEmail(invoice, pdfBase64, lang) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+        const err = new Error('Email service not configured');
+        err.statusCode = 503;
+        throw err;
+    }
+
     const toEmail = invoice?.client?.email;
-    if (!toEmail) return sendJson(res, 400, { error: 'Client email is missing' });
+    if (!toEmail) {
+        const err = new Error('Client email is missing');
+        err.statusCode = 400;
+        throw err;
+    }
 
     const senderSlug = slugifyCompanyName(invoice?.supplier?.name);
     const senderName = invoice?.supplier?.name || 'Fakturidias';
@@ -34,46 +82,12 @@ async function handleEmailSend(req, res, body) {
 
     const base64Data = (pdfBase64 || '').replace(/^data:application\/pdf;base64,/, '');
 
-    const payload = JSON.stringify({
-        from,
-        to,
-        subject,
-        html,
+    const result = await callResend(apiKey, {
+        from, to, subject, html,
         attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: base64Data }]
     });
 
-    return new Promise((resolve) => {
-        const options = {
-            hostname: 'api.resend.com',
-            path: '/emails',
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(payload)
-            }
-        };
-
-        const req = https.request(options, (response) => {
-            let raw = '';
-            response.on('data', chunk => raw += chunk);
-            response.on('end', () => {
-                try {
-                    const parsed = JSON.parse(raw);
-                    if (response.statusCode >= 400) {
-                        return resolve(sendJson(res, 502, { error: 'Email delivery failed' }));
-                    }
-                    resolve(sendJson(res, 200, { success: true, id: parsed.id }));
-                } catch {
-                    resolve(sendJson(res, 500, { error: 'Failed to parse email service response' }));
-                }
-            });
-        });
-
-        req.on('error', () => resolve(sendJson(res, 500, { error: 'Email delivery unavailable' })));
-        req.write(payload);
-        req.end();
-    });
+    return { id: result.id };
 }
 
-module.exports = { handleEmailSend };
+module.exports = { sendEmail };

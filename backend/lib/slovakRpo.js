@@ -1,6 +1,5 @@
 'use strict';
 const https = require('https');
-const { sendJson } = require('./utils');
 
 function requestJson(url) {
     return new Promise((resolve, reject) => {
@@ -32,57 +31,47 @@ function formatRpoAddress(addr) {
     return [streetPart, cityPart].filter(Boolean).join(', ');
 }
 
-async function handleRpoSearch(req, res, body) {
-    const name = String(body.name || '').trim();
-    const limit = body.limit || 8;
-    if (!name) return sendJson(res, 400, { error: 'Missing search name' });
+function mapOrg(org) {
+    return {
+        name: org.fullName || org.name,
+        ico: org.cin || org.ico,
+        address: formatRpoAddress(org.address),
+        city: org.address?.municipality?.name || '',
+        dic: org.tin || '',
+        icDph: org.vatin || ''
+    };
+}
 
+async function searchRpo(name, limit = 8) {
+    if (!name) {
+        const err = new Error('Missing search name');
+        err.statusCode = 400;
+        throw err;
+    }
     const url = `https://rpo.statistics.sk/rpo/api/organizations?name=${encodeURIComponent(name)}&limit=${limit}`;
-
-    try {
-        const result = await requestJson(url);
-        if (result.ok) {
-            const mapped = (result.parsed || []).map(org => ({
-                name: org.fullName || org.name,
-                ico: org.cin || org.ico,
-                address: formatRpoAddress(org.address),
-                city: org.address?.municipality?.name || '',
-                dic: org.tin || '',
-                icDph: org.vatin || ''
-            }));
-            sendJson(res, 200, mapped);
-        } else {
-            sendJson(res, result.status || 502, { error: 'RPO search failed' });
-        }
-    } catch {
-        sendJson(res, 502, { error: 'RPO search unavailable' });
+    const result = await requestJson(url);
+    if (!result.ok) {
+        const err = new Error('RPO search failed');
+        err.statusCode = result.status || 502;
+        throw err;
     }
+    return (result.parsed || []).map(mapOrg);
 }
 
-async function handleRpoIco(req, res, url) {
-    const ico = (url.searchParams.get('ico') || '').trim();
-    if (!ico) return sendJson(res, 400, { error: 'Missing ico' });
-
-    const apiUrl = `https://rpo.statistics.sk/rpo/api/organizations?cin=${encodeURIComponent(ico)}`;
-
-    try {
-        const result = await requestJson(apiUrl);
-        if (result.ok && result.parsed?.length > 0) {
-            const org = result.parsed[0];
-            sendJson(res, 200, {
-                name: org.fullName || org.name,
-                ico: org.cin || org.ico,
-                address: formatRpoAddress(org.address),
-                city: org.address?.municipality?.name || '',
-                dic: org.tin || '',
-                icDph: org.vatin || ''
-            });
-        } else {
-            sendJson(res, 404, { error: 'Organization not found in RPO' });
-        }
-    } catch {
-        sendJson(res, 502, { error: 'RPO lookup unavailable' });
+async function lookupRpoByIco(ico) {
+    if (!ico) {
+        const err = new Error('Missing ico');
+        err.statusCode = 400;
+        throw err;
     }
+    const url = `https://rpo.statistics.sk/rpo/api/organizations?cin=${encodeURIComponent(ico)}`;
+    const result = await requestJson(url);
+    if (!result.ok || !result.parsed?.length) {
+        const err = new Error('Organization not found in RPO');
+        err.statusCode = 404;
+        throw err;
+    }
+    return mapOrg(result.parsed[0]);
 }
 
-module.exports = { handleRpoSearch, handleRpoIco };
+module.exports = { searchRpo, lookupRpoByIco };
