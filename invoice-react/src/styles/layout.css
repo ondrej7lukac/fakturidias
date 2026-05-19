@@ -1,8 +1,6 @@
 main {
   display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
   gap: 2rem;
-  padding: var(--headerH) 2rem 2rem 2rem;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -136,7 +134,9 @@ main.dashboard-mode .invoice-list-container {
     flex-wrap: wrap;
   }
 
-  .grid.two, .grid.three, .grid.four {
+  .grid.two,
+  .grid.three,
+  .grid.four {
     grid-template-columns: 1fr !important;
     gap: 1.5rem !important;
   }
@@ -189,7 +189,8 @@ main.dashboard-mode .invoice-list-container {
     gap: 1rem !important;
   }
 
-  html, body {
+  html,
+  body {
     overflow-x: hidden !important;
     width: 100%;
     margin: 0;
