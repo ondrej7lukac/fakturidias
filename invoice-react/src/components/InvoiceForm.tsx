@@ -1137,7 +1137,7 @@ export default function InvoiceForm({
                     <div className="ap-create__main">
 
                     {/* AI dictation card */}
-                    <AIPrompt lang={lang} onFillForm={handleAIFill} onPreviewInvoice={handleAIPreview} />
+                    <AIPrompt lang={lang} onFillForm={handleAIFill} onPreviewInvoice={handleAIPreview} isGuest={!isAuthenticated} />
 
                     {/* Region/Tax Warning */}
                     {defaultSupplier?.region === 'CZ' && defaultSupplier?.taxStatus === 'non-payer' && formData.clientCountry !== 'CZ' && (

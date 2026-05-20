@@ -29,6 +29,7 @@ export {
   ChevronDown,
   TrendingUp,
   Send,
+  CreditCard,
 } from 'lucide-react'
 
 export const ICON_SM = 14

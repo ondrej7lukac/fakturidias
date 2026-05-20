@@ -69,11 +69,23 @@ const TokenSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+const SubscriptionSchema = new mongoose.Schema({
+    userEmail: { type: String, required: true, unique: true },
+    stripeCustomerId: String,
+    stripeSubscriptionId: String,
+    plan: { type: String, default: 'free' },
+    status: { type: String, default: 'inactive' },
+    interval: String,
+    currentPeriodEnd: Number,
+    updatedAt: { type: Date, default: Date.now }
+});
+
 const InvoiceModel = mongoose.models.Invoice || mongoose.model('Invoice', InvoiceSchema);
 const ItemModel = mongoose.models.Item || mongoose.model('Item', ItemSchema);
 const CustomerModel = mongoose.models.Customer || mongoose.model('Customer', CustomerSchema);
 const SettingsModel = mongoose.models.Settings || mongoose.model('Settings', SettingsSchema);
 const TokenModel = mongoose.models.Token || mongoose.model('Token', TokenSchema);
+const SubscriptionModel = mongoose.models.Subscription || mongoose.model('Subscription', SubscriptionSchema);
 
 const connectDB = async () => {
     if (_isConnected) return;
@@ -282,6 +294,45 @@ async function saveUserSettings(userEmail, settings) {
     } catch { return false; }
 }
 
+async function getSubscription(userEmail) {
+    if (_isConnected) {
+        try {
+            const doc = await SubscriptionModel.findOne({ userEmail }).lean();
+            return doc || null;
+        } catch { return null; }
+    }
+    const filePath = getUserPath(userEmail, 'subscription.json');
+    if (!filePath || !fs.existsSync(filePath)) return null;
+    try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch { return null; }
+}
+
+async function saveSubscription(userEmail, data) {
+    if (_isConnected) {
+        try {
+            await SubscriptionModel.findOneAndUpdate(
+                { userEmail },
+                { ...data, userEmail, updatedAt: new Date() },
+                { upsert: true }
+            );
+            return true;
+        } catch { return false; }
+    }
+    const filePath = getUserPath(userEmail, 'subscription.json');
+    if (!filePath) return false;
+    try {
+        fs.writeFileSync(filePath, JSON.stringify({ ...data, userEmail }, null, 2), 'utf8');
+        return true;
+    } catch { return false; }
+}
+
+async function getSubscriptionByCustomerId(stripeCustomerId) {
+    if (!_isConnected) return null;
+    try {
+        const doc = await SubscriptionModel.findOne({ stripeCustomerId }).lean();
+        return doc || null;
+    } catch { return null; }
+}
+
 module.exports = {
     connectDB,
     InvoiceModel,
@@ -289,6 +340,7 @@ module.exports = {
     CustomerModel,
     SettingsModel,
     TokenModel,
+    SubscriptionModel,
     getUserInvoices,
     saveSingleInvoice,
     saveUserInvoices_FS,
@@ -298,5 +350,8 @@ module.exports = {
     saveUserItem,
     getUserSettings,
     saveUserSettings,
+    getSubscription,
+    saveSubscription,
+    getSubscriptionByCustomerId,
     isConnected: () => _isConnected
 };

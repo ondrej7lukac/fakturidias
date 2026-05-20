@@ -50,14 +50,16 @@ const STATIC_MIMES = {
 };
 
 // Build dispatch tables once at startup
+const billing = require('./routes/billing');
+
 const publicRouter = createRouter();
 publicRouter.add('GET', '/health', ({ res }) => sendJson(res, 200, { status: 'ok' }));
 require('./routes/ares').attach(publicRouter);
 require('./routes/rpo').attach(publicRouter);
 require('./routes/vat').attach(publicRouter);
 require('./routes/exchangeRate').attach(publicRouter);
-require('./routes/ai').attach(publicRouter);
 require('./routes/auth').attach(publicRouter);
+billing.attachPublic(publicRouter);
 
 const protectedRouter = createRouter();
 require('./routes/invoices').attach(protectedRouter);
@@ -67,6 +69,8 @@ require('./routes/settings').attach(protectedRouter);
 require('./routes/drive').attach(protectedRouter);
 require('./routes/export').attach(protectedRouter);
 require('./routes/email').attach(protectedRouter);
+require('./routes/ai').attach(protectedRouter);
+billing.attachProtected(protectedRouter);
 
 function serveStatic(req, res, requestPath) {
     const distDir = fs.existsSync(rootDist) ? rootDist : subDist;

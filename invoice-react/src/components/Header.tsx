@@ -70,6 +70,15 @@ export default function Header({
       popup?.close()
       alert('Failed to connect to login server.')
     }
+    // Detect popup close and signal auth refresh (localStorage is same-origin here)
+    if (popup) {
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed)
+          localStorage.setItem('auth_success', Date.now().toString())
+        }
+      }, 500)
+    }
   }
 
   const isCz = lang === 'cs'

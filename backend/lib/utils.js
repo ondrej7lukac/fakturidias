@@ -82,6 +82,24 @@ function parseBody(req) {
     });
 }
 
+function readRawBody(req) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        let byteCount = 0;
+        req.on('data', chunk => {
+            byteCount += chunk.length;
+            if (byteCount > MAX_BODY_BYTES) {
+                reject(new Error('Request body too large'));
+                req.socket?.destroy();
+                return;
+            }
+            chunks.push(chunk);
+        });
+        req.on('end', () => resolve(Buffer.concat(chunks)));
+        req.on('error', reject);
+    });
+}
+
 module.exports = {
     logDebug,
     sendJson,
@@ -89,5 +107,6 @@ module.exports = {
     sendNotFound,
     readJsonBody,
     parseBody,
+    readRawBody,
     SECURITY_HEADERS
 };

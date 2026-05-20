@@ -6,8 +6,10 @@ const {
     saveSingleInvoice,
     saveUserInvoices_FS,
     isConnected,
-    InvoiceModel
+    InvoiceModel,
+    getSubscription
 } = require('../lib/storage');
+const { isPro, FREE_INVOICE_LIMIT } = require('../lib/plan');
 
 function attach(router) {
     router.add('GET', '/api/invoices', async ({ res, userEmail }) => {
@@ -22,6 +24,21 @@ function attach(router) {
 
         const { invoice } = body;
         if (!invoice?.id) return sendJson(res, 400, { error: 'Invoice id is required' });
+
+        // Enforce plan limits for new invoices only
+        const existingInvoices = await getUserInvoices(userEmail);
+        const isNew = !existingInvoices.find(inv => inv.id === invoice.id);
+        if (isNew) {
+            const subscription = await getSubscription(userEmail);
+            if (!isPro(subscription) && existingInvoices.length >= FREE_INVOICE_LIMIT) {
+                return sendJson(res, 403, {
+                    error: 'Invoice limit reached',
+                    limitReached: true,
+                    limit: FREE_INVOICE_LIMIT,
+                    plan: 'free'
+                });
+            }
+        }
 
         let success = false;
         if (isConnected()) {

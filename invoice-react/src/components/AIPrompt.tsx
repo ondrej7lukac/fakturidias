@@ -18,9 +18,10 @@ interface AIPromptProps {
     lang: string
     onFillForm: (data: any) => void
     onPreviewInvoice: (data: any) => void
+    isGuest?: boolean
 }
 
-export default function AIPrompt({ lang, onFillForm, onPreviewInvoice }: AIPromptProps) {
+export default function AIPrompt({ lang, onFillForm, onPreviewInvoice, isGuest }: AIPromptProps) {
     const [prompt, setPrompt] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [isListening, setIsListening] = useState(false)
@@ -79,6 +80,24 @@ export default function AIPrompt({ lang, onFillForm, onPreviewInvoice }: AIPromp
         } finally {
             setIsLoading(false)
         }
+    }
+
+    if (isGuest) {
+        return (
+            <div className="ap-ai">
+                <div className="ap-ai__head">
+                    <h3>
+                        <Sparkles size={ICON_MD} strokeWidth={STROKE} />
+                        {isCz ? 'AI asistent' : 'AI assistant'}
+                    </h3>
+                    <div className="ap-ai__sub" style={{ color: 'var(--muted)' }}>
+                        {isCz
+                            ? 'AI funkce jsou dostupné pouze pro přihlášené uživatele. Přihlaste se pro přístup.'
+                            : 'AI features are available for logged-in users only. Sign in to access.'}
+                    </div>
+                </div>
+            </div>
+        )
     }
 
     return (

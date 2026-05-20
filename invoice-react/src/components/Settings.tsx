@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { parseIban, calculateIban } from '../utils/bank'
 import AresSearch from './AresSearch'
 import {
-  Contact, Wallet, Plug, Save, Mail, Cloud, Search, Check, RefreshCw,
+  Contact, Wallet, Plug, Save, Mail, Cloud, Search, Check, RefreshCw, CreditCard, TrendingUp,
   ICON_SM, ICON_MD, STROKE,
 } from '@/lib/icons'
 
@@ -31,6 +31,13 @@ interface Supplier {
   [key: string]: unknown
 }
 
+interface Subscription {
+  plan: string
+  status: string
+  interval: string | null
+  currentPeriodEnd: number | null
+}
+
 interface SettingsProps {
   defaultSupplier: Supplier | null
   setDefaultSupplier: (fn: (prev: Supplier | null) => Supplier) => void
@@ -40,6 +47,8 @@ interface SettingsProps {
   onLogout?: () => void
   user?: { email: string } | null
   t: Record<string, string>
+  subscription?: Subscription | null
+  invoiceCount?: number
 }
 
 export default function Settings({
@@ -49,8 +58,11 @@ export default function Settings({
   onLogin,
   onLogout,
   t,
+  subscription,
+  invoiceCount = 0,
 }: SettingsProps) {
   const [tab, setTab] = useState(1)
+  const [checkoutLoading, setCheckoutLoading] = useState<'month' | 'year' | null>(null)
   const [lockedFields, setLockedFields] = useState({
     name: !!defaultSupplier?.name,
     ico: !!defaultSupplier?.ico,
@@ -168,15 +180,48 @@ export default function Settings({
 
   const unlock = (field: string) => setLockedFields(prev => ({ ...prev, [field]: false }))
 
+  const handleCheckout = async (interval: 'month' | 'year') => {
+    setCheckoutLoading(interval)
+    try {
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interval }),
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else alert(isCz ? 'Nepodařilo se spustit platbu.' : 'Failed to start checkout.')
+    } catch {
+      alert(isCz ? 'Nepodařilo se spustit platbu.' : 'Failed to start checkout.')
+    } finally {
+      setCheckoutLoading(null)
+    }
+  }
+
+  const handleManageSubscription = async () => {
+    try {
+      const res = await fetch('/api/billing/portal', { method: 'POST' })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else alert(isCz ? 'Nepodařilo se otevřít správu.' : 'Failed to open billing portal.')
+    } catch {
+      alert(isCz ? 'Nepodařilo se otevřít správu.' : 'Failed to open billing portal.')
+    }
+  }
+
+  const isPro = subscription?.plan === 'pro'
+
   const tabLabels = [
     isCz ? 'Základní údaje' : 'Identity',
     isCz ? 'Daně a Banka' : 'Tax & Bank',
     isCz ? 'Integrace' : 'Integrations',
+    isCz ? 'Plán' : 'Plan',
   ]
   const tabSubs = [
     isCz ? 'Správa vaší identity a údajů dodavatele.' : 'Manage your identity and supplier details.',
     isCz ? 'DPH plátce, bankovní účet a výchozí měna.' : 'VAT status, bank account and default currency.',
     isCz ? 'Propojení s ARES, Google Drive, e-mail a API.' : 'ARES, Google Drive, email and API connections.',
+    isPro ? (isCz ? 'Správa vašeho Pro předplatného.' : 'Manage your Pro subscription.') : (isCz ? 'Upgradujte na Pro pro neomezené faktury.' : 'Upgrade to Pro for unlimited invoices.'),
   ]
 
   const saveLabel = saveStatus === 'saved'
@@ -199,6 +244,7 @@ export default function Settings({
             <Contact key="c" size={ICON_SM} strokeWidth={STROKE} />,
             <Wallet key="w" size={ICON_SM} strokeWidth={STROKE} />,
             <Plug key="p" size={ICON_SM} strokeWidth={STROKE} />,
+            <CreditCard key="cc" size={ICON_SM} strokeWidth={STROKE} />,
           ]
           return (
             <button
@@ -654,6 +700,121 @@ export default function Settings({
               <Save size={ICON_SM} strokeWidth={STROKE} /> {saveLabel}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── TAB 4: PLAN ──────────────────────────────────────── */}
+      {tab === 4 && (
+        <div className="settings-tab-body">
+
+          {/* Current plan card */}
+          <div className="ap-card">
+            <h3 className="ap-card__title">
+              <CreditCard size={ICON_MD} strokeWidth={STROKE} />
+              {isCz ? 'Váš plán' : 'Your plan'}
+            </h3>
+
+            <div className="ap-integration">
+              <div className="ap-integration__body">
+                <div className="ap-integration__title">
+                  {isPro ? (isCz ? 'Pro plán' : 'Pro plan') : (isCz ? 'Bezplatný plán' : 'Free plan')}
+                  <span className={`pill ${isPro ? 'paid' : 'draft'}`} style={{ fontSize: 10.5, padding: '2px 8px', marginLeft: 8 }}>
+                    {isPro ? 'Pro' : 'Free'}
+                  </span>
+                </div>
+                <div className="ap-integration__desc">
+                  {isPro
+                    ? (subscription?.currentPeriodEnd
+                        ? (isCz
+                            ? `Platí do: ${new Date(subscription.currentPeriodEnd * 1000).toLocaleDateString('cs-CZ')}`
+                            : `Valid until: ${new Date(subscription.currentPeriodEnd * 1000).toLocaleDateString('en-GB')}`)
+                        : (isCz ? 'Aktivní předplatné' : 'Active subscription'))
+                    : (isCz ? `Faktury: ${invoiceCount} / 5 využito` : `Invoices: ${invoiceCount} / 5 used`)}
+                </div>
+              </div>
+              {isPro && (
+                <div className="ap-integration__action">
+                  <button className="ap-btn ap-btn--secondary" type="button" onClick={handleManageSubscription}>
+                    {isCz ? 'Spravovat' : 'Manage'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Invoice progress bar for free users */}
+            {!isPro && (
+              <div style={{ marginTop: 12, marginBottom: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
+                  <span>{isCz ? 'Využité faktury' : 'Invoices used'}</span>
+                  <span>{invoiceCount} / 5</span>
+                </div>
+                <div style={{ height: 6, background: 'var(--border)', borderRadius: 3 }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${Math.min(100, (invoiceCount / 5) * 100)}%`,
+                    background: invoiceCount >= 5 ? 'var(--danger)' : 'var(--accent)',
+                    borderRadius: 3,
+                    transition: 'width 0.3s',
+                  }} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Upgrade card — shown only for free users */}
+          {!isPro && (
+            <div className="ap-card">
+              <h3 className="ap-card__title">
+                <TrendingUp size={ICON_MD} strokeWidth={STROKE} />
+                {isCz ? 'Upgradujte na Pro' : 'Upgrade to Pro'}
+              </h3>
+              <p style={{ color: 'var(--muted)', fontSize: 14, margin: '0 0 18px' }}>
+                {isCz
+                  ? 'Neomezený počet faktur, AI asistent a prioritní podpora.'
+                  : 'Unlimited invoices, AI assistant, and priority support.'}
+              </p>
+
+              <div className="ap-grid ap-grid--2">
+                {/* Monthly */}
+                <div className="plan-pricing-card">
+                  <div className="plan-pricing__interval">{isCz ? 'Měsíčně' : 'Monthly'}</div>
+                  <div className="plan-pricing__price">300 CZK</div>
+                  <div className="plan-pricing__sub">{isCz ? 'za měsíc' : 'per month'}</div>
+                  <button
+                    className="ap-btn ap-btn--secondary"
+                    style={{ width: '100%', marginTop: 14 }}
+                    type="button"
+                    disabled={checkoutLoading !== null}
+                    onClick={() => handleCheckout('month')}
+                  >
+                    {checkoutLoading === 'month'
+                      ? (isCz ? 'Načítání…' : 'Loading…')
+                      : (isCz ? 'Předplatit' : 'Subscribe')}
+                  </button>
+                </div>
+
+                {/* Annual */}
+                <div className="plan-pricing-card plan-pricing-card--featured">
+                  <div className="plan-pricing__badge">{isCz ? 'Ušetřete 17 %' : 'Save 17%'}</div>
+                  <div className="plan-pricing__interval">{isCz ? 'Ročně' : 'Annual'}</div>
+                  <div className="plan-pricing__price">3 000 CZK</div>
+                  <div className="plan-pricing__sub">{isCz ? 'za rok (250 CZK/měs)' : 'per year (250 CZK/mo)'}</div>
+                  <button
+                    className="ap-btn ap-btn--primary"
+                    style={{ width: '100%', marginTop: 14 }}
+                    type="button"
+                    disabled={checkoutLoading !== null}
+                    onClick={() => handleCheckout('year')}
+                  >
+                    {checkoutLoading === 'year'
+                      ? (isCz ? 'Načítání…' : 'Loading…')
+                      : (isCz ? 'Předplatit' : 'Subscribe')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
     </div>

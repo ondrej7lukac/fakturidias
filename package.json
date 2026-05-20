@@ -14,7 +14,8 @@
     "googleapis": "^170.1.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.21.1",
-    "nodemailer": "^7.0.12"
+    "nodemailer": "^7.0.12",
+    "stripe": "^22.1.1"
   },
   "engines": {
     "node": "20.x"

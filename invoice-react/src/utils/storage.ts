@@ -33,12 +33,19 @@ export async function loadApiData() {
 export async function saveApiInvoice(invoice) {
     const response = await fetch('/api/invoices', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invoice })
     })
-    if (!response.ok) throw new Error('Failed to save invoice to API')
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        if (response.status === 403 && data.limitReached) {
+            const err: any = new Error(data.error || 'Invoice limit reached')
+            err.limitReached = true
+            err.limit = data.limit
+            throw err
+        }
+        throw new Error('Failed to save invoice to API')
+    }
     const data = await response.json()
     return data.invoice
 }
