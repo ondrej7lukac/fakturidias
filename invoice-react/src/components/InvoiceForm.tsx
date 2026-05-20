@@ -1131,9 +1131,8 @@ export default function InvoiceForm({
                     </div>
                 </div>
             ) : (
-                /* ── 2-column create layout ─────────────────────── */
+                /* ── create layout (single column, beside list) ── */
                 <div className="ap-create">
-                    {/* LEFT: main form */}
                     <div className="ap-create__main">
 
                     {/* AI dictation card */}
@@ -1188,6 +1187,9 @@ export default function InvoiceForm({
                             </div>
                         </div>
                     </div>
+
+                    {/* Supplier */}
+                    {supplierSection}
 
                     {/* Client / Subscriber */}
                     <div className="ap-card">
@@ -1470,6 +1472,9 @@ export default function InvoiceForm({
                         />
                     </div>
 
+                    {/* Summary */}
+                    {summaryCard}
+
                     {/* Action bar */}
                     <div className="ap-action-bar ap-action-bar--mobile-stack">
                         <button type="button" onClick={() => setFormData(prev => ({ ...prev, status: 'draft' }))} className="ap-btn ap-btn--ghost">
@@ -1487,11 +1492,6 @@ export default function InvoiceForm({
                     </div>
 
                     </form>
-                    </div>
-
-                    <div className="ap-create__side">
-                        {supplierSection}
-                        {summaryCard}
                     </div>
 
                 </div>

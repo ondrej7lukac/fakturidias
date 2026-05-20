@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import Clarity from '@microsoft/clarity'
 import './CookieBanner.css'
 
 const CLARITY_ID = import.meta.env.VITE_CLARITY_ID as string
@@ -15,14 +16,12 @@ function grantGA4Consent() {
     }
 }
 
+// Loaded only after the user accepts the cookie banner — keeps the GDPR
+// promise in CookieBanner/PolicyPage that Clarity stays off until consent.
 function loadClarity() {
     if (!CLARITY_ID || (window as any).__clarityLoaded) return
     ;(window as any).__clarityLoaded = true
-    ;(function (c: any, l: Document, a: string, r: string, i: string) {
-        c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments) }
-        const t: any = l.createElement(r); t.async = 1; t.src = 'https://www.clarity.ms/tag/' + i
-        const y = l.getElementsByTagName(r)[0]; y.parentNode!.insertBefore(t, y)
-    })(window, document, 'clarity', 'script', CLARITY_ID)
+    Clarity.init(CLARITY_ID)
 }
 
 interface CookieBannerProps {

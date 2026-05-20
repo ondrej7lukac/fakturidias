@@ -2,10 +2,27 @@
   width: 100%;
 }
 
+/* Browse panel — header + filters stay pinned, invoices scroll */
+.invoice-list-card {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - var(--headerH) - 3.5rem);
+}
+
+.invoice-list-card:hover {
+  transform: none;
+}
+
 .list {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.invoice-list-card .list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .invoice-item {
@@ -44,6 +61,17 @@
   --btn-bg: var(--glass);
   --btn-border: var(--border);
   font-size: 0.75rem;
+}
+
+/* Stacked layout — let the list grow naturally instead of scrolling internally */
+@media (max-width: 1024px) {
+  .invoice-list-card {
+    max-height: none;
+  }
+
+  .invoice-list-card .list {
+    overflow-y: visible;
+  }
 }
 
 @media (max-width: 768px) {

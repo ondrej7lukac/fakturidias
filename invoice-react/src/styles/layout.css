@@ -1,8 +1,10 @@
 main {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
   gap: 2rem;
   max-width: 1400px;
   margin: 0 auto;
+  align-items: start;
 }
 
 main.settings-view {
@@ -95,6 +97,13 @@ main.dashboard-mode .invoice-list-container {
   grid-column: 1 / -1;
 }
 
+/* List column is a sticky browse panel beside the create form */
+main:not(.dashboard-mode) .invoice-list-container {
+  position: sticky;
+  top: var(--headerH);
+  padding-top: 28px;
+}
+
 /* Utility */
 .mobile-only-flex {
   display: none !important;
@@ -105,6 +114,12 @@ main.dashboard-mode .invoice-list-container {
     grid-template-columns: 1fr;
     padding: var(--headerH) 1rem 1rem 1rem;
     gap: 1.5rem;
+  }
+
+  /* Stacked layout — list is no longer a sticky side panel */
+  main:not(.dashboard-mode) .invoice-list-container {
+    position: static;
+    padding-top: 0;
   }
 }
 

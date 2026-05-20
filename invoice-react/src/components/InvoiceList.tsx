@@ -110,7 +110,7 @@ export default function InvoiceList({
   }
 
   return (
-    <section className="card" style={{ marginBottom: '20px' }}>
+    <section className="card invoice-list-card">
       <div className="flex justify-between items-center mb-4">
         <h2 className="m-0">{t.invoices}</h2>
         <Button
