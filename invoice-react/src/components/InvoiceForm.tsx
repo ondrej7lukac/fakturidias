@@ -1,16 +1,26 @@
 import './InvoiceForm.css'
 import { useState, useEffect, useRef } from 'react'
 import { formatInvoiceNumber, addDays, formatDate, money, getUserId } from '../utils/storage'
-import { searchAres, parseAresItem } from '../utils/ares'
-import { Pencil, Eye, AlertTriangle, Cloud, FileText, RefreshCw, ArrowLeftRight, Check, Mail, ICON_MD, STROKE } from '@/lib/icons'
+import { searchAres, parseAresItem, lookupAresByIco } from '../utils/ares'
+import { Pencil, Eye, AlertTriangle, Cloud, FileText, RefreshCw, ArrowLeftRight, Check, Mail, Contact, Wallet, Search, X, Send, Save, ICON_MD, ICON_SM, STROKE } from '@/lib/icons'
 
 import ItemsTable from './ItemsTable'
 import InvoicePreview from './InvoicePreview'
 import AIPrompt from './AIPrompt'
-import { generateInvoicePDF } from '../utils/pdf'
+import { generateInvoicePDF, downloadPDF, pdfBlobToDataUri } from '../utils/pdf'
 import { BANK_CODES, calculateIban, parseIban, getCzechQrPayload } from '../utils/bank'
 import { QRCodeCanvas } from 'qrcode.react'
 import QRCode from 'qrcode'
+
+function randomUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
 
 
 export default function InvoiceForm({
@@ -87,6 +97,9 @@ export default function InvoiceForm({
             if (itemSuggestionsRef.current && !itemSuggestionsRef.current.contains(event.target)) {
                 setItemSuggestions([])
             }
+            if (supplierSuggestionsRef.current && !supplierSuggestionsRef.current.contains(event.target)) {
+                setSupplierSuggestions([])
+            }
         }
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -102,7 +115,13 @@ export default function InvoiceForm({
     const [savedCustomers, setSavedCustomers] = useState([])
     const [itemSuggestions, setItemSuggestions] = useState([])
     const [customerSuggestions, setCustomerSuggestions] = useState([])
+    const [supplierSuggestions, setSupplierSuggestions] = useState([])
     const [saveTimer, setSaveTimer] = useState(null)
+    const [aresAutoFilled, setAresAutoFilled] = useState(false)
+    const [supplierAresAutoFilled, setSupplierAresAutoFilled] = useState(false)
+    const pendingPreviewModeRef = useRef(false)
+    const supplierSuggestionsRef = useRef(null)
+    const supplierAresDebounceRef = useRef(null)
 
     // ─── Effect 1: Load invoice data when selected invoice changes ────────────
     // ONLY this effect may call setItems — prevents items being wiped by unrelated state changes
@@ -159,7 +178,7 @@ export default function InvoiceForm({
         } else {
             // Switching to new invoice mode — reset everything
             if (!newInvoiceIdRef.current) {
-                newInvoiceIdRef.current = crypto.randomUUID()
+                newInvoiceIdRef.current = randomUUID()
             }
             const today = new Date()
             setFormData(prev => ({
@@ -514,6 +533,7 @@ export default function InvoiceForm({
     const handleClientNameChange = (e) => {
         const value = e.target.value
         setFormData(prev => ({ ...prev, clientName: value }))
+        setAresAutoFilled(false)
 
         if (value.trim().length > 0) {
             // 1. Saved Customers (Instant)
@@ -557,7 +577,55 @@ export default function InvoiceForm({
             clientAddress: customer.address || '',
             clientArea: customer.city || customer.area || ''
         }))
+        if (customer.source === 'ares' || customer.source === 'rpo') {
+            setAresAutoFilled(true)
+        }
         setCustomerSuggestions([])
+    }
+
+    const handleSupplierNameChange = (e) => {
+        const value = e.target.value
+        setFormData(prev => ({ ...prev, supplierName: value }))
+        setSupplierAresAutoFilled(false)
+        if (value.trim().length >= 3) {
+            if (supplierAresDebounceRef.current) clearTimeout(supplierAresDebounceRef.current)
+            supplierAresDebounceRef.current = setTimeout(async () => {
+                const results = await searchAres(value)
+                setSupplierSuggestions(results.map(item => ({ ...parseAresItem(item), source: 'ares' })).slice(0, 5))
+            }, 500)
+        } else {
+            setSupplierSuggestions([])
+        }
+    }
+
+    const handleSupplierIcoChange = async (e) => {
+        const value = e.target.value
+        setFormData(prev => ({ ...prev, supplierIco: value }))
+        if (/^\d{8}$/.test(value.trim())) {
+            const entity = await lookupAresByIco(value.trim())
+            if (entity) {
+                const parsed = parseAresItem(entity)
+                setFormData(prev => ({
+                    ...prev,
+                    supplierName: parsed.name || prev.supplierName,
+                    supplierVat: parsed.vat || prev.supplierVat,
+                    supplierAddress: parsed.address || prev.supplierAddress,
+                }))
+                setSupplierAresAutoFilled(true)
+            }
+        }
+    }
+
+    const handleSelectSupplier = (entity) => {
+        setFormData(prev => ({
+            ...prev,
+            supplierName: entity.name || prev.supplierName,
+            supplierIco: entity.ico || prev.supplierIco,
+            supplierVat: entity.vat || prev.supplierVat,
+            supplierAddress: entity.address || prev.supplierAddress,
+        }))
+        setSupplierSuggestions([])
+        setSupplierAresAutoFilled(true)
     }
 
     const handleInputBlur = () => {
@@ -579,7 +647,7 @@ export default function InvoiceForm({
         const total = subtotal + taxAmount
 
         const newItem = {
-            id: crypto.randomUUID(),
+            id: randomUUID(),
             name: itemInput.name.trim(),
             qty,
             price: basePrice,
@@ -648,12 +716,37 @@ export default function InvoiceForm({
     }
 
     const handleDeleteRow = (index) => {
-        if (window.confirm(lang === 'cs' ? 'Smazat položku?' : 'Delete item?')) {
-            const newItems = [...items]
-            newItems.splice(index, 1)
-            setItems(newItems)
-            handleBlurSave()
-        }
+        setItems(prev => prev.filter((_, i) => i !== index))
+        handleBlurSave()
+    }
+
+    const addItem = () => {
+        setItems(prev => [...prev, {
+            id: randomUUID(),
+            name: '',
+            qty: 1,
+            unit: 'h',
+            price: 0,
+            discount: 0,
+            taxRate: formData.isVatPayer ? 21 : 0,
+            subtotal: 0,
+            taxAmount: 0,
+            total: 0
+        }])
+    }
+
+    const updateItem = (i: number, key: string, rawValue: any) => {
+        setItems(prev => prev.map((it, idx) => {
+            if (idx !== i) return it
+            const updated = { ...it, [key]: rawValue }
+            const qty = parseFloat(String(key === 'qty' ? rawValue : updated.qty)) || 0
+            const price = parseFloat(String(key === 'price' ? rawValue : updated.price)) || 0
+            const taxRate = parseFloat(String(key === 'taxRate' ? rawValue : updated.taxRate)) || 0
+            const discount = parseFloat(String(updated.discount)) || 0
+            const afterDiscount = qty * price - discount
+            const taxAmount = afterDiscount * (taxRate / 100)
+            return { ...updated, subtotal: afterDiscount, taxAmount, total: afterDiscount + taxAmount }
+        }))
     }
 
     const handleItemTotalChange = (e) => {
@@ -715,6 +808,7 @@ export default function InvoiceForm({
             clientArea: data.city || prev.clientArea,
             clientVat: data.vat || prev.clientVat
         }))
+        setAresAutoFilled(true)
     }
 
     const handleDownloadPDF = async () => {
@@ -734,7 +828,7 @@ export default function InvoiceForm({
             } catch (err) { }
 
             const pdf = await generateInvoicePDF(currentData, t, qrDataUrl)
-            pdf.save(`${currentData.invoiceNumber}.pdf`)
+            downloadPDF(pdf, `${currentData.invoiceNumber}.pdf`)
         } catch (error) {
             alert('Failed to generate PDF')
         }
@@ -761,8 +855,8 @@ export default function InvoiceForm({
                     qrDataUrl = await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: 'M', margin: 0, width: 256 })
                 }
             } catch (err) {}
-            const pdf = await generateInvoicePDF(currentData, t, qrDataUrl)
-            const pdfBase64 = pdf.output('datauristring')
+            const pdfBlob = await generateInvoicePDF(currentData, t, qrDataUrl)
+            const pdfBase64 = await pdfBlobToDataUri(pdfBlob)
             const response = await fetch('/api/email/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -807,8 +901,8 @@ export default function InvoiceForm({
                 }
             } catch (err) { }
 
-            const pdf = await generateInvoicePDF(currentData, t, qrDataUrl)
-            const pdfBase64 = pdf.output('datauristring')
+            const pdfBlob = await generateInvoicePDF(currentData, t, qrDataUrl)
+            const pdfBase64 = await pdfBlobToDataUri(pdfBlob)
 
             const response = await fetch('/api/drive/backup', {
                 method: 'POST',
@@ -843,599 +937,566 @@ export default function InvoiceForm({
             clientIco: data.clientIco || prev.clientIco,
             clientVat: data.clientVat || prev.clientVat,
             clientArea: data.clientArea || prev.clientArea,
+            clientCountry: data.clientCountry || prev.clientCountry,
             currency: data.currency || prev.currency,
             dueDate: data.dueDate || prev.dueDate,
             issueDate: data.issueDate || prev.issueDate,
             variableSymbol: data.variableSymbol || prev.variableSymbol,
             paymentNote: data.paymentNote || prev.paymentNote,
+            ...(data.supplierName ? { supplierName: data.supplierName } : {}),
+            ...(data.supplierIco ? { supplierIco: data.supplierIco } : {}),
+            ...(data.supplierVat ? { supplierVat: data.supplierVat } : {}),
+            ...(data.supplierAddress ? { supplierAddress: data.supplierAddress } : {}),
         }))
         if (Array.isArray(data.items) && data.items.length > 0) {
             const vatPayer = formData.isVatPayer
-            const newItems = data.items.map((item: any) => {
+            setItems(data.items.map((item: any) => {
                 const qty = Number(item.qty) || 1
                 const price = Number(item.price) || 0
-                const taxRate = vatPayer ? 21 : 0
+                const taxRate = item.taxRate != null ? Number(item.taxRate) : (vatPayer ? 21 : 0)
                 const subtotal = qty * price
                 const taxAmount = subtotal * (taxRate / 100)
-                return {
-                    id: crypto.randomUUID(),
-                    name: String(item.name || ''),
-                    qty,
-                    price,
-                    discount: 0,
-                    taxRate,
-                    subtotal,
-                    taxAmount,
-                    total: subtotal + taxAmount,
-                }
-            })
-            setItems(newItems)
+                return { id: randomUUID(), name: String(item.name || ''), qty, price, discount: 0, taxRate, subtotal, taxAmount, total: subtotal + taxAmount }
+            }))
+        }
+        if (pendingPreviewModeRef.current) {
+            setPreviewMode(true)
+            pendingPreviewModeRef.current = false
         }
     }
 
     const handleAIPreview = (data: any) => {
+        pendingPreviewModeRef.current = true
         handleAIFill(data)
-        setPreviewMode(true)
     }
+
+    // Supplier section — rendered in sidebar
+    const supplierSection = (
+        <div className="ap-card">
+            <h3 className="ap-card__title">
+                <Contact size={ICON_MD} strokeWidth={STROKE} />
+                {lang === 'cs' ? 'Dodavatel' : 'Supplier'}
+            </h3>
+            <div className="ap-grid">
+                <div className="ap-field" ref={supplierSuggestionsRef} style={{ position: 'relative' }}>
+                    <label>{lang === 'cs' ? 'Jméno / Název' : 'Name / Company'}</label>
+                    <input
+                        className="ap-input"
+                        name="supplierName"
+                        value={formData.supplierName}
+                        onChange={handleSupplierNameChange}
+                        onBlur={handleInputBlur}
+                        placeholder={lang === 'cs' ? 'Vyhledat firmu nebo zadat IČO...' : 'Search company or enter business ID...'}
+                        autoComplete="off"
+                    />
+                    {supplierSuggestions.length > 0 && (
+                        <ul style={{
+                            position: 'absolute', top: '100%', left: 0, right: 0,
+                            background: 'var(--bg)', border: '1px solid var(--border)',
+                            borderRadius: '12px', zIndex: 10,
+                            listStyle: 'none', padding: '4px', margin: '4px 0 0 0',
+                            maxHeight: '200px', overflowY: 'auto',
+                            boxShadow: 'var(--shadow-lg)'
+                        }}>
+                            {supplierSuggestions.map((s, i) => (
+                                <li
+                                    key={i}
+                                    onClick={() => handleSelectSupplier(s)}
+                                    style={{ padding: '9px 12px', cursor: 'pointer', borderRadius: '8px', transition: 'background 0.1s' }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--card)')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = '')}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                                        <span style={{ fontWeight: 600, fontSize: 13 }}>{s.name}</span>
+                                        <small style={{ color: 'var(--accent)', fontSize: 10.5, fontWeight: 600 }}>ARES</small>
+                                    </div>
+                                    <small style={{ color: 'var(--muted)', fontSize: 12 }}>{s.ico && `IČO: ${s.ico}`}{s.address && ` · ${s.address}`}</small>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+                {supplierAresAutoFilled && (
+                    <div className="ap-ares-banner">
+                        <Check size={ICON_SM} strokeWidth={STROKE} />
+                        <strong>ARES</strong> · {lang === 'cs' ? 'Automaticky vyplněno z ARES' : 'Auto-filled from ARES'}
+                    </div>
+                )}
+                <div className="ap-grid ap-grid--2">
+                    <div className="ap-field">
+                        <label>{lang === 'cs' ? 'IČO' : 'Business ID'}</label>
+                        <input className="ap-input" name="supplierIco" value={formData.supplierIco} onChange={handleSupplierIcoChange} onBlur={handleInputBlur} placeholder="12345678" />
+                    </div>
+                    <div className="ap-field">
+                        <label>{lang === 'cs' ? 'DIČ' : 'VAT ID'}</label>
+                        <input className="ap-input" name="supplierVat" value={formData.supplierVat} onChange={handleChange} onBlur={handleInputBlur} placeholder="CZ12345678" />
+                    </div>
+                </div>
+                <div className="ap-field">
+                    <label>{lang === 'cs' ? 'Adresa' : 'Address'}</label>
+                    <input className="ap-input" name="supplierAddress" value={formData.supplierAddress} onChange={handleChange} onBlur={handleInputBlur} placeholder="Ulice 123, Praha" />
+                </div>
+            </div>
+        </div>
+    )
+
+    const getDueInDays = () => {
+        if (!formData.dueDate) return null
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const due = new Date(formData.dueDate)
+        due.setHours(0, 0, 0, 0)
+        const days = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        if (days < 0) return lang === 'cs' ? `Po splatnosti (${Math.abs(days)} dní)` : `Overdue by ${Math.abs(days)} days`
+        if (days === 0) return lang === 'cs' ? 'Splatno dnes' : 'Due today'
+        return lang === 'cs' ? `Splatnost za ${days} dní` : `Due in ${days} days`
+    }
+
+    // Summary sidebar card
+    const summaryCard = (
+        <div className="ap-card" style={{
+            background: 'radial-gradient(closest-side at 100% 0%, rgba(124, 247, 212, 0.08), transparent 60%), var(--card)'
+        }}>
+            <h3 className="ap-card__title">
+                <FileText size={ICON_MD} strokeWidth={STROKE} />
+                {lang === 'cs' ? 'Souhrn' : 'Summary'}
+            </h3>
+            <div style={{ display: 'grid', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                    <span style={{ color: 'var(--muted)' }}>{lang === 'cs' ? 'Mezisoučet' : 'Subtotal'}</span>
+                    <span style={{ fontFamily: 'var(--font-secondary, inherit)', fontWeight: 500 }}>{formData.taxBase} {formData.currency}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                    <span style={{ color: 'var(--muted)' }}>{lang === 'cs' ? `DPH ${formData.taxRate} %` : `VAT ${formData.taxRate} %`}</span>
+                    <span style={{ fontFamily: 'var(--font-secondary, inherit)', fontWeight: 500 }}>{formData.taxAmount} {formData.currency}</span>
+                </div>
+                <div className="ap-summary-total">
+                    <span style={{ fontWeight: 600 }}>{lang === 'cs' ? 'Celkem k úhradě' : 'Total to be paid'}</span>
+                    <span className="amount">{formData.amount}</span>
+                </div>
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                    <span className={`ap-pill ${formData.status}`}>{t[formData.status] || formData.status}</span>
+                    {getDueInDays() && <span style={{ color: 'var(--muted)' }}>{getDueInDays()}</span>}
+                </div>
+            </div>
+        </div>
+    )
 
     return (
         <>
-        <AIPrompt lang={lang} onFillForm={handleAIFill} onPreviewInvoice={handleAIPreview} />
-        <section className="card" style={{ position: 'relative' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{ margin: 0 }}>{t.createEditInvoice}</h2>
-                <button
-                    type="button"
-                    onClick={togglePreview}
-                    className="secondary"
-                    style={{ padding: '8px 16px' }}
-                >
-                    {previewMode
-                        ? <><Pencil size={ICON_MD} strokeWidth={STROKE} /> {lang === 'cs' ? 'Upravit' : 'Edit'}</>
-                        : <><Eye size={ICON_MD} strokeWidth={STROKE} /> {lang === 'cs' ? 'Náhled' : 'Preview'}</>
-                    }
-                </button>
+        <style>{`
+            input[type="number"]::-webkit-inner-spin-button,
+            input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+            input[type="number"] { -moz-appearance: textfield; }
+        `}</style>
+
+        <div className="ap-page">
+            {/* Page header */}
+            <div className="ap-page__head">
+                <div>
+                    <h1 className="ap-page__title">
+                        {invoice ? (lang === 'cs' ? 'Upravit fakturu' : 'Edit invoice') : (lang === 'cs' ? 'Nová faktura' : 'New invoice')}
+                    </h1>
+                    <p className="ap-page__sub">
+                        {lang === 'cs' ? 'Vyplňte hlasem, textem, nebo ručně.' : 'Fill it by voice, by text, or by hand.'}
+                        <span style={{ color: 'var(--muted2)', fontFamily: 'var(--font-mono, monospace)', fontSize: 12, marginLeft: 8 }}>
+                            · {formData.invoiceNumber}
+                        </span>
+                    </p>
+                </div>
             </div>
 
-            <style>{`
-                input[type="number"]::-webkit-inner-spin-button,
-                input[type="number"]::-webkit-outer-spin-button {
-                    -webkit-appearance: none;
-                    margin: 0;
-                }
-                input[type="number"] {
-                    -moz-appearance: textfield;
-                }
-            `}</style>
-
-            {/* Region/Tax Warnings */}
-            {defaultSupplier?.region === 'CZ' && defaultSupplier?.taxStatus === 'non-payer' && formData.clientCountry !== 'CZ' && (
-                <div style={{ padding: '12px', background: 'rgba(255, 150, 0, 0.1)', border: '1px solid orange', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.875rem', color: '#ffb347' }}>
-                    <AlertTriangle size={14} strokeWidth={2} style={{ flexShrink: 0 }} /> {t.identifiedPersonWarning}
-                </div>
-            )}
-
             {previewMode ? (
-                <>
+                <div className="ap-card">
                     <InvoicePreview invoice={getCurrentInvoiceData()} t={t} lang={lang} />
-                    <div className="actions" style={{ marginTop: '30px' }}>
-                        <button type="button" onClick={(e) => { e.preventDefault(); onSave(getCurrentInvoiceData()); }} className="primary">
-                            {t.saveInvoice}
+                    <div className="ap-action-bar" style={{ marginTop: '24px' }}>
+                        <button type="button" onClick={(e) => { e.preventDefault(); onSave(getCurrentInvoiceData()); }} className="ap-btn ap-btn--primary ap-btn--lg">
+                            <Save size={ICON_MD} strokeWidth={STROKE} /> {t.saveInvoice}
                         </button>
-                        <button type="button" onClick={(e) => { e.preventDefault(); setPreviewMode(false); }} className="secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <button type="button" onClick={(e) => { e.preventDefault(); setPreviewMode(false); }} className="ap-btn ap-btn--secondary">
                             <Pencil size={ICON_MD} strokeWidth={STROKE} /> {lang === 'cs' ? 'Upravit' : 'Edit'}
                         </button>
-                        <button type="button" onClick={handleDownloadPDF} disabled={isGenerating} className="secondary">
+                        <button type="button" onClick={handleDownloadPDF} disabled={isGenerating} className="ap-btn ap-btn--secondary">
                             {isGenerating && !emailStatus ? t.alertGenerating : t.downloadPdf}
                         </button>
-                        <button type="button" onClick={handleEmailPDF} disabled={isGenerating || !isAuthenticated} className="secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            <Mail size={ICON_MD} strokeWidth={STROKE} /> {emailStatus || t.emailPdf}
+                        <button type="button" onClick={handleEmailPDF} disabled={isGenerating || !isAuthenticated} className="ap-btn ap-btn--secondary">
+                            <Send size={ICON_MD} strokeWidth={STROKE} /> {emailStatus || t.emailPdf}
                         </button>
-                        <button type="button" onClick={handleBackupToDrive} disabled={isGenerating} className="secondary">
-                            <Cloud size={ICON_MD} strokeWidth={STROKE} /> {emailStatus ? emailStatus : (lang === 'cs' ? 'Zálohovat na Drive' : 'Backup to Drive')}
+                        <button type="button" onClick={handleBackupToDrive} disabled={isGenerating} className="ap-btn ap-btn--ghost">
+                            <Cloud size={ICON_MD} strokeWidth={STROKE} /> Drive
                         </button>
-                        <button type="button" 
-                            onClick={async () => {
-                                const invData = getCurrentInvoiceData();
-                                const res = await fetch('/api/export/peppol', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ invoice: invData })
-                                });
-                                if (res.ok) {
-                                    const blob = await res.blob();
-                                    const url = window.URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `invoice-${invData.invoiceNumber}.xml`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    a.remove();
-                                }
-                            }} 
-                            className="secondary"
-                        >
-                            <FileText size={ICON_MD} strokeWidth={STROKE} /> {lang === 'sk' ? 'Stiahnuť Peppol XML' : 'Stáhnout Peppol XML'}
-                        </button>
-                        <button type="button" onClick={handleMarkPaid} className="secondary" style={{ marginLeft: 'auto' }}>
+                        <button type="button" onClick={handleMarkPaid} className="ap-btn ap-btn--ghost" style={{ marginLeft: 'auto' }}>
                             {t.markPaid}
                         </button>
                     </div>
-                </>
+                </div>
             ) : (
-                <form onSubmit={handleSubmit} onBlur={handleInputBlur} className="grid">
-                    <div className="grid two">
-                        <div>
-                            <label>{t.invoiceNumber}</label>
-                            <input name="invoiceNumber" value={formData.invoiceNumber} onChange={handleChange} required />
-                        </div>
-                        <div>
-                            <label>{t.issueDate}</label>
-                            <input name="issueDate" type="date" value={formData.issueDate} onChange={handleChange} required />
-                        </div>
-                    </div>
+                /* ── create layout (single column, beside list) ── */
+                <div className="ap-create">
+                    <div className="ap-create__main">
 
-                    <div className="grid two">
-                        <div>
-                            <label>{t.dueDate}</label>
-                            <input name="dueDate" type="date" value={formData.dueDate} onChange={handleChange} />
-                        </div>
-                        <div>
-                            <label>{lang === 'cs' ? 'DUZP' : 'DUZP'}</label>
-                            <input name="taxableSupplyDate" type="date" value={formData.taxableSupplyDate || formData.issueDate} onChange={handleChange} />
-                        </div>
-                    </div>
+                    {/* AI dictation card */}
+                    <AIPrompt lang={lang} onFillForm={handleAIFill} onPreviewInvoice={handleAIPreview} isGuest={!isAuthenticated} />
 
-                    <div className="grid two">
-                        <div>
-                            <label>{t.status}</label>
-                            <select name="status" value={formData.status} onChange={handleChange}>
-                                <option value="draft">{t.draft}</option>
-                                <option value="sent">{t.sent}</option>
-                                <option value="paid">{t.paid}</option>
-                                <option value="overdue">{t.overdue}</option>
-                            </select>
+                    {/* Region/Tax Warning */}
+                    {defaultSupplier?.region === 'CZ' && defaultSupplier?.taxStatus === 'non-payer' && formData.clientCountry !== 'CZ' && (
+                        <div className="form-warning-banner">
+                            <AlertTriangle size={ICON_SM} strokeWidth={STROKE} style={{ flexShrink: 0 }} /> {t.identifiedPersonWarning}
                         </div>
-                        <div>
-                            <label>{t.category}</label>
-                            <select name="category" value={formData.category} onChange={handleChange}>
-                                <option value="">{t.all}</option>
-                                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                            </select>
-                        </div>
-                    </div>
+                    )}
 
-                    <div>
-                        <label>{t.addCategory}</label>
-                        <div className="actions">
-                            <input value={categoryInput} onChange={(e) => setCategoryInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())} />
-                            <button type="button" onClick={handleAddCategory} className="secondary">{t.add}</button>
-                        </div>
-                    </div>
+                    <form onSubmit={handleSubmit} onBlur={handleInputBlur} style={{ display: 'contents' }}>
 
-                    <h3>{t.issuer}</h3>
-                    <div className="grid two">
-                        <div>
-                            <label>{t.supplierName}</label>
-                            <input name="supplierName" value={formData.supplierName} onChange={handleChange} placeholder="Vaše firma s.r.o." />
-                        </div>
-                        <div>
-                            <label>{t.supplierIco}</label>
-                            <input name="supplierIco" value={formData.supplierIco} onChange={handleChange} placeholder="12345678" />
-                        </div>
-                    </div>
-                    <div className="grid two">
-                        <div>
-                            <label>{t.supplierVat}</label>
-                            <input name="supplierVat" value={formData.supplierVat} onChange={handleChange} placeholder="CZ12345678" />
-                        </div>
-                        <div>
-                            <label>{t.supplierAddress}</label>
-                            <input name="supplierAddress" value={formData.supplierAddress} onChange={handleChange} placeholder="Ulice 123, Praha" />
-                        </div>
-                    </div>
-                    <div>
-                        <label>{lang === 'cs' ? 'Zápis v rejstříku' : 'Registry Entry'}</label>
-                        <input name="supplierRegistry" value={formData.supplierRegistry} onChange={handleChange} />
-                    </div>
-
-                    <div className="grid two">
-                        <div>
-                            <label>{lang === 'cs' ? 'Telefon' : 'Phone'}</label>
-                            <input name="supplierPhone" value={formData.supplierPhone} onChange={handleChange} />
-                        </div>
-                        <div>
-                            <label>Email</label>
-                            <input name="supplierEmail" type="email" value={formData.supplierEmail} onChange={handleChange} />
-                        </div>
-                    </div>
-                    <div>
-                        <label>Web</label>
-                        <input name="supplierWebsite" value={formData.supplierWebsite} onChange={handleChange} />
-                    </div>
-
-                    <h3>{t.client}</h3>
-                    <div className="grid two" style={{ marginBottom: '10px' }}>
-                        <div>
-                            <label>{t.clientArea}</label>
-                            <select 
-                                name="clientCountry" 
-                                value={formData.clientCountry} 
-                                onChange={(e) => setFormData(prev => ({ ...prev, clientCountry: e.target.value }))}
-                            >
-                                <option value="CZ">Czech Republic (CZ)</option>
-                                <option value="SK">Slovakia (SK)</option>
-                                <option value="DE">Germany (DE)</option>
-                                <option value="AT">Austria (AT)</option>
-                                <option value="PL">Poland (PL)</option>
-                                <option value="OTHER">Other EU / World</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label>{t.clientName}</label>
-                            <div style={{ position: 'relative' }}>
-                                <input
-                                    name="clientName"
-                                    value={formData.clientName}
-                                    onChange={handleClientNameChange}
-                                    onBlur={handleInputBlur}
-                                    placeholder={lang === 'cs' ? 'Zadej název firmy nebo IČO pro vyhledávání...' : 'Enter company name or ID...'}
-                                    autoComplete="off"
-                                />
-                                {customerSuggestions.length > 0 && (
-                                    <ul className="suggestions" style={{
-                                        position: 'absolute',
-                                        top: '100%',
-                                        left: 0,
-                                        right: 0,
-                                        background: '#1a1d2e',
-                                        border: '1px solid var(--border)',
-                                        borderRadius: '8px',
-                                        zIndex: 10,
-                                        listStyle: 'none',
-                                        padding: 0,
-                                        margin: 0,
-                                        maxHeight: '200px',
-                                        overflowY: 'auto'
-                                    }}>
-                                        {customerSuggestions.map((c, i) => (
-                                            <li
-                                                key={i}
-                                                onClick={() => handleSelectCustomer(c)}
-                                                style={{ padding: '8px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
-                                            >
-                                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                    <b>{c.name}</b>
-                                                    <small style={{ color: 'var(--muted)' }}>{c.source === 'ares' ? 'ARES' : 'Saved'}</small>
-                                                </div>
-                                                <small>{c.ico && `IČO: ${c.ico}`} {c.email && `| ${c.email}`}</small>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
+                    {/* Basic info */}
+                    <div className="ap-card">
+                        <h3 className="ap-card__title">
+                            <FileText size={ICON_MD} strokeWidth={STROKE} />
+                            {lang === 'cs' ? 'Základní údaje' : 'Basic info'}
+                        </h3>
+                        <div className="ap-grid ap-grid--3">
+                            <div className="ap-field">
+                                <label>{t.invoiceNumber}</label>
+                                <input className="ap-input" name="invoiceNumber" value={formData.invoiceNumber} onChange={handleChange} required />
+                            </div>
+                            <div className="ap-field">
+                                <label>{t.issueDate}</label>
+                                <input className="ap-input" name="issueDate" type="date" value={formData.issueDate} onChange={handleChange} required />
+                            </div>
+                            <div className="ap-field">
+                                <label>{t.dueDate}</label>
+                                <input className="ap-input" name="dueDate" type="date" value={formData.dueDate} onChange={handleChange} />
+                            </div>
+                            <div className="ap-field">
+                                <label>{lang === 'cs' ? 'DUZP' : 'Tax supply date'}</label>
+                                <input className="ap-input" name="taxableSupplyDate" type="date" value={formData.taxableSupplyDate || formData.issueDate} onChange={handleChange} />
+                            </div>
+                            <div className="ap-field">
+                                <label>{t.currency}</label>
+                                <select className="ap-select" name="currency" value={formData.currency} onChange={handleChange}>
+                                    <option value="CZK">CZK · Česká koruna</option>
+                                    <option value="EUR">EUR · Euro</option>
+                                    <option value="USD">USD · US Dollar</option>
+                                </select>
+                            </div>
+                            <div className="ap-field">
+                                <label>{t.category}</label>
+                                <select className="ap-select" name="category" value={formData.category} onChange={handleChange}>
+                                    <option value="">{lang === 'cs' ? 'Kategorie' : 'Category'}</option>
+                                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                </select>
                             </div>
                         </div>
-                        <div>
-                            <label>{t.clientAddress}</label>
-                            <input name="clientAddress" value={formData.clientAddress} onChange={handleChange} />
+                    </div>
+
+                    {/* Supplier */}
+                    {supplierSection}
+
+                    {/* Client / Subscriber */}
+                    <div className="ap-card">
+                        <h3 className="ap-card__title">
+                            <Contact size={ICON_MD} strokeWidth={STROKE} />
+                            {lang === 'cs' ? 'Odběratel' : 'Subscriber'}
+                        </h3>
+
+                        {/* Name search — full width */}
+                        <div className="ap-grid ap-grid--2" style={{ marginBottom: 14 }}>
+                            <div className="ap-field" style={{ gridColumn: 'span 2' }}>
+                                <label>{lang === 'cs' ? 'Jméno / Název' : 'Name / Title'}</label>
+                                <div className="ap-input-wrap" style={{ position: 'relative' }}>
+                                    <Search size={ICON_SM} strokeWidth={STROKE} />
+                                    <input
+                                        className="ap-input"
+                                        name="clientName"
+                                        value={formData.clientName}
+                                        onChange={handleClientNameChange}
+                                        onBlur={handleInputBlur}
+                                        placeholder={lang === 'cs' ? 'Vyhledat firmu nebo zadat IČO...' : 'Search a company or enter business ID...'}
+                                        autoComplete="off"
+                                    />
+                                    {customerSuggestions.length > 0 && (
+                                        <ul style={{
+                                            position: 'absolute', top: '100%', left: 0, right: 0,
+                                            background: 'var(--bg)', border: '1px solid var(--border)',
+                                            borderRadius: '12px', zIndex: 10,
+                                            listStyle: 'none', padding: '4px', margin: '4px 0 0 0',
+                                            maxHeight: '200px', overflowY: 'auto',
+                                            boxShadow: 'var(--shadow-lg)'
+                                        }}>
+                                            {customerSuggestions.map((c, i) => (
+                                                <li
+                                                    key={i}
+                                                    onClick={() => handleSelectCustomer(c)}
+                                                    style={{ padding: '9px 12px', cursor: 'pointer', borderRadius: '8px', transition: 'background 0.1s' }}
+                                                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--card)')}
+                                                    onMouseLeave={e => (e.currentTarget.style.background = '')}
+                                                >
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                                                        <span style={{ fontWeight: 600, fontSize: 13 }}>{c.name}</span>
+                                                        <small style={{ color: 'var(--accent)', fontSize: 10.5, fontWeight: 600 }}>{c.source === 'ares' ? 'ARES' : c.source === 'rpo' ? 'RPO' : 'Saved'}</small>
+                                                    </div>
+                                                    <small style={{ color: 'var(--muted)', fontSize: 12 }}>{c.ico && `IČO: ${c.ico}`}{c.email && ` · ${c.email}`}</small>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ARES auto-fill banner */}
+                        {aresAutoFilled && (
+                            <div className="ap-ares-banner">
+                                <Check size={ICON_SM} strokeWidth={STROKE} />
+                                <strong>ARES</strong> · {lang === 'cs' ? 'Automaticky vyplněno z ARES' : 'Auto-filled from ARES'}
+                            </div>
+                        )}
+
+                        {/* ICO / DIC + Address + Email / Phone */}
+                        <div className="ap-grid ap-grid--2">
+                            <div className="ap-field">
+                                <label>{lang === 'cs' ? 'IČO' : 'Business ID'}</label>
+                                <input className="ap-input" name="clientIco" value={formData.clientIco} onChange={handleChange} />
+                            </div>
+                            <div className="ap-field">
+                                <label>
+                                    {lang === 'cs' ? 'DIČ' : 'VAT ID'}
+                                    {viesStatus === 'valid' && <Check size={12} strokeWidth={3} className="vat-valid" style={{ marginLeft: 4 }} />}
+                                    {viesStatus === 'invalid' && <span className="vat-invalid" style={{ marginLeft: 4 }}>✗</span>}
+                                </label>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                    <input className="ap-input" name="clientVat" value={formData.clientVat} onChange={handleChange} style={{ flex: 1 }} />
+                                    {formData.clientVat && (
+                                        <button
+                                            type="button"
+                                            className="ap-btn ap-btn--secondary"
+                                            style={{ padding: '0 10px', fontSize: 11, flexShrink: 0 }}
+                                            onClick={async () => {
+                                                setViesStatus('loading')
+                                                try {
+                                                    const res = await fetch('/api/vat/validate', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ vat: formData.clientVat })
+                                                    })
+                                                    const data = await res.json()
+                                                    setViesStatus(data.isValid ? 'valid' : 'invalid')
+                                                } catch {
+                                                    setViesStatus(null)
+                                                }
+                                            }}
+                                            disabled={viesStatus === 'loading'}
+                                        >
+                                            {viesStatus === 'loading' ? '…' : 'VIES'}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="ap-field" style={{ gridColumn: 'span 2' }}>
+                                <label>{lang === 'cs' ? 'Adresa' : 'Address'}</label>
+                                <input className="ap-input" name="clientAddress" value={formData.clientAddress} onChange={handleChange} />
+                            </div>
+                            <div className="ap-field">
+                                <label>Email</label>
+                                <input className="ap-input" name="clientEmail" type="email" value={formData.clientEmail} onChange={handleChange} />
+                            </div>
+                            <div className="ap-field">
+                                <label>{lang === 'cs' ? 'Telefon' : 'Phone'}</label>
+                                <input className="ap-input" name="clientPhone" value={formData.clientPhone} onChange={handleChange} placeholder="+420..." />
+                            </div>
+                            <div className="ap-field">
+                                <label>{lang === 'cs' ? 'Země' : 'Country'}</label>
+                                <select className="ap-select" name="clientCountry" value={formData.clientCountry} onChange={(e) => setFormData(prev => ({ ...prev, clientCountry: e.target.value }))}>
+                                    <option value="CZ">Czech Republic (CZ)</option>
+                                    <option value="SK">Slovakia (SK)</option>
+                                    <option value="DE">Germany (DE)</option>
+                                    <option value="AT">Austria (AT)</option>
+                                    <option value="PL">Poland (PL)</option>
+                                    <option value="OTHER">Other EU / World</option>
+                                </select>
+                            </div>
+                            <div className="ap-field">
+                                <label>Email CC</label>
+                                <input className="ap-input" name="clientEmailCopy" type="email" value={formData.clientEmailCopy} onChange={handleChange} />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="grid three">
-                        <div>
-                            <label>{t.clientIco}</label>
-                            <input name="clientIco" value={formData.clientIco} onChange={handleChange} />
-                        </div>
-                        <div>
-                            <label>
-                                {t.clientVat} 
-                                {viesStatus === 'valid' && <Check size={12} strokeWidth={3} style={{ color: '#4ade80', marginLeft: '5px', flexShrink: 0 }} />}
-                                {viesStatus === 'invalid' && <span style={{ color: '#ef4444', marginLeft: '5px', fontSize: '0.75rem' }}>✗</span>}
-                            </label>
-                            <div style={{ display: 'flex', gap: '5px' }}>
-                                <input name="clientVat" value={formData.clientVat} onChange={handleChange} />
-                                {formData.clientVat && (
-                                    <button 
-                                        type="button" 
-                                        onClick={async () => {
-                                            setViesStatus('loading')
-                                            try {
-                                                const res = await fetch('/api/vat/validate', {
-                                                    method: 'POST',
-                                                    headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({ vat: formData.clientVat })
-                                                })
-                                                const data = await res.json()
-                                                setViesStatus(data.isValid ? 'valid' : 'invalid')
-                                            } catch (e) {
-                                                setViesStatus(null)
-                                            }
-                                        }}
-                                        className="secondary"
-                                        style={{ padding: '0 8px', fontSize: '0.75rem' }}
-                                        disabled={viesStatus === 'loading'}
+                    {/* Line items */}
+                    <div className="ap-card">
+                        <h3 className="ap-card__title">
+                            <Wallet size={ICON_MD} strokeWidth={STROKE} />
+                            {lang === 'cs' ? 'Položky' : 'Items'}
+                        </h3>
+
+                        <div className="ap-items">
+                            {/* Header row */}
+                            <div className="ap-items__row">
+                                <div>{lang === 'cs' ? 'Popis položky' : 'Item description'}</div>
+                                <div>{lang === 'cs' ? 'Množství' : 'Amount'}</div>
+                                <div>{lang === 'cs' ? 'Jedn.' : 'Unit'}</div>
+                                <div style={{ textAlign: 'right' }}>{lang === 'cs' ? 'Jedn. cena' : 'Unit price'}</div>
+                                <div style={{ textAlign: 'right' }}>{lang === 'cs' ? 'DPH %' : 'VAT %'}</div>
+                                <div style={{ textAlign: 'right' }}>{lang === 'cs' ? 'Celkem' : 'Total'}</div>
+                                <div />
+                            </div>
+                            {items.map((it, i) => (
+                                <div key={it.id || i} className="ap-items__row">
+                                    <input
+                                        className="ap-input"
+                                        placeholder={lang === 'cs' ? 'Popis (např. Konzultace UX designu)' : 'Description (e.g. UX design consulting)'}
+                                        value={it.name}
+                                        onChange={e => updateItem(i, 'name', e.target.value)}
+                                    />
+                                    <input
+                                        className="ap-input"
+                                        type="number"
+                                        value={it.qty}
+                                        onChange={e => updateItem(i, 'qty', parseFloat(e.target.value) || 0)}
+                                    />
+                                    <select
+                                        className="ap-select"
+                                        value={(it as any).unit || 'h'}
+                                        onChange={e => updateItem(i, 'unit', e.target.value)}
                                     >
-                                        {viesStatus === 'loading' ? '...' : 'VIES'}
+                                        <option value="h">{lang === 'cs' ? 'h' : 'h'}</option>
+                                        <option value="ks">{lang === 'cs' ? 'ks' : 'pcs'}</option>
+                                        <option value="m">{lang === 'cs' ? 'měsíc' : 'month'}</option>
+                                    </select>
+                                    <input
+                                        className="ap-input"
+                                        type="number"
+                                        value={it.price}
+                                        onChange={e => updateItem(i, 'price', parseFloat(e.target.value) || 0)}
+                                        style={{ textAlign: 'right' }}
+                                    />
+                                    <select
+                                        className="ap-select"
+                                        value={String(it.taxRate || 0)}
+                                        onChange={e => updateItem(i, 'taxRate', parseFloat(e.target.value))}
+                                    >
+                                        <option value="21">21</option>
+                                        <option value="15">15</option>
+                                        <option value="12">12</option>
+                                        <option value="0">0</option>
+                                    </select>
+                                    <div className="num">{money(it.total)}</div>
+                                    <button
+                                        type="button"
+                                        className="ap-items__remove"
+                                        onClick={() => handleDeleteRow(i)}
+                                        aria-label={lang === 'cs' ? 'Odstranit' : 'Remove'}
+                                    >
+                                        <X size={ICON_SM} strokeWidth={STROKE} />
                                     </button>
+                                </div>
+                            ))}
+                        </div>
+
+                        <button type="button" className="ap-items__add" onClick={addItem}>
+                            {lang === 'cs' ? '+ Přidat položku' : '+ Add line item'}
+                        </button>
+
+                        {/* Totals */}
+                        <div className="ap-totals">
+                            <div className="ap-totals__row">
+                                <span className="label">{lang === 'cs' ? 'Mezisoučet' : 'Subtotal'}</span>
+                                <span className="num">{formData.taxBase}</span>
+                            </div>
+                            <div className="ap-totals__row">
+                                <span className="label">{lang === 'cs' ? 'DPH' : 'VAT'}</span>
+                                <span className="num">{formData.taxAmount}</span>
+                            </div>
+                            <div className="ap-totals__row ap-totals__row--grand">
+                                <span>{lang === 'cs' ? 'Celkem k úhradě' : 'Total to be paid'}</span>
+                                <span className="num">{formData.amount} {formData.currency}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Payment card */}
+                    <div className="ap-card">
+                        <h3 className="ap-card__title">
+                            <Wallet size={ICON_MD} strokeWidth={STROKE} />
+                            {lang === 'cs' ? 'Platba' : 'Payment'}
+                        </h3>
+                        <div className="ap-grid ap-grid--2">
+                            <div className="ap-field">
+                                <label>IBAN</label>
+                                <input className="ap-input" name="iban" value={formData.iban} onChange={handleChange} onPaste={handlePasteBank} placeholder="CZ..." />
+                            </div>
+                            <div className="ap-field">
+                                <label>BIC / SWIFT</label>
+                                <input className="ap-input" name="bic" value={formData.bic} onChange={handleChange} />
+                            </div>
+                            <div className="ap-field">
+                                <label>{lang === 'cs' ? 'Variabilní symbol' : 'Variable symbol'}</label>
+                                <input className="ap-input" name="variableSymbol" value={formData.variableSymbol} onChange={handleChange} />
+                            </div>
+                            <div className="ap-field">
+                                <label>{lang === 'cs' ? 'Konstantní symbol' : 'Constant symbol'}</label>
+                                <input className="ap-input" name="bankCode" value={formData.bankCode} onChange={handleChange} />
+                            </div>
+                        </div>
+
+                        {/* Exchange rate & reverse charge */}
+                        {(formData.reverseChargeText || (formData.exchangeRate && formData.exchangeRate !== '1.0000')) && (
+                            <div style={{ marginTop: 14, display: 'grid', gap: 8, fontSize: 13, color: 'var(--muted)' }}>
+                                {formData.reverseChargeText && (
+                                    <div className="form-info-banner">
+                                        <RefreshCw size={12} strokeWidth={2} style={{ flexShrink: 0 }} />
+                                        <strong>{t.reverseCharge}:</strong> {formData.reverseChargeText} (VAT 0%)
+                                    </div>
+                                )}
+                                {formData.exchangeRate && formData.exchangeRate !== '1.0000' && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <ArrowLeftRight size={12} strokeWidth={2} style={{ flexShrink: 0 }} />
+                                        {t.exchangeRate}: 1 {formData.currency} = {formData.exchangeRate} {defaultSupplier?.region === 'SK' ? 'EUR' : 'CZK'}
+                                    </div>
                                 )}
                             </div>
-                        </div>
-                        <div>
-                            <label>{formData.clientCountry === 'SK' ? t.clientIcDph : (lang === 'cs' ? 'DPH' : 'VAT')}</label>
-                            <input name="clientArea" value={formData.clientArea} onChange={handleChange} />
-                        </div>
-                    </div>
-
-                    <div className="grid three">
-                        <div>
-                            <label>Email</label>
-                            <input name="clientEmail" type="email" value={formData.clientEmail} onChange={handleChange} />
-                        </div>
-                        <div>
-                            <label>Email (Kopie/CC)</label>
-                            <input name="clientEmailCopy" type="email" value={formData.clientEmailCopy} onChange={handleChange} />
-                        </div>
-                        <div>
-                            <label>{lang === 'cs' ? 'Telefon' : 'Phone'}</label>
-                            <input name="clientPhone" value={formData.clientPhone} onChange={handleChange} placeholder="+420..." />
-                        </div>
-                    </div>
-
-                    <h3>{t.items}</h3>
-
-                    <div className="add-item-form grid form-item-grid" style={{ gap: '5px', alignItems: 'end' }}>
-                        <div style={{ position: 'relative' }} ref={itemSuggestionsRef}>
-                            <label>{t.item}</label>
-                            <input
-                                value={itemInput.name}
-                                onChange={(e) => handleItemNameChange(e.target.value)}
-                                placeholder={t.itemPlaceholder}
-                            />
-                            {itemSuggestions.length > 0 && (
-                                <ul className="suggestions" style={{
-                                    position: 'absolute', top: '100%', left: 0, right: 0,
-                                    background: 'var(--card)', border: '1px solid var(--border)',
-                                    borderRadius: '8px', zIndex: 1000,
-                                    listStyle: 'none', padding: '4px', margin: '2px 0 0 0',
-                                    maxHeight: '200px', overflowY: 'auto'
-                                }}>
-                                    {itemSuggestions.map((s, i) => (
-                                        <li key={i} onClick={() => handleSelectSuggestion(s)} style={{ padding: '8px', cursor: 'pointer', borderRadius: '6px', marginBottom: '2px' }} onMouseOver={(e) => e.currentTarget.style.background = 'rgba(37, 99, 235, 0.1)'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
-                                            {s.name} <small style={{ color: 'var(--muted)' }}>({s.price} {formData.currency})</small>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                        <div>
-                            <label>{lang === 'cs' ? 'Cena (bez dane)' : 'Price (ex. tax)'}</label>
-                            <input
-                                type="number"
-                                placeholder="0"
-                                value={itemInput.price}
-                                onChange={(e) => {
-                                    const price = e.target.value
-                                    const qty = Number(itemInput.qty) || 1
-                                    const taxRate = formData.isVatPayer ? (Number(itemInput.taxRate) || 0) : 0
-                                    const discountPct = Number(itemInput.discount) || 0
-                                    const priceAfterDiscount = Number(price) * (1 - discountPct / 100)
-                                    const sub = priceAfterDiscount * qty
-                                    const total = sub * (1 + taxRate / 100)
-                                    setItemInput(prev => ({ ...prev, price, total: total.toFixed(2) }))
-                                }}
-                            />
-                        </div>
-                        <div>
-                            <label>{lang === 'cs' ? 'DPH %' : 'Tax %'}</label>
-                            <select
-                                value={itemInput.taxRate}
-                                onChange={(e) => {
-                                    const taxRate = e.target.value
-                                    const qty = Number(itemInput.qty) || 1
-                                    const price = Number(itemInput.price) || 0
-                                    const discountPct = Number(itemInput.discount) || 0
-                                    const priceAfterDiscount = price * (1 - discountPct / 100)
-                                    const sub = priceAfterDiscount * qty
-                                    const total = sub * (1 + Number(taxRate) / 100)
-                                    setItemInput(prev => ({ ...prev, taxRate, total: total.toFixed(2) }))
-                                }}
-                            >
-                                {!formData.isVatPayer ? (
-                                    <>
-                                        <option value="0">0%</option>
-                                        <option value="21">21%</option>
-                                        <option value="15">15%</option>
-                                        <option value="12">12%</option>
-                                    </>
-                                ) : (
-                                    <>
-                                        <option value="21">21%</option>
-                                        <option value="15">15%</option>
-                                        <option value="12">12%</option>
-                                        <option value="0">0%</option>
-                                    </>
-                                )}
-                            </select>
-                        </div>
-                        <div>
-                            <label>{lang === 'cs' ? 'Sleva %' : 'Discount %'}</label>
-                            <select
-                                value={itemInput.discount}
-                                onChange={(e) => {
-                                    const discountPct = e.target.value
-                                    const qty = Number(itemInput.qty) || 1
-                                    const price = Number(itemInput.price) || 0
-                                    const taxRate = Number(itemInput.taxRate) || 0
-                                    const priceAfterDiscount = price * (1 - Number(discountPct) / 100)
-                                    const sub = priceAfterDiscount * qty
-                                    const total = sub * (1 + taxRate / 100)
-                                    setItemInput(prev => ({ ...prev, discount: discountPct, total: total.toFixed(2) }))
-                                }}
-                            >
-                                <option value="0">0%</option>
-                                <option value="5">5%</option>
-                                <option value="10">10%</option>
-                                <option value="15">15%</option>
-                                <option value="20">20%</option>
-                                <option value="25">25%</option>
-                                <option value="50">50%</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label>{lang === 'cs' ? 'Celkem (s dani)' : 'Total (incl. tax)'}</label>
-                            <input
-                                type="number"
-                                placeholder="0"
-                                value={itemInput.total}
-                                onChange={handleItemTotalChange}
-                            />
-                        </div>
-                    </div>
-
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        marginTop: '15px',
-                    }}>
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0',
-                            background: 'rgba(255,255,255,0.05)',
-                            borderRadius: '12px',
-                            padding: '4px',
-                            height: '40px'
-                        }}>
-                            <button
-                                type="button"
-                                onClick={() => setItemInput(prev => ({ ...prev, qty: Math.max(1, prev.qty - 1) }))}
-                                style={{
-                                    padding: '0 11px',
-                                    height: '28px',
-                                    fontSize: '0.85rem',
-                                    background: 'rgba(100, 150, 200, 0.3)',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    color: '#6495ed',
-                                    fontWeight: 'bold',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(100, 150, 200, 0.5)'}
-                                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(100, 150, 200, 0.3)'}
-                            >
-                                −
-                            </button>
-                            <span style={{
-                                padding: '0 17px',
-                                fontSize: '0.85rem',
-                                fontWeight: '600',
-                                minWidth: '42px',
-                                textAlign: 'center'
-                            }}>
-                                {itemInput.qty}
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => setItemInput(prev => ({ ...prev, qty: prev.qty + 1 }))}
-                                style={{
-                                    padding: '0 11px',
-                                    height: '28px',
-                                    fontSize: '0.85rem',
-                                    background: 'rgba(100, 150, 200, 0.3)',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    color: '#6495ed',
-                                    fontWeight: 'bold',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(100, 150, 200, 0.5)'}
-                                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(100, 150, 200, 0.3)'}
-                            >
-                                +
-                            </button>
-                        </div>
-                        <button type="button" onClick={handleAddItem} className="secondary">
-                            {t.addItem}
-                        </button>
-                    </div>
-
-                    <ItemsTable items={items} lang={lang} t={t} onDelete={handleDeleteRow} />
-
-                    <div className="grid two">
-                        <div>
-                            <h3>{t.payment}</h3>
-                            <label>IBAN</label>
-                            <input name="iban" value={formData.iban} onChange={handleChange} onPaste={handlePasteBank} placeholder="CZ..." />
-                        </div>
-                        <div>
-                            <h3>&nbsp;</h3>
-                            <label>BIC (SWIFT)</label>
-                            <input name="bic" value={formData.bic} onChange={handleChange} />
-                        </div>
-                    </div>
-                    <div className="grid payment-grid-mobile" style={{ gridTemplateColumns: '0.5fr 1.5fr 1fr' }}>
-                        <div>
-                            <label>{lang === 'cs' ? 'Předčíslí' : 'Prefix'}</label>
-                            <input name="prefix" value={formData.prefix} onChange={handleChange} placeholder="000" />
-                        </div>
-                        <div>
-                            <label>{lang === 'cs' ? 'Číslo účtu' : 'Account Number'}</label>
-                            <input name="accountNumber" value={formData.accountNumber} onChange={handleChange} />
-                        </div>
-                        <div>
-                            <label>{lang === 'cs' ? 'Kód banky' : 'Bank Code'}</label>
-                            <input name="bankCode" value={formData.bankCode} onChange={handleChange} />
-                        </div>
-                    </div>
-                    <div>
-                        <label>{t.variableSymbol}</label>
-                        <input name="variableSymbol" value={formData.variableSymbol} onChange={handleChange} />
-                    </div>
-                    <div>
-                        <label>{lang === 'cs' ? 'Poznámka' : 'Note'}</label>
-                        <textarea name="paymentNote" value={formData.paymentNote} onChange={handleChange} rows="2" />
-                    </div>
-
-                    <div className="summary">
-                        {formData.reverseChargeText && (
-                            <div style={{ padding: '8px', background: 'rgba(50, 200, 100, 0.1)', border: '1px dotted #32c864', borderRadius: '8px', marginBottom: '10px', fontSize: '0.85rem' }}>
-                                <RefreshCw size={12} strokeWidth={2} style={{ display: 'inline', flexShrink: 0 }} /> <strong>{t.reverseCharge}:</strong> {formData.reverseChargeText} (VAT 0%)
-                            </div>
                         )}
-                        {formData.exchangeRate && formData.exchangeRate !== '1.0000' && (
-                            <div style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '5px' }}>
-                                <ArrowLeftRight size={12} strokeWidth={2} style={{ display: 'inline', flexShrink: 0 }} /> {t.exchangeRate}: 1 {formData.currency} = {formData.exchangeRate} {(defaultSupplier?.region === 'SK' ? 'EUR' : 'CZK')}
-                            </div>
-                        )}
-                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'left', marginTop: '20px' }}>
-                            {t.total}: {formData.amount} {formData.currency}
-                        </div>
                     </div>
 
-                    <div className="actions" style={{ marginTop: '30px' }}>
-                        <button type="submit" className="primary">
-                            {t.saveInvoice}
+                    {/* Note card */}
+                    <div className="ap-card">
+                        <h3 className="ap-card__title">
+                            <Pencil size={ICON_MD} strokeWidth={STROKE} />
+                            {lang === 'cs' ? 'Poznámka' : 'Note'}
+                        </h3>
+                        <textarea
+                            className="ap-textarea"
+                            name="paymentNote"
+                            value={formData.paymentNote}
+                            onChange={handleChange}
+                            placeholder={lang === 'cs' ? 'Děkujeme za spolupráci...' : 'Thank you for working with us...'}
+                        />
+                    </div>
+
+                    {/* Summary */}
+                    {summaryCard}
+
+                    {/* Action bar */}
+                    <div className="ap-action-bar ap-action-bar--mobile-stack">
+                        <button type="button" onClick={() => setFormData(prev => ({ ...prev, status: 'draft' }))} className="ap-btn ap-btn--ghost">
+                            {lang === 'cs' ? 'Uložit jako rozepsanou' : 'Save as draft'}
                         </button>
-                        <button type="button" onClick={(e) => { e.preventDefault(); setPreviewMode(!previewMode); }} className="secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            <Eye size={ICON_MD} strokeWidth={STROKE} /> {lang === 'cs' ? 'Náhled' : 'Preview'}
+                        <button type="button" onClick={(e) => { e.preventDefault(); setPreviewMode(true); }} className="ap-btn ap-btn--secondary">
+                            <Eye size={ICON_MD} strokeWidth={STROKE} /> {lang === 'cs' ? 'Náhled PDF' : 'PDF preview'}
                         </button>
-                        <button type="button" onClick={handleDownloadPDF} disabled={isGenerating} className="secondary">
-                            {isGenerating && !emailStatus ? t.alertGenerating : t.downloadPdf}
+                        <button type="button" onClick={handleEmailPDF} disabled={isGenerating || !isAuthenticated} className="ap-btn ap-btn--secondary">
+                            <Send size={ICON_MD} strokeWidth={STROKE} /> {emailStatus || (lang === 'cs' ? 'Odeslat e-mailem' : 'Send by email')}
                         </button>
-                        <button type="button" onClick={handleEmailPDF} disabled={isGenerating || !isAuthenticated} className="secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            <Mail size={ICON_MD} strokeWidth={STROKE} /> {emailStatus || t.emailPdf}
-                        </button>
-                        <button type="button" onClick={handleMarkPaid} className="secondary" style={{ marginLeft: 'auto' }}>
-                            {t.markPaid}
+                        <button type="submit" className="ap-btn ap-btn--primary ap-btn--lg">
+                            <Save size={ICON_MD} strokeWidth={STROKE} /> {t.saveInvoice}
                         </button>
                     </div>
-                </form>
-            )
-            }
-        </section >
+
+                    </form>
+                    </div>
+
+                </div>
+            )}
+        </div>
         </>
     )
 }

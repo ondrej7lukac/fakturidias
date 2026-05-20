@@ -109,12 +109,12 @@ export default function AresSearch({
                         </div>
                     </div>
                     {showResults && (
-                        <div style={{ marginTop: '1rem', display: 'grid', gap: '8px' }}>
+                        <div className="ares-results-list">
                             {results.map((item, index) => (
                                 <button
                                     key={index}
                                     type="button"
-                                    style={{ textAlign: 'left', padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                                    className="ares-result-item"
                                     onClick={() => applyAresEntity(item)}
                                 >
                                     <div style={{ fontWeight: 600 }}>{item.obchodniJmeno || item.nazev || item.name}</div>

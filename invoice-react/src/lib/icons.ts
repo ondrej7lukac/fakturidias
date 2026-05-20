@@ -1,5 +1,6 @@
 export {
   Settings2,
+  Plus,
   Contact,
   Wallet,
   Plug,
@@ -17,9 +18,18 @@ export {
   Mail,
   RefreshCw,
   ArrowLeftRight,
+  ArrowUp,
+  ArrowDown,
   Sparkles,
   Mic,
   MicOff,
+  Search,
+  Calendar,
+  ChevronRight,
+  ChevronDown,
+  TrendingUp,
+  Send,
+  CreditCard,
 } from 'lucide-react'
 
 export const ICON_SM = 14

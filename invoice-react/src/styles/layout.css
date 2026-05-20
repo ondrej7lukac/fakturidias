@@ -1,17 +1,23 @@
 main {
   display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
   gap: 2rem;
-  padding: calc(var(--headerH) + 2rem) 2rem 2rem 2rem;
   max-width: 1400px;
   margin: 0 auto;
+  align-items: start;
 }
 
 main.settings-view {
   display: block;
   max-width: 1400px;
   margin: 0 auto;
-  padding-top: calc(var(--headerH) + 3rem);
+  padding-top: calc(var(--headerH) + 1rem);
+}
+
+/* Prevent sticky sidebar from bleeding over sibling columns */
+.invoice-form-container,
+.invoice-list-container {
+  isolation: isolate;
 }
 
 .grid {
@@ -91,6 +97,13 @@ main.dashboard-mode .invoice-list-container {
   grid-column: 1 / -1;
 }
 
+/* List column is a sticky browse panel beside the create form */
+main:not(.dashboard-mode) .invoice-list-container {
+  position: sticky;
+  top: var(--headerH);
+  padding-top: 28px;
+}
+
 /* Utility */
 .mobile-only-flex {
   display: none !important;
@@ -99,8 +112,14 @@ main.dashboard-mode .invoice-list-container {
 @media (max-width: 1024px) {
   main {
     grid-template-columns: 1fr;
-    padding: 1rem;
+    padding: var(--headerH) 1rem 1rem 1rem;
     gap: 1.5rem;
+  }
+
+  /* Stacked layout — list is no longer a sticky side panel */
+  main:not(.dashboard-mode) .invoice-list-container {
+    position: static;
+    padding-top: 0;
   }
 }
 
@@ -130,7 +149,9 @@ main.dashboard-mode .invoice-list-container {
     flex-wrap: wrap;
   }
 
-  .grid.two, .grid.three, .grid.four {
+  .grid.two,
+  .grid.three,
+  .grid.four {
     grid-template-columns: 1fr !important;
     gap: 1.5rem !important;
   }
@@ -183,7 +204,8 @@ main.dashboard-mode .invoice-list-container {
     gap: 1rem !important;
   }
 
-  html, body {
+  html,
+  body {
     overflow-x: hidden !important;
     width: 100%;
     margin: 0;

@@ -1,0 +1,49 @@
+User-agent: *
+Allow: /
+
+# Block private app routes from indexing
+Disallow: /api/
+Disallow: /auth/
+
+# Traditional search bots
+User-agent: Googlebot
+Allow: /
+
+User-agent: bingbot
+Allow: /
+
+User-agent: msnbot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: BraveBot
+Allow: /
+
+# AI search engine bots — explicitly permitted to index, cite, and summarize
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+Sitemap: https://fakturidias.app/sitemap.xml

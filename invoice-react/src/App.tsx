@@ -4,6 +4,7 @@ import InvoiceForm from './components/InvoiceForm'
 import InvoiceList from './components/InvoiceList'
 import Settings from './components/Settings'
 import WelcomeScreen from './components/WelcomeScreen'
+import CookieBanner from './components/CookieBanner'
 import { getNextInvoiceCounter, loadApiData, loadLocalData, saveApiInvoice, saveLocalInvoice, deleteApiInvoice, deleteLocalInvoice } from './utils/storage'
 import { generateInvoicePDF } from './utils/pdf'
 import { getCzechQrPayload } from './utils/bank'
@@ -26,19 +27,60 @@ function App() {
     const [mobileView, setMobileView] = useState('form') // 'form' or 'list'
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [dashboardOpen, setDashboardOpen] = useState(false)
+    const [subscription, setSubscription] = useState<{ plan: string; status: string; interval: string | null; currentPeriodEnd: number | null } | null>(null)
+    const [pendingCheckoutPlan, setPendingCheckoutPlan] = useState<'standard' | 'max' | null>(null)
 
     const t = languages[lang]
 
     // Show welcome screen only when not logged in
     useEffect(() => {
         if (user) {
-            // User is logged in, hide welcome screen
             setShowWelcome(false)
         } else {
-            // User is not logged in, show welcome screen
             setShowWelcome(true)
+            setSubscription(null)
         }
     }, [user])
+
+    // Fetch subscription when user logs in; trigger pending checkout if set
+    useEffect(() => {
+        if (!user) return
+        fetch('/api/billing/subscription')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data) setSubscription(data) })
+            .catch(() => {})
+        if (pendingCheckoutPlan) {
+            const plan = pendingCheckoutPlan
+            setPendingCheckoutPlan(null)
+            fetch('/api/billing/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ interval: 'month', plan }),
+            })
+                .then(r => r.ok ? r.json() : null)
+                .then(data => { if (data?.url) window.location.href = data.url })
+                .catch(() => {})
+        }
+    }, [user])
+
+    // Handle Stripe redirect back (?billing=success|cancel)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search)
+        const billing = params.get('billing')
+        if (billing === 'success') {
+            window.history.replaceState({}, '', '/')
+            setCurrentView('settings')
+            // Refresh subscription after short delay to allow webhook to process
+            setTimeout(() => {
+                fetch('/api/billing/subscription')
+                    .then(r => r.ok ? r.json() : null)
+                    .then(data => { if (data) setSubscription(data) })
+                    .catch(() => {})
+            }, 2000)
+        } else if (billing === 'cancel') {
+            window.history.replaceState({}, '', '/')
+        }
+    }, [])
 
     // Check Auth Status on Mount
     useEffect(() => {
@@ -158,20 +200,18 @@ function App() {
     // Listen for Google Login success from OAuth popup
     useEffect(() => {
         const handleAuthSuccess = async () => {
-            console.log("Login detected, refreshing auth...")
             await checkAuthStatus()
-            await fetchInvoices()
         }
 
         // Method 1: postMessage from popup
-        const handleMessage = async (event) => {
+        const handleMessage = async (event: MessageEvent) => {
             if (event.data && event.data.type === 'GOOGLE_LOGIN_SUCCESS') {
                 await handleAuthSuccess()
             }
         }
         window.addEventListener('message', handleMessage)
 
-        // Method 2: localStorage polling fallback (cross-origin popup can't postMessage)
+        // Method 2: localStorage flag set by Header.tsx popup-close detector (same-origin)
         const pollInterval = setInterval(async () => {
             const flag = localStorage.getItem('auth_success')
             if (flag) {
@@ -180,9 +220,14 @@ function App() {
             }
         }, 500)
 
+        // Method 3: window focus — fires when user returns to this tab after popup closes
+        const handleFocus = () => { checkAuthStatus() }
+        window.addEventListener('focus', handleFocus)
+
         return () => {
             window.removeEventListener('message', handleMessage)
             clearInterval(pollInterval)
+            window.removeEventListener('focus', handleFocus)
         }
     }, [])
 
@@ -256,7 +301,14 @@ function App() {
             if (invoice.category && !categories.includes(invoice.category)) {
                 setCategories([...categories, invoice.category].sort())
             }
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.limitReached) {
+                alert(lang === 'cs'
+                    ? 'Dosáhli jste limitu 5 faktur bezplatného plánu. Upgradujte na Pro pro neomezený počet faktur.'
+                    : 'You reached the 5-invoice limit on the free plan. Upgrade to Pro for unlimited invoices.')
+                setCurrentView('settings')
+                return
+            }
             alert(t.alertError || 'Failed to save invoice')
         }
     }
@@ -324,19 +376,10 @@ function App() {
 
     const handleLogout = () => {
         fetch('/auth/google/disconnect', { method: 'POST' })
+            .catch(err => console.error('Logout error:', err))
             .then(() => {
                 localStorage.clear()
                 window.location.reload()
-            })
-            .catch((err) => {
-                console.error('Logout error:', err)
-                localStorage.clear()
-                setUser(null)
-                setInvoices([])
-                setDefaultSupplier(null)
-                setCategories([])
-                setCurrentView('invoices')
-                setInvoiceCounter(1)
             })
     }
 
@@ -344,13 +387,19 @@ function App() {
         setShowWelcome(false)
     }
 
+    const handleStartCheckout = (plan: 'standard' | 'max') => {
+        setPendingCheckoutPlan(plan)
+        handleLogin()
+    }
+
     // Show welcome screen if user hasn't seen it
     if (showWelcome) {
-        return <WelcomeScreen onLogin={handleLogin} onContinueAsGuest={handleContinueAsGuest} lang={lang} />
+        return <WelcomeScreen onLogin={handleLogin} onContinueAsGuest={handleContinueAsGuest} onStartCheckout={handleStartCheckout} lang={lang} />
     }
 
     return (
         <>
+            <CookieBanner lang={lang} />
             <Header
                 onNewInvoice={handleNewInvoice}
                 lang={lang}
@@ -377,6 +426,8 @@ function App() {
                         onLogout={handleLogout}
                         defaultSupplier={defaultSupplier}
                         setDefaultSupplier={setDefaultSupplier}
+                        subscription={subscription}
+                        invoiceCount={invoices.length}
                     />
                 ) : (
                     <>
@@ -422,6 +473,7 @@ function App() {
                                     isAuthenticated={!!user}
                                     dashboardOpen={dashboardOpen}
                                     setDashboardOpen={setDashboardOpen}
+                                    onNewInvoice={handleNewInvoice}
                                     // Props for inline editing:
                                     onSave={handleSaveInvoice}
                                     onAddCategory={handleAddCategory}

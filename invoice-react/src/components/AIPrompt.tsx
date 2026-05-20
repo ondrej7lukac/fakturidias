@@ -1,17 +1,16 @@
-import './AIPrompt.css'
 import { useState, useRef } from 'react'
-import { Sparkles, Mic, MicOff, ICON_MD, STROKE } from '@/lib/icons'
+import { Sparkles, Mic, MicOff, X, ICON_MD, ICON_LG, ICON_SM, STROKE } from '@/lib/icons'
 
 const SAMPLES = {
     cs: [
-        'Faktura pro Acme s.r.o., 5 hodin konzultace po 2 500 Kč, splatnost 14 dní',
-        'Vyfakturuj TechStart a.s. (IČO 12345678) za vývoj webu 35 000 Kč a logo 8 000 Kč, splatnost 30 dní',
-        'Jan Novák, jan@novak.cz, 3 měsíce hostingu po 990 Kč/měsíc, splatnost konec měsíce',
+        'Faktura pro Novák s.r.o. za 3 hodiny konzultace po 2000 Kč, 21% DPH, splatnost 14 dní',
+        'Webdesign pro e-shop, paušál 25 000 Kč, klient Jan Dvořák, splatnost konec měsíce',
+        '5 hodin programování, 1500 Kč/h, bez DPH',
     ],
     en: [
-        'Invoice Acme Corp for 5 hours consulting at 2500 CZK/hour, due in 14 days',
-        'Bill TechStart s.r.o. (ICO 12345678) for website development 35000 CZK and logo 8000 CZK, due in 30 days',
-        'John Smith, john@example.com, 3 months hosting at 990 CZK/month, due end of month',
+        'Invoice Acme Studio for 3h UX consulting at 2000 CZK, 21% VAT, due in 14 days',
+        'Monthly retainer for social media management, 15000 CZK, client John Smith',
+        '5 hours of development work at 1500 CZK/h, no VAT',
     ],
 }
 
@@ -19,9 +18,10 @@ interface AIPromptProps {
     lang: string
     onFillForm: (data: any) => void
     onPreviewInvoice: (data: any) => void
+    isGuest?: boolean
 }
 
-export default function AIPrompt({ lang, onFillForm, onPreviewInvoice }: AIPromptProps) {
+export default function AIPrompt({ lang, onFillForm, onPreviewInvoice, isGuest }: AIPromptProps) {
     const [prompt, setPrompt] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [isListening, setIsListening] = useState(false)
@@ -82,79 +82,98 @@ export default function AIPrompt({ lang, onFillForm, onPreviewInvoice }: AIPromp
         }
     }
 
+    if (isGuest) {
+        return (
+            <div className="ap-ai">
+                <div className="ap-ai__head">
+                    <h3>
+                        <Sparkles size={ICON_MD} strokeWidth={STROKE} />
+                        {isCz ? 'AI asistent' : 'AI assistant'}
+                    </h3>
+                    <div className="ap-ai__sub" style={{ color: 'var(--muted)' }}>
+                        {isCz
+                            ? 'AI funkce jsou dostupné pouze pro přihlášené uživatele. Přihlaste se pro přístup.'
+                            : 'AI features are available for logged-in users only. Sign in to access.'}
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     return (
-        <div className="ai-prompt-panel">
-            <div className="ai-prompt-header">
-                <Sparkles size={ICON_MD} strokeWidth={STROKE} />
-                <span>{isCz ? 'Vytvořit fakturu pomocí AI' : 'Create Invoice with AI'}</span>
+        <div className="ap-ai">
+            <div className="ap-ai__head">
+                <h3>
+                    <Sparkles size={ICON_MD} strokeWidth={STROKE} />
+                    {isCz ? 'Vyplňte fakturu hlasem nebo textem' : 'Fill the invoice by voice or text'}
+                </h3>
+                <div className="ap-ai__sub">
+                    {isCz
+                        ? 'AI rozpozná klienta, položky a DPH. Co AI nepochopí, opravíte jedním klikem.'
+                        : 'The AI extracts the client, line items and VAT. Whatever it misreads, fix in one click.'}
+                </div>
             </div>
 
-            <div className="ai-prompt-input-row">
-                <textarea
-                    className="ai-prompt-textarea"
-                    value={prompt}
-                    onChange={e => setPrompt(e.target.value)}
-                    placeholder={
-                        isCz
-                            ? 'Popište fakturu... např. "Faktura pro Acme s.r.o., 5 hodin konzultace po 2 500 Kč, splatnost 14 dní"'
-                            : 'Describe your invoice... e.g. "Invoice Acme Corp for 5 hours consulting at 2500 CZK/hour, due in 14 days"'
-                    }
-                    rows={2}
-                    disabled={isLoading}
-                    onKeyDown={e => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            processPrompt('form')
-                        }
-                    }}
-                />
-                <button
-                    type="button"
-                    className={`ai-mic-btn${isListening ? ' ai-mic-btn--active' : ''}`}
-                    onClick={handleVoice}
-                    title={isCz ? (isListening ? 'Zastavit nahrávání' : 'Mluvit') : (isListening ? 'Stop recording' : 'Speak')}
-                >
-                    {isListening
-                        ? <MicOff size={ICON_MD} strokeWidth={STROKE} />
-                        : <Mic size={ICON_MD} strokeWidth={STROKE} />
-                    }
-                </button>
-            </div>
-
-            <div className="ai-prompt-samples">
-                {samples.map((s, i) => (
+            <div className="ap-ai__row">
+                <div className="ap-ai__input">
+                    <textarea
+                        className="ap-ai__textarea"
+                        placeholder={isCz
+                            ? 'Diktujte nebo napište, např. „Vyfakturuj 12 hodin práce Acme Studio za 1500 Kč s 21% DPH..."'
+                            : 'Dictate or type, e.g. "Bill 12 hours of work for Acme Studio at 1500 CZK with 21% VAT..."'}
+                        rows={2}
+                        value={prompt}
+                        onChange={e => setPrompt(e.target.value)}
+                        disabled={isLoading}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault()
+                                processPrompt('form')
+                            }
+                        }}
+                    />
                     <button
-                        key={i}
                         type="button"
-                        className="ai-sample-chip"
-                        onClick={() => setPrompt(s)}
+                        className={`ap-ai__mic${isListening ? ' ap-ai__mic--active' : ''}`}
+                        onClick={handleVoice}
+                        aria-label={isCz ? 'Mikrofon' : 'Mic'}
                     >
+                        {isListening
+                            ? <MicOff size={ICON_LG} strokeWidth={STROKE} />
+                            : <Mic size={ICON_LG} strokeWidth={STROKE} />}
+                    </button>
+                </div>
+
+                <div className="ap-ai__actions">
+                    <button
+                        type="button"
+                        className="ap-btn ap-btn--primary"
+                        onClick={() => processPrompt('form')}
+                        disabled={isLoading || !prompt.trim()}
+                    >
+                        <Sparkles size={ICON_SM} strokeWidth={STROKE} />
+                        {isLoading ? (isCz ? 'Zpracovávám…' : 'Processing…') : (isCz ? 'Vygenerovat' : 'Generate')}
+                    </button>
+                    <button
+                        type="button"
+                        className="ap-btn ap-btn--ghost"
+                        onClick={() => { setPrompt(''); setError('') }}
+                    >
+                        <X size={ICON_SM} strokeWidth={STROKE} />
+                        {isCz ? 'Smazat' : 'Clear'}
+                    </button>
+                </div>
+            </div>
+
+            {error && <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8, marginBottom: 0 }}>{error}</p>}
+
+            <div className="ap-ai__hints">
+                <div className="ap-ai__hints-title">{isCz ? 'Příklady:' : 'Examples:'}</div>
+                {samples.map((s, i) => (
+                    <button key={i} type="button" className="ap-ai__hint" onClick={() => setPrompt(s)}>
                         {s}
                     </button>
                 ))}
-            </div>
-
-            {error && <p className="ai-prompt-error">{error}</p>}
-
-            <div className="ai-prompt-actions">
-                <button
-                    type="button"
-                    className="primary"
-                    onClick={() => processPrompt('form')}
-                    disabled={isLoading || !prompt.trim()}
-                >
-                    {isLoading
-                        ? (isCz ? 'Zpracovávám…' : 'Processing…')
-                        : (isCz ? 'Vyplnit formulář' : 'Fill Form')}
-                </button>
-                <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => processPrompt('preview')}
-                    disabled={isLoading || !prompt.trim()}
-                >
-                    {isCz ? 'Náhled faktury' : 'Preview Invoice'}
-                </button>
             </div>
         </div>
     )

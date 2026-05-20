@@ -4,16 +4,18 @@
   "private": true,
   "scripts": {
     "build": "npm install --prefix invoice-react && npm run build --prefix invoice-react",
-    "start": "node server.js"
+    "start": "node backend/server.js"
   },
   "dependencies": {
+    "@dotenvx/dotenvx": "^1.66.0",
     "cookie": "^1.1.1",
     "cookie-session": "^2.1.1",
     "dotenv": "^17.2.3",
     "googleapis": "^170.1.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.21.1",
-    "nodemailer": "^7.0.12"
+    "nodemailer": "^7.0.12",
+    "stripe": "^22.1.1"
   },
   "engines": {
     "node": "20.x"

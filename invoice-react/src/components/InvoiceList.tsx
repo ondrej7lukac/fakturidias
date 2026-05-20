@@ -31,6 +31,7 @@ interface InvoiceListProps {
   isAuthenticated: boolean
   dashboardOpen: boolean
   setDashboardOpen: (open: boolean) => void
+  onNewInvoice?: () => void
   onSave: (invoice: unknown) => void
   onAddCategory: (cat: string) => void
   invoiceCounter: number
@@ -54,6 +55,7 @@ export default function InvoiceList({
   isAuthenticated,
   dashboardOpen,
   setDashboardOpen,
+  onNewInvoice,
   onSave,
   onAddCategory,
   invoiceCounter,
@@ -91,6 +93,7 @@ export default function InvoiceList({
         onSendReminder={onSendReminder}
         onStatusChange={onStatusChange}
         onClose={() => setDashboardOpen(false)}
+        onNewInvoice={onNewInvoice}
         lang={lang}
         t={t}
         isAuthenticated={isAuthenticated}
@@ -107,14 +110,14 @@ export default function InvoiceList({
   }
 
   return (
-    <section className="card" style={{ marginBottom: '20px' }}>
+    <section className="card invoice-list-card">
       <div className="flex justify-between items-center mb-4">
         <h2 className="m-0">{t.invoices}</h2>
         <Button
           variant="outline"
           size="sm"
           onClick={() => setDashboardOpen(true)}
-          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)' }}
+          className="btn--list-action"
         >
           <BarChart2 size={16} strokeWidth={2} className="mr-1" /> {lang === 'cs' ? 'Přehled' : 'Dashboard'}
         </Button>
@@ -128,7 +131,7 @@ export default function InvoiceList({
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
             placeholder="Invoice #, client, area"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text)' }}
+            className="invoice-list__input"
           />
         </div>
         <div>
@@ -189,7 +192,7 @@ export default function InvoiceList({
                   variant="outline"
                   size="sm"
                   onClick={e => { e.stopPropagation(); onSelect(inv.id) }}
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.75rem' }}
+                  className="btn--list-action"
                 >
                   {lang === 'cs' ? 'Otevřít' : 'Open'}
                 </Button>
