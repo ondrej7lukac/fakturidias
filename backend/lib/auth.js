@@ -33,7 +33,7 @@ if (oAuth2Client && fs.existsSync(TOKENS_PATH)) {
 }
 
 const getRedirectUri = (req) => {
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    const protocol = (req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
     const host = req.headers.host;
     return `${protocol}://${host}/auth/google/callback`;
 };
@@ -123,7 +123,7 @@ async function handleAuthCallback(req, res, url) {
 </body>
 </html>`);
     } catch (error) {
-        console.error('[OAuth] Callback error:', error.message);
+        console.error('[OAuth] Callback error:', error.message, error.response?.data || '');
         res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('Authentication failed. Please try again.');
     }
