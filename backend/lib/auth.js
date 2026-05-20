@@ -133,9 +133,16 @@ async function handleAuthCallback(req, res, url) {
 </body>
 </html>`);
     } catch (error) {
-        console.error('[OAuth] Callback error:', error.message, error.response?.data || '');
-        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('Authentication failed. Please try again.');
+        const googleErr = error.response?.data || {};
+        console.error('[OAuth] Callback error:', error.message, googleErr);
+        res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(`<!doctype html><html><head><meta charset="utf-8"><title>Auth Error</title></head>
+<body style="font-family:sans-serif;text-align:center;padding:50px">
+  <h1 style="color:red">Authentication failed</h1>
+  <p><b>Error:</b> ${error.message}</p>
+  <p><b>Google:</b> ${googleErr.error || ''} — ${googleErr.error_description || ''}</p>
+  <p><b>Redirect URI used:</b> ${getRedirectUri(req)}</p>
+</body></html>`);
     }
 }
 
