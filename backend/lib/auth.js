@@ -68,11 +68,21 @@ async function handleAuthCallback(req, res, url) {
 
         let userEmail = null;
         if (tokens.id_token) {
-            const ticket = await tempClient.verifyIdToken({
-                idToken: tokens.id_token,
-                audience: GOOGLE_CLIENT_ID
-            });
-            userEmail = ticket.getPayload().email;
+            try {
+                const ticket = await tempClient.verifyIdToken({
+                    idToken: tokens.id_token,
+                    audience: GOOGLE_CLIENT_ID
+                });
+                userEmail = ticket.getPayload().email;
+            } catch (verifyErr) {
+                console.warn('[OAuth] verifyIdToken failed, falling back to JWT decode:', verifyErr.message);
+                try {
+                    const payload = JSON.parse(Buffer.from(tokens.id_token.split('.')[1], 'base64url').toString());
+                    userEmail = payload.email || null;
+                } catch {
+                    console.error('[OAuth] JWT decode also failed');
+                }
+            }
         }
 
         const tokensToSave = { ...tokens, email: userEmail };
