@@ -2,12 +2,16 @@
 
 const { sendJson, readRawBody, parseBody } = require('../lib/utils');
 const { getSubscription, saveSubscription, getSubscriptionByCustomerId } = require('../lib/storage');
-const { isPro } = require('../lib/plan');
+const { isPro, isMax } = require('../lib/plan');
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+// Standard tier (65 CZK/mo) — reuses the original STRIPE_PRICE_MONTHLY/ANNUAL keys
 const STRIPE_PRICE_MONTHLY = process.env.STRIPE_PRICE_MONTHLY;
 const STRIPE_PRICE_ANNUAL = process.env.STRIPE_PRICE_ANNUAL;
+// Max tier (120 CZK/mo)
+const STRIPE_PRICE_MAX_MONTHLY = process.env.STRIPE_PRICE_MAX_MONTHLY;
+const STRIPE_PRICE_MAX_ANNUAL = process.env.STRIPE_PRICE_MAX_ANNUAL;
 
 let stripe = null;
 if (STRIPE_SECRET_KEY) {
@@ -45,10 +49,11 @@ async function handleWebhook(req, res) {
             const subscriptionId = obj.subscription;
             if (userEmail && subscriptionId) {
                 const sub = await stripe.subscriptions.retrieve(subscriptionId);
+                const priceId = sub.items.data[0]?.price?.id;
                 await saveSubscription(userEmail, {
                     stripeCustomerId: obj.customer,
                     stripeSubscriptionId: subscriptionId,
-                    plan: 'pro',
+                    plan: getPlanFromPriceId(priceId),
                     status: sub.status,
                     interval: sub.items.data[0]?.price?.recurring?.interval || 'month',
                     currentPeriodEnd: sub.current_period_end,
@@ -60,10 +65,11 @@ async function handleWebhook(req, res) {
             const userEmail = existing?.userEmail;
             if (userEmail) {
                 const isActive = sub.status === 'active' || sub.status === 'trialing';
+                const priceId = sub.items.data[0]?.price?.id;
                 await saveSubscription(userEmail, {
                     stripeCustomerId: sub.customer,
                     stripeSubscriptionId: sub.id,
-                    plan: isActive ? 'pro' : 'free',
+                    plan: isActive ? getPlanFromPriceId(priceId) : 'free',
                     status: sub.status,
                     interval: sub.items.data[0]?.price?.recurring?.interval || 'month',
                     currentPeriodEnd: sub.current_period_end,
@@ -91,6 +97,13 @@ async function handleWebhook(req, res) {
     return sendJson(res, 200, { received: true });
 }
 
+function getPlanFromPriceId(priceId) {
+    if (priceId && (priceId === STRIPE_PRICE_MAX_MONTHLY || priceId === STRIPE_PRICE_MAX_ANNUAL)) {
+        return 'max';
+    }
+    return 'standard';
+}
+
 function attachPublic(router) {
     router.add('POST', '/api/billing/webhook', ({ req, res }) => handleWebhook(req, res));
 }
@@ -98,8 +111,13 @@ function attachPublic(router) {
 function attachProtected(router) {
     router.add('GET', '/api/billing/subscription', async ({ res, userEmail }) => {
         const sub = await getSubscription(userEmail);
+        let plan = 'free';
+        if (isPro(sub)) {
+            // Return the actual saved plan ('standard', 'max', or legacy 'pro')
+            plan = isMax(sub) ? 'max' : 'standard';
+        }
         return sendJson(res, 200, {
-            plan: isPro(sub) ? 'pro' : 'free',
+            plan,
             status: sub?.status || 'inactive',
             interval: sub?.interval || null,
             currentPeriodEnd: sub?.currentPeriodEnd || null,
@@ -108,16 +126,24 @@ function attachProtected(router) {
 
     router.add('POST', '/api/billing/checkout', async ({ req, res, userEmail }) => {
         if (!stripe) return sendJson(res, 503, { error: 'Stripe not configured' });
-        if (!STRIPE_PRICE_MONTHLY || !STRIPE_PRICE_ANNUAL) {
-            return sendJson(res, 503, { error: 'Stripe prices not configured' });
-        }
 
         let body;
         try { body = await parseBody(req); }
         catch { return sendJson(res, 400, { error: 'Invalid body' }); }
 
+        const plan = body.plan === 'max' ? 'max' : 'standard';
         const interval = body.interval === 'year' ? 'year' : 'month';
-        const priceId = interval === 'year' ? STRIPE_PRICE_ANNUAL : STRIPE_PRICE_MONTHLY;
+
+        let priceId;
+        if (plan === 'max') {
+            priceId = interval === 'year' ? STRIPE_PRICE_MAX_ANNUAL : STRIPE_PRICE_MAX_MONTHLY;
+        } else {
+            priceId = interval === 'year' ? STRIPE_PRICE_ANNUAL : STRIPE_PRICE_MONTHLY;
+        }
+
+        if (!priceId) {
+            return sendJson(res, 503, { error: `Stripe price not configured for ${plan}/${interval}` });
+        }
         const appUrl = getAppUrl(req);
 
         let sub = await getSubscription(userEmail);
@@ -137,7 +163,7 @@ function attachProtected(router) {
             mode: 'subscription',
             success_url: `${appUrl}/?billing=success`,
             cancel_url: `${appUrl}/?billing=cancel`,
-            metadata: { userEmail },
+            metadata: { userEmail, plan },
         });
 
         return sendJson(res, 200, { url: session.url });

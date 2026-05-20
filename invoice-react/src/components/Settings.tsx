@@ -180,13 +180,13 @@ export default function Settings({
 
   const unlock = (field: string) => setLockedFields(prev => ({ ...prev, [field]: false }))
 
-  const handleCheckout = async (interval: 'month' | 'year') => {
+  const handleCheckout = async (interval: 'month' | 'year', plan: 'standard' | 'max' = 'standard') => {
     setCheckoutLoading(interval)
     try {
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ interval }),
+        body: JSON.stringify({ interval, plan }),
       })
       const data = await res.json()
       if (data.url) window.location.href = data.url
@@ -209,7 +209,13 @@ export default function Settings({
     }
   }
 
-  const isPro = subscription?.plan === 'pro'
+  const isPro = ['standard', 'max', 'pro'].includes(subscription?.plan ?? '')
+  const isMax = subscription?.plan === 'max'
+  const isStandard = isPro && !isMax
+
+  const planLabel = isMax
+    ? 'Max'
+    : isStandard ? 'Standard' : (isCz ? 'Bezplatný' : 'Free')
 
   const tabLabels = [
     isCz ? 'Základní údaje' : 'Identity',
@@ -221,7 +227,9 @@ export default function Settings({
     isCz ? 'Správa vaší identity a údajů dodavatele.' : 'Manage your identity and supplier details.',
     isCz ? 'DPH plátce, bankovní účet a výchozí měna.' : 'VAT status, bank account and default currency.',
     isCz ? 'Propojení s ARES, Google Drive, e-mail a API.' : 'ARES, Google Drive, email and API connections.',
-    isPro ? (isCz ? 'Správa vašeho Pro předplatného.' : 'Manage your Pro subscription.') : (isCz ? 'Upgradujte na Pro pro neomezené faktury.' : 'Upgrade to Pro for unlimited invoices.'),
+    isPro
+      ? (isCz ? `Správa vašeho ${planLabel} předplatného.` : `Manage your ${planLabel} subscription.`)
+      : (isCz ? 'Upgradujte pro více faktur a AI funkce.' : 'Upgrade for more invoices and AI features.'),
   ]
 
   const saveLabel = saveStatus === 'saved'
@@ -717,9 +725,9 @@ export default function Settings({
             <div className="ap-integration">
               <div className="ap-integration__body">
                 <div className="ap-integration__title">
-                  {isPro ? (isCz ? 'Pro plán' : 'Pro plan') : (isCz ? 'Bezplatný plán' : 'Free plan')}
+                  {isCz ? `${planLabel} plán` : `${planLabel} plan`}
                   <span className={`pill ${isPro ? 'paid' : 'draft'}`} style={{ fontSize: 10.5, padding: '2px 8px', marginLeft: 8 }}>
-                    {isPro ? 'Pro' : 'Free'}
+                    {planLabel}
                   </span>
                 </div>
                 <div className="ap-integration__desc">
@@ -759,56 +767,83 @@ export default function Settings({
                 </div>
               </div>
             )}
+
+            {/* Invoice progress bar for Standard users */}
+            {isStandard && (
+              <div style={{ marginTop: 12, marginBottom: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
+                  <span>{isCz ? 'Faktury za rok' : 'Invoices this year'}</span>
+                  <span>{invoiceCount} / 100</span>
+                </div>
+                <div style={{ height: 6, background: 'var(--border)', borderRadius: 3 }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${Math.min(100, (invoiceCount / 100) * 100)}%`,
+                    background: invoiceCount >= 100 ? 'var(--danger)' : 'var(--accent)',
+                    borderRadius: 3,
+                    transition: 'width 0.3s',
+                  }} />
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Upgrade card — shown only for free users */}
-          {!isPro && (
+          {/* Upgrade card — shown for free and Standard users */}
+          {!isMax && (
             <div className="ap-card">
               <h3 className="ap-card__title">
                 <TrendingUp size={ICON_MD} strokeWidth={STROKE} />
-                {isCz ? 'Upgradujte na Pro' : 'Upgrade to Pro'}
+                {!isPro
+                  ? (isCz ? 'Vyberte plán' : 'Choose a plan')
+                  : (isCz ? 'Upgradujte na Max' : 'Upgrade to Max')}
               </h3>
               <p style={{ color: 'var(--muted)', fontSize: 14, margin: '0 0 18px' }}>
-                {isCz
-                  ? 'Neomezený počet faktur, AI asistent a prioritní podpora.'
-                  : 'Unlimited invoices, AI assistant, and priority support.'}
+                {!isPro
+                  ? (isCz
+                    ? 'Získejte více faktur a AI funkce.'
+                    : 'Get more invoices and AI features.')
+                  : (isCz
+                    ? 'Neomezené faktury, neomezené AI a prioritní podpora.'
+                    : 'Unlimited invoices, unlimited AI, and priority support.')}
               </p>
 
-              <div className="ap-grid ap-grid--2">
-                {/* Monthly */}
-                <div className="plan-pricing-card">
-                  <div className="plan-pricing__interval">{isCz ? 'Měsíčně' : 'Monthly'}</div>
-                  <div className="plan-pricing__price">300 CZK</div>
-                  <div className="plan-pricing__sub">{isCz ? 'za měsíc' : 'per month'}</div>
-                  <button
-                    className="ap-btn ap-btn--secondary"
-                    style={{ width: '100%', marginTop: 14 }}
-                    type="button"
-                    disabled={checkoutLoading !== null}
-                    onClick={() => handleCheckout('month')}
-                  >
-                    {checkoutLoading === 'month'
-                      ? (isCz ? 'Načítání…' : 'Loading…')
-                      : (isCz ? 'Předplatit' : 'Subscribe')}
-                  </button>
-                </div>
+              <div className={`ap-grid ap-grid--${!isPro ? '2' : '1'}`}>
+                {/* Standard — shown only for free users */}
+                {!isPro && (
+                  <div className="plan-pricing-card">
+                    <div className="plan-pricing__interval">Standard</div>
+                    <div className="plan-pricing__price">65 CZK</div>
+                    <div className="plan-pricing__sub">{isCz ? '/ měsíc · 100 faktur/rok' : '/ month · 100 invoices/yr'}</div>
+                    <button
+                      className="ap-btn ap-btn--secondary"
+                      style={{ width: '100%', marginTop: 14 }}
+                      type="button"
+                      disabled={checkoutLoading !== null}
+                      onClick={() => handleCheckout('month', 'standard')}
+                    >
+                      {checkoutLoading === 'month'
+                        ? (isCz ? 'Načítání…' : 'Loading…')
+                        : (isCz ? 'Předplatit' : 'Subscribe')}
+                    </button>
+                  </div>
+                )}
 
-                {/* Annual */}
+                {/* Max */}
                 <div className="plan-pricing-card plan-pricing-card--featured">
-                  <div className="plan-pricing__badge">{isCz ? 'Ušetřete 17 %' : 'Save 17%'}</div>
-                  <div className="plan-pricing__interval">{isCz ? 'Ročně' : 'Annual'}</div>
-                  <div className="plan-pricing__price">3 000 CZK</div>
-                  <div className="plan-pricing__sub">{isCz ? 'za rok (250 CZK/měs)' : 'per year (250 CZK/mo)'}</div>
+                  {!isPro && <div className="plan-pricing__badge">{isCz ? 'Nejoblíbenější' : 'Most popular'}</div>}
+                  <div className="plan-pricing__interval">Max</div>
+                  <div className="plan-pricing__price">120 CZK</div>
+                  <div className="plan-pricing__sub">{isCz ? '/ měsíc · vše neomezené' : '/ month · everything unlimited'}</div>
                   <button
                     className="ap-btn ap-btn--primary"
                     style={{ width: '100%', marginTop: 14 }}
                     type="button"
                     disabled={checkoutLoading !== null}
-                    onClick={() => handleCheckout('year')}
+                    onClick={() => handleCheckout('month', 'max')}
                   >
                     {checkoutLoading === 'year'
                       ? (isCz ? 'Načítání…' : 'Loading…')
-                      : (isCz ? 'Předplatit' : 'Subscribe')}
+                      : (isCz ? 'Předplatit Max' : 'Subscribe to Max')}
                   </button>
                 </div>
               </div>

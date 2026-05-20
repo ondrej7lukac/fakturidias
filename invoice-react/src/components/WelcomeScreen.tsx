@@ -42,15 +42,15 @@ const I18N = {
         howStep3Title: 'Odešlete PDF', howStep3Body: 'Stáhněte PDF nebo pošlete klientovi e-mailem. Faktura se uloží do přehledu, sleduje stav platby a automaticky se zálohuje do Google Drive.',
         pricingEyebrow: 'Cena', pricingTitle: 'Jednoduchý plán, žádné překvapení.',
         pricingLead: 'Začněte zdarma. Když budete chtít víc, zaplatíte měsíčně nebo ročně.',
-        pricingFreeName: 'Zdarma', pricingFreeTagline: 'Generovat faktury', pricingFreePrice: '0 Kč',
-        pricingFreeNote: 'navždy', pricingFreeF1: 'Uložit 5 faktur', pricingFreeF2: 'Základní funkce',
-        pricingFreeF3: 'ARES vyhledávání', pricingFreeF4: 'PDF export', pricingFreeCta: 'Začít zdarma',
-        pricingProName: 'Neomezené faktury', pricingProTag: 'Pro malé firmy', pricingProPrice: '65 Kč',
-        pricingProNote: '/ měsíc', pricingProBadge: 'Nejoblíbenější', pricingProF1: 'Neomezený počet faktur',
-        pricingProF2: 'Hlasový AI vstup', pricingProF3: 'Pokročilé funkce', pricingProF4: 'Podpora e-mailem',
-        pricingProF5: 'Automatické zálohy', pricingProCta: 'Vyzkoušet 14 dní zdarma',
-        pricingMaxName: 'Neomezené funkce', pricingMaxTag: 'Pro profesionály', pricingMaxPrice: '120 Kč',
-        pricingMaxNote: '/ měsíc', pricingMaxF1: 'Vše z plánu Pro', pricingMaxF2: 'API přístup',
+        pricingFreeName: 'Zdarma', pricingFreeTagline: 'Vyzkoušejte bez kreditní karty', pricingFreePrice: '0 Kč',
+        pricingFreeNote: 'navždy', pricingFreeF1: '5 faktur celkem', pricingFreeF2: 'ARES vyhledávání',
+        pricingFreeF3: 'Google synchronizace', pricingFreeF4: 'PDF export', pricingFreeCta: 'Začít zdarma',
+        pricingProName: 'Standard', pricingProTag: 'Pro freelancery a malé firmy', pricingProPrice: '65 Kč',
+        pricingProNote: '/ měsíc', pricingProBadge: 'Nejoblíbenější', pricingProF1: '100 faktur za rok',
+        pricingProF2: '5 AI faktur měsíčně', pricingProF3: 'Hlasový vstup', pricingProF4: 'Podpora e-mailem',
+        pricingProF5: 'Automatické zálohy', pricingProCta: 'Vyzkoušet zdarma',
+        pricingMaxName: 'Max', pricingMaxTag: 'Pro profesionály bez limitů', pricingMaxPrice: '120 Kč',
+        pricingMaxNote: '/ měsíc', pricingMaxF1: 'Neomezené faktury', pricingMaxF2: 'Neomezené AI faktury',
         pricingMaxF3: 'Prioritní podpora', pricingMaxF4: 'Vlastní šablony', pricingMaxF5: 'Vlastní doména PDF',
         pricingMaxCta: 'Začít s Max',
         faqEyebrow: 'Časté otázky', faqTitle: 'Vše, co byste mohli chtít vědět.',
@@ -59,7 +59,7 @@ const I18N = {
         faq3Q: 'Splňuje to české účetní předpisy?', faq3A: 'Ano. Faktury splňují všechny povinné náležitosti dle § 29 zákona o DPH č. 235/2004 Sb. Podporujeme sazby 21 %, 15 %, 12 % i 0 %, včetně přenesené daňové povinnosti (reverse charge) pro přeshraniční B2B plnění.',
         faq4Q: 'Mohu importovat faktury z jiné aplikace?', faq4A: 'Ano. Podporujeme import z CSV a ze standardizovaných formátů ISDOC (český standard e-faktur) a UBL 2.1. Z velkých systémů jako Pohoda nebo Fakturoid vám pomůžeme s migrací osobně.',
         faq5Q: 'Co se stane s mými daty, když přestanu platit?', faq5A: 'Plán se vrátí na Zdarma a vy si zachováte plný přístup k posledním 5 fakturám. Všechny ostatní si můžete kdykoliv exportovat jako PDF nebo CSV. Data se nemazají — uchováváme je 7 let dle české legislativy.',
-        faq6Q: 'Mohu nastavit vlastní šablonu faktury?', faq6A: 'V plánu Neomezené funkce (120 Kč/měsíc) ano — změníte logo, barvy, písmo i rozložení. Plán Neomezené faktury používá výchozí profesionální šablonu Fakturidias.',
+        faq6Q: 'Mohu nastavit vlastní šablonu faktury?', faq6A: 'V plánu Max (120 Kč/měsíc) ano — změníte logo, barvy, písmo i rozložení. Plán Standard používá výchozí profesionální šablonu Fakturidias.',
         finalTitle: 'Začněte fakturovat hlasem.', finalSub: 'Zdarma navždy pro prvních 5 faktur. Bez kreditní karty.',
         finalCta1: 'Začít zdarma', finalCta2: 'Pokračovat jako host',
         footerTagline: 'Fakturace nové generace · postaveno v Praze',
@@ -102,15 +102,15 @@ const I18N = {
         howStep3Title: 'Send the PDF', howStep3Body: 'Download the PDF or email the client directly. The invoice lands in your dashboard with live payment status and auto-backs up to Google Drive.',
         pricingEyebrow: 'Pricing', pricingTitle: 'Simple plans, no surprises.',
         pricingLead: 'Start free. Upgrade monthly or annually when you need more.',
-        pricingFreeName: 'Free', pricingFreeTagline: 'Generate invoices', pricingFreePrice: '0 CZK',
-        pricingFreeNote: 'forever', pricingFreeF1: 'Save 5 invoices', pricingFreeF2: 'Core features',
-        pricingFreeF3: 'ARES lookup', pricingFreeF4: 'PDF export', pricingFreeCta: 'Start free',
-        pricingProName: 'Unlimited invoices', pricingProTag: 'For small businesses', pricingProPrice: '65 CZK',
-        pricingProNote: '/ month', pricingProBadge: 'Most popular', pricingProF1: 'Unlimited invoices',
-        pricingProF2: 'Voice AI input', pricingProF3: 'Advanced features', pricingProF4: 'Email support',
-        pricingProF5: 'Automatic backups', pricingProCta: 'Try 14 days free',
-        pricingMaxName: 'Unlimited features', pricingMaxTag: 'For professionals', pricingMaxPrice: '120 CZK',
-        pricingMaxNote: '/ month', pricingMaxF1: 'Everything in Pro', pricingMaxF2: 'API access',
+        pricingFreeName: 'Free', pricingFreeTagline: 'Try without a credit card', pricingFreePrice: '0 CZK',
+        pricingFreeNote: 'forever', pricingFreeF1: '5 invoices total', pricingFreeF2: 'ARES lookup',
+        pricingFreeF3: 'Google sync', pricingFreeF4: 'PDF export', pricingFreeCta: 'Start free',
+        pricingProName: 'Standard', pricingProTag: 'For freelancers & small businesses', pricingProPrice: '65 CZK',
+        pricingProNote: '/ month', pricingProBadge: 'Most popular', pricingProF1: '100 invoices per year',
+        pricingProF2: '5 AI invoices per month', pricingProF3: 'Voice input', pricingProF4: 'Email support',
+        pricingProF5: 'Automatic backups', pricingProCta: 'Try for free',
+        pricingMaxName: 'Max', pricingMaxTag: 'For professionals with no limits', pricingMaxPrice: '120 CZK',
+        pricingMaxNote: '/ month', pricingMaxF1: 'Unlimited invoices', pricingMaxF2: 'Unlimited AI invoices',
         pricingMaxF3: 'Priority support', pricingMaxF4: 'Custom templates', pricingMaxF5: 'Custom PDF domain',
         pricingMaxCta: 'Go Max',
         faqEyebrow: 'FAQ', faqTitle: 'Everything you might want to know.',
@@ -119,7 +119,7 @@ const I18N = {
         faq3Q: 'Is it compliant with Czech tax rules?', faq3A: 'Yes. Invoices include all mandatory fields under Section 29 of Czech VAT Act No. 235/2004 Coll. We support rates 21%, 15%, 12% and 0%, including reverse charge for cross-border EU B2B transactions.',
         faq4Q: 'Can I import invoices from another app?', faq4A: 'Yes — CSV, ISDOC (Czech e-invoice standard) and UBL 2.1 formats. For large systems like Pohoda or Fakturoid we\'ll assist with the migration personally.',
         faq5Q: 'What happens to my data if I stop paying?', faq5A: 'Your plan reverts to Free and you keep full access to your last 5 invoices. You can export anything else at any time as PDF or CSV. Data is never deleted — we retain it for 7 years per Czech law.',
-        faq6Q: 'Can I customize the invoice template?', faq6A: 'On the Unlimited features plan (120 CZK/month) — change logo, colors, font and layout. The Unlimited invoices plan uses the default Fakturidias professional template.',
+        faq6Q: 'Can I customize the invoice template?', faq6A: 'On the Max plan (120 CZK/month) — change logo, colors, font and layout. The Standard plan uses the default Fakturidias professional template.',
         finalTitle: 'Start invoicing by voice.', finalSub: 'Free forever for the first 5 invoices. No credit card.',
         finalCta1: 'Start free', finalCta2: 'Continue as guest',
         footerTagline: 'Next-generation invoicing · built in Prague',
@@ -136,6 +136,7 @@ type T = typeof I18N['cs']
 interface WelcomeScreenProps {
     onLogin: () => void
     onContinueAsGuest: () => void
+    onStartCheckout?: (plan: 'standard' | 'max') => void
     lang?: string
 }
 
@@ -238,7 +239,7 @@ function DashboardMock({ t }: { t: T }) {
     )
 }
 
-export default function WelcomeScreen({ onLogin, onContinueAsGuest, lang: initialLang = 'cs' }: WelcomeScreenProps) {
+export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheckout, lang: initialLang = 'cs' }: WelcomeScreenProps) {
     const [lang, setLang] = useState(initialLang)
     const [theme, setTheme] = useState<'dark' | 'light'>(() =>
         window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -268,21 +269,25 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, lang: initia
         { Icon: Sparkles,       title: t.feature6Title, body: t.feature6Body, alt: true  },
     ]
 
-    const pricingTiers = [
+    const pricingTiers: Array<{
+        name: string; tag: string; price: string; note: string; features: string[];
+        cta: string; ctaClass: string; featured: boolean; badge?: string;
+        plan: 'free' | 'standard' | 'max';
+    }> = [
         {
             name: t.pricingFreeName, tag: t.pricingFreeTagline, price: t.pricingFreePrice, note: t.pricingFreeNote,
             features: [t.pricingFreeF1, t.pricingFreeF2, t.pricingFreeF3, t.pricingFreeF4],
-            cta: t.pricingFreeCta, ctaClass: 'lp-btn--secondary', featured: false, badge: undefined,
+            cta: t.pricingFreeCta, ctaClass: 'lp-btn--secondary', featured: false, badge: undefined, plan: 'free',
         },
         {
             name: t.pricingProName, tag: t.pricingProTag, price: t.pricingProPrice, note: t.pricingProNote,
             features: [t.pricingProF1, t.pricingProF2, t.pricingProF3, t.pricingProF4, t.pricingProF5],
-            cta: t.pricingProCta, ctaClass: 'lp-btn--primary', featured: true, badge: t.pricingProBadge,
+            cta: t.pricingProCta, ctaClass: 'lp-btn--primary', featured: true, badge: t.pricingProBadge, plan: 'standard',
         },
         {
             name: t.pricingMaxName, tag: t.pricingMaxTag, price: t.pricingMaxPrice, note: t.pricingMaxNote,
             features: [t.pricingMaxF1, t.pricingMaxF2, t.pricingMaxF3, t.pricingMaxF4, t.pricingMaxF5],
-            cta: t.pricingMaxCta, ctaClass: 'lp-btn--secondary', featured: false, badge: undefined,
+            cta: t.pricingMaxCta, ctaClass: 'lp-btn--secondary', featured: false, badge: undefined, plan: 'max',
         },
     ]
 
@@ -548,7 +553,18 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, lang: initia
                                         </li>
                                     ))}
                                 </ul>
-                                <button className={`lp-btn ${tier.ctaClass} lp-btn--lg`} onClick={onContinueAsGuest}>
+                                <button
+                                    className={`lp-btn ${tier.ctaClass} lp-btn--lg`}
+                                    onClick={() => {
+                                        if (tier.plan === 'free') {
+                                            onLogin()
+                                        } else if (onStartCheckout) {
+                                            onStartCheckout(tier.plan as 'standard' | 'max')
+                                        } else {
+                                            onLogin()
+                                        }
+                                    }}
+                                >
                                     {tier.cta}
                                 </button>
                             </div>

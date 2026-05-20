@@ -28,6 +28,7 @@ function App() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [dashboardOpen, setDashboardOpen] = useState(false)
     const [subscription, setSubscription] = useState<{ plan: string; status: string; interval: string | null; currentPeriodEnd: number | null } | null>(null)
+    const [pendingCheckoutPlan, setPendingCheckoutPlan] = useState<'standard' | 'max' | null>(null)
 
     const t = languages[lang]
 
@@ -41,13 +42,25 @@ function App() {
         }
     }, [user])
 
-    // Fetch subscription when user logs in
+    // Fetch subscription when user logs in; trigger pending checkout if set
     useEffect(() => {
         if (!user) return
         fetch('/api/billing/subscription')
             .then(r => r.ok ? r.json() : null)
             .then(data => { if (data) setSubscription(data) })
             .catch(() => {})
+        if (pendingCheckoutPlan) {
+            const plan = pendingCheckoutPlan
+            setPendingCheckoutPlan(null)
+            fetch('/api/billing/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ interval: 'month', plan }),
+            })
+                .then(r => r.ok ? r.json() : null)
+                .then(data => { if (data?.url) window.location.href = data.url })
+                .catch(() => {})
+        }
     }, [user])
 
     // Handle Stripe redirect back (?billing=success|cancel)
@@ -374,9 +387,14 @@ function App() {
         setShowWelcome(false)
     }
 
+    const handleStartCheckout = (plan: 'standard' | 'max') => {
+        setPendingCheckoutPlan(plan)
+        handleLogin()
+    }
+
     // Show welcome screen if user hasn't seen it
     if (showWelcome) {
-        return <WelcomeScreen onLogin={handleLogin} onContinueAsGuest={handleContinueAsGuest} lang={lang} />
+        return <WelcomeScreen onLogin={handleLogin} onContinueAsGuest={handleContinueAsGuest} onStartCheckout={handleStartCheckout} lang={lang} />
     }
 
     return (
