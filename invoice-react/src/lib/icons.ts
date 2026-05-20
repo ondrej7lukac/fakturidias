@@ -30,6 +30,22 @@ export {
   TrendingUp,
   Send,
   CreditCard,
+  Shield,
+  Users,
+  Tag,
+  Trash2,
+  Crown,
+  UserCheck,
+  Activity,
+  Filter,
+  Copy,
+  ToggleLeft,
+  ToggleRight,
+  ChevronUp,
+  MoreHorizontal,
+  Zap,
+  Star,
+  BadgeCheck,
 } from 'lucide-react'
 
 export const ICON_SM = 14
