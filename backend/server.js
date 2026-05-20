@@ -70,6 +70,7 @@ require('./routes/drive').attach(protectedRouter);
 require('./routes/export').attach(protectedRouter);
 require('./routes/email').attach(protectedRouter);
 require('./routes/ai').attach(protectedRouter);
+require('./routes/admin').attach(protectedRouter);
 billing.attachProtected(protectedRouter);
 
 function serveStatic(req, res, requestPath) {

@@ -78,8 +78,8 @@ Each file in `backend/lib/` is a focused module required by `backend/server.js`:
 
 ## Deployment
 
-- **Vercel**: `vercel.json` routes all `/api/*` and `/auth/*` to `api/index.js` (serverless adapter). The `api/` directory at the root wraps `server.js` for serverless execution.
-- **Docker / self-hosted**: `Dockerfile` builds the frontend then runs `node server.js`.
+- **Railway**: `railway.json` selects the `Dockerfile` builder; health check on `/health`. Env vars are set in the Railway service Variables tab. `VITE_*` vars are declared as `ARG`s in the Dockerfile so they reach the Vite build.
+- **Docker / self-hosted**: `Dockerfile` builds the frontend then runs `node backend/server.js`. Pass `VITE_GA4_ID` / `VITE_CLARITY_ID` as `--build-arg`s.
 - **Vite build output**: Always goes to `dist/` at the repo root (configured in `invoice-react/vite.config.ts` → `build.outDir: '../dist'`).
 
 ## Frontend — see `invoice-react/CLAUDE.md`

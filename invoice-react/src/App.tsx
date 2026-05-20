@@ -5,6 +5,7 @@ import InvoiceList from './components/InvoiceList'
 import Settings from './components/Settings'
 import WelcomeScreen from './components/WelcomeScreen'
 import CookieBanner from './components/CookieBanner'
+import AdminDashboard from './components/AdminDashboard'
 import { getNextInvoiceCounter, loadApiData, loadLocalData, saveApiInvoice, saveLocalInvoice, deleteApiInvoice, deleteLocalInvoice } from './utils/storage'
 import { generateInvoicePDF } from './utils/pdf'
 import { getCzechQrPayload } from './utils/bank'
@@ -29,6 +30,7 @@ function App() {
     const [dashboardOpen, setDashboardOpen] = useState(false)
     const [subscription, setSubscription] = useState<{ plan: string; status: string; interval: string | null; currentPeriodEnd: number | null } | null>(null)
     const [pendingCheckoutPlan, setPendingCheckoutPlan] = useState<'standard' | 'max' | null>(null)
+    const [isAdmin, setIsAdmin] = useState(false)
 
     const t = languages[lang]
 
@@ -42,12 +44,16 @@ function App() {
         }
     }, [user])
 
-    // Fetch subscription when user logs in; trigger pending checkout if set
+    // Fetch subscription + admin status when user logs in; trigger pending checkout if set
     useEffect(() => {
-        if (!user) return
+        if (!user) { setIsAdmin(false); return }
         fetch('/api/billing/subscription')
             .then(r => r.ok ? r.json() : null)
             .then(data => { if (data) setSubscription(data) })
+            .catch(() => {})
+        fetch('/api/admin/check')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data) setIsAdmin(!!data.isAdmin) })
             .catch(() => {})
         if (pendingCheckoutPlan) {
             const plan = pendingCheckoutPlan
@@ -414,9 +420,12 @@ function App() {
                 setMobileMenuOpen={setMobileMenuOpen}
                 onOpenDashboard={() => { setCurrentView('invoices'); setDashboardOpen(true) }}
                 onLogout={handleLogout}
+                isAdmin={isAdmin}
             />
             <main className={`${dashboardOpen ? 'dashboard-mode' : ''} ${currentView === 'settings' ? 'settings-view' : ''}`}>
-                {currentView === 'settings' ? (
+                {currentView === 'admin' ? (
+                    <AdminDashboard />
+                ) : currentView === 'settings' ? (
                     <Settings
                         lang={lang}
                         t={t}

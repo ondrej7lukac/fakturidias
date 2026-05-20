@@ -86,8 +86,8 @@ npm run dev
 │   │   ├── components/
 │   │   ├── utils/
 │   │   └── App.jsx
-│   └── api/
-│       └── index.js          # Vercel serverless functions
+├── Dockerfile                # Container build for Railway / self-hosting
+├── railway.json              # Railway deployment config
 ├── .env                      # Environment variables (DO NOT COMMIT)
 ├── .env.example              # Template for environment variables
 ├── .gitignore                # Git ignore rules
@@ -101,27 +101,36 @@ npm run dev
 - `GOOGLE_CLIENT_ID` - Your Google OAuth2 Client ID
 - `GOOGLE_CLIENT_SECRET` - Your Google OAuth2 Client Secret
 
-### Required for Vercel Deployment
+### Required for Production Deployment
 
 - `GOOGLE_CLIENT_ID` - Your Google OAuth2 Client ID
 - `GOOGLE_CLIENT_SECRET` - Your Google OAuth2 Client Secret
+- `SESSION_SECRET` / `SESSION_SECRET_2` - Cookie session signing keys
 - `MONGODB_URI` - MongoDB connection string (optional)
+- `VITE_GA4_ID` / `VITE_CLARITY_ID` - frontend analytics (needed at build time)
 
 ## Deployment
 
-### Vercel Deployment
+### Railway Deployment
 
 1. Push your code to GitHub (make sure `.env` is NOT committed!)
-2. Import your repository in Vercel
-3. Add environment variables in Vercel dashboard:
-   - `GOOGLE_CLIENT_ID`
-   - `GOOGLE_CLIENT_SECRET`
+2. Create a new project in Railway and connect the repository.
+   Railway uses the `Dockerfile` (declared in `railway.json`).
+3. In the service **Variables** tab, add each environment variable as a
+   **separate** key/value entry (plaintext values, never a multi-line blob):
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+   - `SESSION_SECRET`, `SESSION_SECRET_2`
    - `MONGODB_URI` (if using MongoDB)
-4. Deploy!
+   - `GEMINI_API_KEY`, `RESEND_API_KEY`, `STRIPE_*`
+   - `VITE_GA4_ID`, `VITE_CLARITY_ID` (consumed as Docker build args)
+   - `ADMIN_EMAILS` (for the admin dashboard)
+4. Railway sets `PORT` automatically — the server already reads it.
+5. Deploy. Health checks hit `/health`.
 
-**Important**: Update your Google Cloud Console OAuth2 redirect URI to include your Vercel URL:
+**Important**: Update your Google Cloud Console OAuth2 redirect URI to include
+your Railway URL:
 ```
-https://your-app.vercel.app/auth/google/callback
+https://your-app.up.railway.app/auth/google/callback
 ```
 
 ## API Endpoints

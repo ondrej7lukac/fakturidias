@@ -80,12 +80,27 @@ const SubscriptionSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+const PromoSchema = new mongoose.Schema({
+    code: { type: String, required: true, unique: true, uppercase: true },
+    description: { type: String, default: '' },
+    planGrant: { type: String, enum: ['standard', 'max', null], default: null },
+    discountPercent: { type: Number, default: 0 },
+    durationDays: { type: Number, default: 30 },
+    maxUses: { type: Number, default: null },
+    usedCount: { type: Number, default: 0 },
+    usedBy: { type: [String], default: [] },
+    active: { type: Boolean, default: true },
+    expiresAt: { type: Date, default: null },
+    createdAt: { type: Date, default: Date.now },
+});
+
 const InvoiceModel = mongoose.models.Invoice || mongoose.model('Invoice', InvoiceSchema);
 const ItemModel = mongoose.models.Item || mongoose.model('Item', ItemSchema);
 const CustomerModel = mongoose.models.Customer || mongoose.model('Customer', CustomerSchema);
 const SettingsModel = mongoose.models.Settings || mongoose.model('Settings', SettingsSchema);
 const TokenModel = mongoose.models.Token || mongoose.model('Token', TokenSchema);
 const SubscriptionModel = mongoose.models.Subscription || mongoose.model('Subscription', SubscriptionSchema);
+const PromoModel = mongoose.models.Promo || mongoose.model('Promo', PromoSchema);
 
 const connectDB = async () => {
     if (_isConnected) return;
@@ -333,6 +348,146 @@ async function getSubscriptionByCustomerId(stripeCustomerId) {
     } catch { return null; }
 }
 
+// ── Admin functions ───────────────────────────────────────────────────────────
+
+async function getAllUsersWithStats() {
+    if (!_isConnected) return [];
+    try {
+        const [subs, invoiceCounts, settingsDocs] = await Promise.all([
+            SubscriptionModel.find({}).lean(),
+            InvoiceModel.aggregate([{ $group: { _id: '$userEmail', count: { $sum: 1 }, lastInvoice: { $max: '$createdAt' } } }]),
+            SettingsModel.find({}, { userEmail: 1, updatedAt: 1 }).lean(),
+        ]);
+
+        const countMap = new Map(invoiceCounts.map(r => [r._id, { count: r.count, lastInvoice: r.lastInvoice }]));
+        const subMap = new Map(subs.map(s => [s.userEmail, s]));
+        const settingsMap = new Map(settingsDocs.map(s => [s.userEmail, s]));
+
+        const allEmails = new Set([
+            ...subs.map(s => s.userEmail),
+            ...settingsDocs.map(s => s.userEmail),
+        ]);
+
+        return Array.from(allEmails).map(email => {
+            const sub = subMap.get(email) || {};
+            const settings = settingsMap.get(email);
+            const invStats = countMap.get(email) || {};
+            return {
+                email,
+                plan: sub.plan || 'free',
+                status: sub.status || 'inactive',
+                stripeCustomerId: sub.stripeCustomerId || null,
+                stripeSubscriptionId: sub.stripeSubscriptionId || null,
+                currentPeriodEnd: sub.currentPeriodEnd || null,
+                interval: sub.interval || null,
+                invoiceCount: invStats.count || 0,
+                lastInvoice: invStats.lastInvoice || null,
+                lastActivity: sub.updatedAt || settings?.updatedAt || null,
+            };
+        }).sort((a, b) => new Date(b.lastActivity || 0) - new Date(a.lastActivity || 0));
+    } catch (err) {
+        console.error('[admin] getAllUsersWithStats error:', err.message);
+        return [];
+    }
+}
+
+async function setUserPlanOverride(userEmail, plan, durationDays) {
+    const existing = await getSubscription(userEmail) || {};
+    const currentPeriodEnd = (plan === 'free')
+        ? null
+        : Math.floor(Date.now() / 1000) + (durationDays || 30) * 86400;
+    return saveSubscription(userEmail, {
+        stripeCustomerId: existing.stripeCustomerId || null,
+        stripeSubscriptionId: existing.stripeSubscriptionId || null,
+        plan,
+        status: plan === 'free' ? 'inactive' : 'active',
+        interval: existing.interval || 'manual',
+        currentPeriodEnd,
+    });
+}
+
+async function deleteUserAllData(userEmail) {
+    if (!_isConnected) return false;
+    try {
+        await Promise.all([
+            InvoiceModel.deleteMany({ userEmail }),
+            CustomerModel.deleteMany({ userEmail }),
+            ItemModel.deleteMany({ userEmail }),
+            SettingsModel.deleteMany({ userEmail }),
+            SubscriptionModel.deleteMany({ userEmail }),
+            TokenModel.deleteMany({ userEmail }),
+        ]);
+        return true;
+    } catch (err) {
+        console.error('[admin] deleteUserAllData error:', err.message);
+        return false;
+    }
+}
+
+// Promo CRUD
+async function getPromos() {
+    if (!_isConnected) return [];
+    try {
+        return await PromoModel.find({}).sort({ createdAt: -1 }).lean();
+    } catch { return []; }
+}
+
+async function getPromoByCode(code) {
+    if (!_isConnected) return null;
+    try {
+        return await PromoModel.findOne({ code: code.toUpperCase() }).lean();
+    } catch { return null; }
+}
+
+async function createPromo(data) {
+    if (!_isConnected) return null;
+    try {
+        const doc = new PromoModel({ ...data, code: data.code.toUpperCase() });
+        return (await doc.save()).toObject();
+    } catch (err) {
+        console.error('[admin] createPromo error:', err.message);
+        return null;
+    }
+}
+
+async function updatePromo(code, data) {
+    if (!_isConnected) return null;
+    try {
+        return await PromoModel.findOneAndUpdate(
+            { code: code.toUpperCase() },
+            { $set: data },
+            { new: true, lean: true }
+        );
+    } catch { return null; }
+}
+
+async function deletePromo(code) {
+    if (!_isConnected) return false;
+    try {
+        await PromoModel.deleteOne({ code: code.toUpperCase() });
+        return true;
+    } catch { return false; }
+}
+
+async function applyPromoToUser(code, userEmail) {
+    if (!_isConnected) return { error: 'DB not connected' };
+    const promo = await getPromoByCode(code);
+    if (!promo) return { error: 'Promo not found' };
+    if (!promo.active) return { error: 'Promo is inactive' };
+    if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) return { error: 'Promo expired' };
+    if (promo.maxUses !== null && promo.usedCount >= promo.maxUses) return { error: 'Promo limit reached' };
+    if (promo.usedBy.includes(userEmail)) return { error: 'Already used by this user' };
+
+    if (promo.planGrant) {
+        await setUserPlanOverride(userEmail, promo.planGrant, promo.durationDays);
+    }
+    await PromoModel.updateOne(
+        { code: code.toUpperCase() },
+        { $inc: { usedCount: 1 }, $push: { usedBy: userEmail } }
+    );
+    return { success: true, planGranted: promo.planGrant, durationDays: promo.durationDays };
+}
+
 module.exports = {
     connectDB,
     InvoiceModel,
@@ -341,6 +496,7 @@ module.exports = {
     SettingsModel,
     TokenModel,
     SubscriptionModel,
+    PromoModel,
     getUserInvoices,
     saveSingleInvoice,
     saveUserInvoices_FS,
@@ -353,5 +509,14 @@ module.exports = {
     getSubscription,
     saveSubscription,
     getSubscriptionByCustomerId,
+    getAllUsersWithStats,
+    setUserPlanOverride,
+    deleteUserAllData,
+    getPromos,
+    getPromoByCode,
+    createPromo,
+    updatePromo,
+    deletePromo,
+    applyPromoToUser,
     isConnected: () => _isConnected
 };

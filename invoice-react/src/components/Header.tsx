@@ -13,7 +13,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { BarChart2, Plus, Settings2, X, Menu, Check, ICON_SM, STROKE } from '@/lib/icons'
+import { BarChart2, Plus, Settings2, X, Menu, Check, Shield, ICON_SM, STROKE } from '@/lib/icons'
 
 interface HeaderProps {
   onNewInvoice: () => void
@@ -29,6 +29,7 @@ interface HeaderProps {
   setMobileView: (v: string) => void
   mobileMenuOpen: boolean
   setMobileMenuOpen: (open: boolean) => void
+  isAdmin?: boolean
 }
 
 export default function Header({
@@ -43,6 +44,7 @@ export default function Header({
   onLogout,
   mobileMenuOpen,
   setMobileMenuOpen,
+  isAdmin = false,
 }: HeaderProps) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -158,6 +160,12 @@ export default function Header({
                   <Settings2 size={15} strokeWidth={2} className="user-dropdown__item-icon" />
                   <span>{isCz ? 'Nastavení' : 'Settings'}</span>
                 </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => onViewChange('admin')} className="user-dropdown__item">
+                    <Shield size={15} strokeWidth={2} className="user-dropdown__item-icon" style={{ color: 'var(--accent)' }} />
+                    <span style={{ color: 'var(--accent)' }}>Admin</span>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator className="user-dropdown__separator--inner" />
                 {user ? (
                   <DropdownMenuItem onClick={onLogout} className="user-dropdown__item user-dropdown__item--danger">

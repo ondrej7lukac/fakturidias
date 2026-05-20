@@ -1,0 +1,630 @@
+/* ── Admin Dashboard ─────────────────────────────────────────────────────── */
+
+.admin-dashboard {
+  min-height: calc(100vh - var(--headerH));
+  padding: 2rem 2rem 4rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ── Header bar ─────────────────────────────────────────────────────────── */
+
+.admin-topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.admin-topbar__title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.admin-topbar__badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: var(--danger);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 4px;
+  margin-bottom: 2rem;
+}
+
+.admin-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.admin-tab:hover {
+  background: var(--glass-active);
+  color: var(--text);
+}
+
+.admin-tab--active {
+  background: var(--accent);
+  color: #0b1022;
+}
+
+/* ── Stats grid ─────────────────────────────────────────────────────────── */
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.admin-stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: border-color 0.18s;
+}
+
+.admin-stat-card:hover {
+  border-color: var(--accent);
+}
+
+.admin-stat-card__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.admin-stat-card__value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.admin-stat-card__sub {
+  font-size: 0.75rem;
+  color: var(--muted2);
+}
+
+.admin-stat-card--accent .admin-stat-card__value { color: var(--accent); }
+.admin-stat-card--green .admin-stat-card__value  { color: #2dd7a6; }
+.admin-stat-card--indigo .admin-stat-card__value { color: var(--accent-2); }
+.admin-stat-card--danger .admin-stat-card__value { color: var(--danger); }
+
+/* ── Plan distribution bar ──────────────────────────────────────────────── */
+
+.admin-plan-dist {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.admin-plan-dist__title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+.admin-plan-dist__bar {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  gap: 2px;
+  margin-bottom: 1rem;
+}
+
+.admin-plan-dist__seg {
+  height: 100%;
+  border-radius: 4px;
+  transition: flex 0.4s var(--ease-spring);
+  min-width: 4px;
+}
+
+.admin-plan-dist__seg--free     { background: var(--muted2); }
+.admin-plan-dist__seg--standard { background: var(--accent-2); }
+.admin-plan-dist__seg--max      { background: var(--accent); }
+
+.admin-plan-dist__legend {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-plan-dist__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.admin-plan-dist__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.admin-plan-dist__dot--free     { background: var(--muted2); }
+.admin-plan-dist__dot--standard { background: var(--accent-2); }
+.admin-plan-dist__dot--max      { background: var(--accent); }
+
+/* ── Section headers ─────────────────────────────────────────────────────── */
+
+.admin-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.admin-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.admin-section-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── Search + filter bar ─────────────────────────────────────────────────── */
+
+.admin-search-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.admin-search-input {
+  flex: 1;
+  min-width: 200px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.55rem 1rem;
+  font-size: 0.88rem;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.admin-search-input:focus {
+  border-color: var(--accent);
+}
+
+.admin-search-input::placeholder {
+  color: var(--muted2);
+}
+
+.admin-filter-chip {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.admin-filter-chip:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.admin-filter-chip--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b1022;
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+
+.admin-table-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th {
+  padding: 10px 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  background: var(--card2);
+  white-space: nowrap;
+}
+
+.admin-table td {
+  padding: 12px 16px;
+  font-size: 0.86rem;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table tr:hover td {
+  background: var(--glass-sm);
+}
+
+/* ── Plan pills ─────────────────────────────────────────────────────────── */
+
+.plan-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.plan-pill--free     { background: var(--card2); color: var(--muted); }
+.plan-pill--standard { background: var(--accent2-soft); color: var(--accent-2); }
+.plan-pill--max      { background: var(--accent-soft); color: var(--accent); }
+.plan-pill--pro      { background: var(--accent-soft); color: var(--accent); }
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.status-dot--active    { background: #2dd7a6; }
+.status-dot--inactive  { background: var(--muted2); }
+.status-dot--canceled  { background: var(--danger); }
+.status-dot--trialing  { background: var(--warn); }
+
+/* ── Action buttons ─────────────────────────────────────────────────────── */
+
+.admin-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.admin-action-btn:hover {
+  background: var(--glass-active);
+  color: var(--text);
+  border-color: var(--text);
+}
+
+.admin-action-btn--danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.admin-action-btn--primary {
+  background: var(--accent);
+  color: #0b1022;
+  border-color: var(--accent);
+}
+
+.admin-action-btn--primary:hover {
+  opacity: 0.88;
+  color: #0b1022;
+  border-color: var(--accent);
+}
+
+/* ── Plan selector dropdown inside table ────────────────────────────────── */
+
+.admin-plan-select {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.admin-plan-select:focus {
+  border-color: var(--accent);
+}
+
+/* ── Promo form ─────────────────────────────────────────────────────────── */
+
+.admin-promo-form {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.admin-promo-form__full {
+  grid-column: 1 / -1;
+}
+
+.admin-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-form-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.admin-form-input {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.88rem;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.admin-form-input:focus {
+  border-color: var(--accent);
+}
+
+.admin-form-input::placeholder {
+  color: var(--muted2);
+}
+
+.admin-form-select {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.88rem;
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+
+.admin-form-select:focus {
+  border-color: var(--accent);
+}
+
+.admin-form-actions {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+/* ── Apply promo modal ───────────────────────────────────────────────────── */
+
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  backdrop-filter: blur(6px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: fadeIn 0.15s;
+}
+
+.admin-modal {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius2);
+  padding: 2rem;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: var(--shadow);
+  animation: slideUp 0.22s var(--ease-spring);
+}
+
+.admin-modal__title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 1.2rem;
+}
+
+.admin-modal__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 1.2rem;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.admin-empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ── Recent activity list ────────────────────────────────────────────────── */
+
+.admin-activity-list {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.admin-activity-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.84rem;
+}
+
+.admin-activity-item:last-child {
+  border-bottom: none;
+}
+
+.admin-activity-item__email {
+  flex: 1;
+  color: var(--text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-activity-item__plan {
+  flex-shrink: 0;
+}
+
+.admin-activity-item__date {
+  color: var(--muted2);
+  font-size: 0.76rem;
+  flex-shrink: 0;
+}
+
+/* ── Overview grid ───────────────────────────────────────────────────────── */
+
+.admin-overview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .admin-overview-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-dashboard {
+    padding: 1rem 1rem 4rem;
+  }
+}
+
+/* ── Inline confirm ──────────────────────────────────────────────────────── */
+
+.admin-confirm-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.admin-copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.12s;
+}
+
+.admin-copy-btn:hover {
+  color: var(--accent);
+}
+
+/* ── Duration input row ──────────────────────────────────────────────────── */
+
+.admin-plan-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-days-input {
+  width: 72px;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.admin-days-input:focus {
+  border-color: var(--accent);
+}
+
+@keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: translateY(0) } }
