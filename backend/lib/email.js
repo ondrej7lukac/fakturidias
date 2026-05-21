@@ -90,4 +90,81 @@ async function sendEmail(invoice, pdfBase64, lang) {
     return { id: result.id };
 }
 
-module.exports = { sendEmail };
+async function sendBroadcastEmail(recipients, subject, html) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+        const err = new Error('Email service not configured');
+        err.statusCode = 503;
+        throw err;
+    }
+
+    const list = (Array.isArray(recipients) ? recipients : [recipients])
+        .map(e => String(e || '').trim())
+        .filter(Boolean);
+    if (list.length === 0) {
+        const err = new Error('No recipients');
+        err.statusCode = 400;
+        throw err;
+    }
+    if (!subject || !html) {
+        const err = new Error('Subject and message are required');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const from = 'Fakturidias <noreply@fakturidias.app>';
+    let sent = 0;
+    const failed = [];
+
+    // One email per recipient so no user sees another's address.
+    for (const to of list) {
+        try {
+            await callResend(apiKey, { from, to: [to], subject, html });
+            sent++;
+        } catch {
+            failed.push(to);
+        }
+    }
+
+    return { sent, failed };
+}
+
+// Escape a plain-text broadcast message into safe HTML (preserves line breaks).
+function broadcastHtml(message) {
+    const safe = String(message || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+    return `<div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#1a1a2e;font-size:15px">${safe}</div>`;
+}
+
+const BROADCAST_SEGMENTS = ['all', 'free', 'standard', 'max', 'paid'];
+
+async function resolveSegmentRecipients(segment) {
+    const { getAllUsersWithStats } = require('./storage');
+    const seg = BROADCAST_SEGMENTS.includes(segment) ? segment : 'all';
+    const users = await getAllUsersWithStats();
+    return users.filter(u => {
+        if (seg === 'all') return true;
+        const paid = ['standard', 'max', 'pro'].includes(u.plan) && u.status === 'active';
+        if (seg === 'paid') return paid;
+        if (seg === 'free') return !paid;
+        return u.plan === seg && u.status === 'active';
+    }).map(u => u.email).filter(Boolean);
+}
+
+// Resolve a segment to recipients and send the broadcast. Used by both the
+// immediate admin broadcast endpoint and the scheduled-email poller.
+async function sendSegmentBroadcast(segment, subject, message) {
+    const recipients = await resolveSegmentRecipients(segment);
+    if (recipients.length === 0) {
+        const err = new Error('No recipients match this segment');
+        err.statusCode = 400;
+        throw err;
+    }
+    const result = await sendBroadcastEmail(recipients, subject, broadcastHtml(message));
+    return { ...result, total: recipients.length };
+}
+
+module.exports = { sendEmail, sendBroadcastEmail, sendSegmentBroadcast, broadcastHtml };

@@ -31,6 +31,7 @@ function App() {
     const [subscription, setSubscription] = useState<{ plan: string; status: string; interval: string | null; currentPeriodEnd: number | null } | null>(null)
     const [pendingCheckoutPlan, setPendingCheckoutPlan] = useState<'standard' | 'max' | null>(null)
     const [isAdmin, setIsAdmin] = useState(false)
+    const [impersonating, setImpersonating] = useState<string | null>(null)
 
     const t = languages[lang]
 
@@ -46,14 +47,19 @@ function App() {
 
     // Fetch subscription + admin status when user logs in; trigger pending checkout if set
     useEffect(() => {
-        if (!user) { setIsAdmin(false); return }
+        if (!user) { setIsAdmin(false); setImpersonating(null); return }
         fetch('/api/billing/subscription')
             .then(r => r.ok ? r.json() : null)
             .then(data => { if (data) setSubscription(data) })
             .catch(() => {})
         fetch('/api/admin/check')
             .then(r => r.ok ? r.json() : null)
-            .then(data => { if (data) setIsAdmin(!!data.isAdmin) })
+            .then(data => {
+                if (data) {
+                    setIsAdmin(!!data.isAdmin)
+                    setImpersonating(data.impersonating || null)
+                }
+            })
             .catch(() => {})
         if (pendingCheckoutPlan) {
             const plan = pendingCheckoutPlan
@@ -393,6 +399,12 @@ function App() {
         setShowWelcome(false)
     }
 
+    const handleStopImpersonating = () => {
+        fetch('/api/admin/impersonate/stop', { method: 'POST' })
+            .catch(() => {})
+            .then(() => window.location.reload())
+    }
+
     const handleStartCheckout = (plan: 'standard' | 'max') => {
         setPendingCheckoutPlan(plan)
         handleLogin()
@@ -498,6 +510,31 @@ function App() {
                     </>
                 )}
             </main>
+            {impersonating && (
+                <div
+                    style={{
+                        position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 300,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px',
+                        padding: '10px 16px', background: '#e33d63', color: '#fff',
+                        fontSize: '0.86rem', fontWeight: 600,
+                        boxShadow: '0 -4px 16px rgba(0,0,0,0.25)',
+                    }}
+                >
+                    <span>
+                        Viewing as <strong>{impersonating}</strong> — changes affect their account.
+                    </span>
+                    <button
+                        onClick={handleStopImpersonating}
+                        style={{
+                            background: '#fff', color: '#e33d63', border: 'none',
+                            borderRadius: '8px', padding: '5px 14px', fontWeight: 700,
+                            fontSize: '0.82rem', cursor: 'pointer',
+                        }}
+                    >
+                        Stop impersonating
+                    </button>
+                </div>
+            )}
         </>
     )
 }

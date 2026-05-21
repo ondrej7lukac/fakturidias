@@ -7,9 +7,10 @@ const {
     saveUserInvoices_FS,
     isConnected,
     InvoiceModel,
-    getSubscription
+    getSubscription,
+    getGlobalSettings
 } = require('../lib/storage');
-const { isPro, FREE_INVOICE_LIMIT } = require('../lib/plan');
+const { isPro } = require('../lib/plan');
 
 function attach(router) {
     router.add('GET', '/api/invoices', async ({ res, userEmail }) => {
@@ -30,11 +31,12 @@ function attach(router) {
         const isNew = !existingInvoices.find(inv => inv.id === invoice.id);
         if (isNew) {
             const subscription = await getSubscription(userEmail);
-            if (!isPro(subscription) && existingInvoices.length >= FREE_INVOICE_LIMIT) {
+            const { freeInvoiceLimit } = await getGlobalSettings();
+            if (!isPro(subscription) && existingInvoices.length >= freeInvoiceLimit) {
                 return sendJson(res, 403, {
                     error: 'Invoice limit reached',
                     limitReached: true,
-                    limit: FREE_INVOICE_LIMIT,
+                    limit: freeInvoiceLimit,
                     plan: 'free'
                 });
             }

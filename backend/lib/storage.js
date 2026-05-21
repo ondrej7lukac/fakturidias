@@ -6,6 +6,8 @@ const path = require('path');
 const baseDir = path.join(__dirname, '..', '..');
 const dataDir = path.join(baseDir, 'data');
 
+const { PRICING, GUEST_INVOICE_LIMIT, FREE_INVOICE_LIMIT, STANDARD_INVOICE_LIMIT } = require('./plan');
+
 const MONGODB_URI = process.env.MONGODB_URI;
 
 let _isConnected = false;
@@ -94,6 +96,67 @@ const PromoSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
 });
 
+const AuditLogSchema = new mongoose.Schema({
+    adminEmail: { type: String, required: true },
+    action: { type: String, required: true },
+    target: { type: String, default: null },
+    details: { type: Object, default: {} },
+    createdAt: { type: Date, default: Date.now, index: true },
+});
+
+const AdminUserMetaSchema = new mongoose.Schema({
+    userEmail: { type: String, required: true, unique: true },
+    notes: { type: String, default: '' },
+    suspended: { type: Boolean, default: false },
+    suspendedAt: { type: Date, default: null },
+    suspendedBy: { type: String, default: null },
+    updatedAt: { type: Date, default: Date.now },
+});
+
+const GlobalSettingsSchema = new mongoose.Schema({
+    key: { type: String, required: true, unique: true, default: 'global' },
+    guestInvoiceLimit: { type: Number, default: GUEST_INVOICE_LIMIT },
+    freeInvoiceLimit: { type: Number, default: FREE_INVOICE_LIMIT },
+    standardInvoiceLimit: { type: Number, default: STANDARD_INVOICE_LIMIT },
+    updatedAt: { type: Date, default: Date.now },
+});
+
+const EmailTemplateSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    subject: { type: String, default: '' },
+    body: { type: String, default: '' },
+    createdAt: { type: Date, default: Date.now },
+});
+
+const ScheduledEmailSchema = new mongoose.Schema({
+    subject: { type: String, required: true },
+    message: { type: String, required: true },
+    segment: { type: String, default: 'all' },
+    sendAt: { type: Date, required: true, index: true },
+    status: { type: String, default: 'pending' }, // pending|sending|sent|failed|canceled
+    createdBy: String,
+    createdAt: { type: Date, default: Date.now },
+    sentAt: Date,
+    result: Object,
+});
+
+const WebhookEventSchema = new mongoose.Schema({
+    provider: { type: String, default: 'stripe' },
+    eventId: { type: String, index: true },
+    type: String,
+    status: { type: String, default: 'received' }, // received|processed|failed|replayed
+    error: { type: String, default: null },
+    payload: Object,
+    createdAt: { type: Date, default: Date.now, index: true },
+});
+
+const EmailBounceSchema = new mongoose.Schema({
+    email: { type: String, required: true, index: true },
+    type: { type: String, default: 'bounce' }, // bounce|complaint|delivery_delayed
+    reason: { type: String, default: '' },
+    createdAt: { type: Date, default: Date.now, index: true },
+});
+
 const InvoiceModel = mongoose.models.Invoice || mongoose.model('Invoice', InvoiceSchema);
 const ItemModel = mongoose.models.Item || mongoose.model('Item', ItemSchema);
 const CustomerModel = mongoose.models.Customer || mongoose.model('Customer', CustomerSchema);
@@ -101,6 +164,13 @@ const SettingsModel = mongoose.models.Settings || mongoose.model('Settings', Set
 const TokenModel = mongoose.models.Token || mongoose.model('Token', TokenSchema);
 const SubscriptionModel = mongoose.models.Subscription || mongoose.model('Subscription', SubscriptionSchema);
 const PromoModel = mongoose.models.Promo || mongoose.model('Promo', PromoSchema);
+const AuditLogModel = mongoose.models.AuditLog || mongoose.model('AuditLog', AuditLogSchema);
+const AdminUserMetaModel = mongoose.models.AdminUserMeta || mongoose.model('AdminUserMeta', AdminUserMetaSchema);
+const GlobalSettingsModel = mongoose.models.GlobalSettings || mongoose.model('GlobalSettings', GlobalSettingsSchema);
+const EmailTemplateModel = mongoose.models.EmailTemplate || mongoose.model('EmailTemplate', EmailTemplateSchema);
+const ScheduledEmailModel = mongoose.models.ScheduledEmail || mongoose.model('ScheduledEmail', ScheduledEmailSchema);
+const WebhookEventModel = mongoose.models.WebhookEvent || mongoose.model('WebhookEvent', WebhookEventSchema);
+const EmailBounceModel = mongoose.models.EmailBounce || mongoose.model('EmailBounce', EmailBounceSchema);
 
 const connectDB = async () => {
     if (_isConnected) return;
@@ -488,6 +558,367 @@ async function applyPromoToUser(code, userEmail) {
     return { success: true, planGranted: promo.planGrant, durationDays: promo.durationDays };
 }
 
+// ── Audit log ──────────────────────────────────────────────────────────────
+
+async function logAdminAction(adminEmail, action, target, details) {
+    if (!_isConnected) return false;
+    try {
+        await AuditLogModel.create({
+            adminEmail,
+            action,
+            target: target || null,
+            details: details || {},
+        });
+        return true;
+    } catch (err) {
+        console.error('[admin] logAdminAction error:', err.message);
+        return false;
+    }
+}
+
+async function getAuditLog(limit = 200) {
+    if (!_isConnected) return [];
+    try {
+        return await AuditLogModel.find({}).sort({ createdAt: -1 }).limit(limit).lean();
+    } catch { return []; }
+}
+
+// ── User detail ────────────────────────────────────────────────────────────
+
+async function getUserDetail(userEmail) {
+    if (!_isConnected) return null;
+    try {
+        const [invoices, customers, items, settings, subscription] = await Promise.all([
+            InvoiceModel.find({ userEmail }).sort({ createdAt: -1 }).lean(),
+            CustomerModel.find({ userEmail }).lean(),
+            ItemModel.find({ userEmail }).lean(),
+            SettingsModel.findOne({ userEmail }).lean(),
+            SubscriptionModel.findOne({ userEmail }).lean(),
+        ]);
+        return { invoices, customers, items, settings, subscription };
+    } catch (err) {
+        console.error('[admin] getUserDetail error:', err.message);
+        return null;
+    }
+}
+
+// ── Promo conversion stats ─────────────────────────────────────────────────
+
+async function getPromoStats() {
+    if (!_isConnected) return {};
+    try {
+        const [promos, paidSubs] = await Promise.all([
+            PromoModel.find({}, { code: 1, usedBy: 1 }).lean(),
+            SubscriptionModel.find(
+                { status: { $in: ['active', 'trialing'] }, plan: { $in: ['standard', 'max', 'pro'] } },
+                { userEmail: 1 }
+            ).lean(),
+        ]);
+        const paidSet = new Set(paidSubs.map(s => s.userEmail));
+        const stats = {};
+        promos.forEach(p => {
+            const usedBy = p.usedBy || [];
+            stats[p.code] = {
+                used: usedBy.length,
+                converted: usedBy.filter(e => paidSet.has(e)).length,
+            };
+        });
+        return stats;
+    } catch { return {}; }
+}
+
+// ── Revenue metrics (MRR / ARR / churn) ────────────────────────────────────
+
+async function getRevenueMetrics() {
+    if (!_isConnected) return null;
+    try {
+        const subs = await SubscriptionModel.find({}).lean();
+        let mrr = 0;
+        const byPlan = { standard: 0, max: 0 };
+        let activePaid = 0;
+        const now = Date.now();
+
+        subs.forEach(s => {
+            const active = (s.status === 'active' || s.status === 'trialing')
+                && (!s.currentPeriodEnd || s.currentPeriodEnd * 1000 > now);
+            if (!active) return;
+            const plan = s.plan === 'pro' ? 'standard' : s.plan;
+            if (plan !== 'standard' && plan !== 'max') return;
+            activePaid++;
+            byPlan[plan]++;
+            // Manual admin overrides have no Stripe revenue.
+            if (s.interval === 'manual') return;
+            const interval = s.interval === 'year' ? 'annual' : 'monthly';
+            const price = PRICING[`${plan}_${interval}`];
+            if (price) mrr += interval === 'annual' ? price.amount / 12 : price.amount;
+        });
+
+        const churned30 = subs.filter(s =>
+            s.status === 'canceled' && s.updatedAt
+            && (now - new Date(s.updatedAt).getTime()) < 30 * 86400000,
+        ).length;
+        const churnBase = activePaid + churned30;
+
+        return {
+            mrr: Math.round(mrr),
+            arr: Math.round(mrr * 12),
+            activePaid,
+            byPlan,
+            arpu: activePaid > 0 ? Math.round(mrr / activePaid) : 0,
+            churned30,
+            churnRate: churnBase > 0 ? Number(((churned30 / churnBase) * 100).toFixed(1)) : 0,
+        };
+    } catch (err) {
+        console.error('[admin] getRevenueMetrics error:', err.message);
+        return null;
+    }
+}
+
+// ── Dunning (failed payments) ───────────────────────────────────────────────
+
+async function getDunningUsers() {
+    if (!_isConnected) return [];
+    try {
+        const subs = await SubscriptionModel.find({
+            status: { $in: ['past_due', 'unpaid', 'incomplete'] },
+        }).lean();
+        return subs.map(s => ({
+            email: s.userEmail,
+            plan: s.plan,
+            status: s.status,
+            stripeCustomerId: s.stripeCustomerId || null,
+            stripeSubscriptionId: s.stripeSubscriptionId || null,
+            currentPeriodEnd: s.currentPeriodEnd || null,
+            updatedAt: s.updatedAt || null,
+        }));
+    } catch { return []; }
+}
+
+// ── Admin user meta (notes + suspension) ───────────────────────────────────
+
+let _suspendedCache = new Set();
+let _suspendedCacheAt = 0;
+
+async function refreshSuspendedCache() {
+    if (!_isConnected) { _suspendedCache = new Set(); return; }
+    try {
+        const docs = await AdminUserMetaModel.find({ suspended: true }, { userEmail: 1 }).lean();
+        _suspendedCache = new Set(docs.map(d => String(d.userEmail).toLowerCase()));
+        _suspendedCacheAt = Date.now();
+    } catch { /* keep stale cache */ }
+}
+
+async function isUserSuspended(email) {
+    if (!email || !_isConnected) return false;
+    try {
+        if (Date.now() - _suspendedCacheAt > 30000) await refreshSuspendedCache();
+        return _suspendedCache.has(String(email).toLowerCase());
+    } catch { return false; }
+}
+
+async function getUserMeta(userEmail) {
+    if (!_isConnected) return null;
+    try { return await AdminUserMetaModel.findOne({ userEmail }).lean(); }
+    catch { return null; }
+}
+
+async function setUserNotes(userEmail, notes) {
+    if (!_isConnected) return false;
+    try {
+        await AdminUserMetaModel.findOneAndUpdate(
+            { userEmail },
+            { $set: { notes: String(notes || ''), updatedAt: new Date() } },
+            { upsert: true },
+        );
+        return true;
+    } catch { return false; }
+}
+
+async function setUserSuspended(userEmail, suspended, by) {
+    if (!_isConnected) return false;
+    try {
+        await AdminUserMetaModel.findOneAndUpdate(
+            { userEmail },
+            { $set: {
+                suspended: !!suspended,
+                suspendedAt: suspended ? new Date() : null,
+                suspendedBy: suspended ? (by || null) : null,
+                updatedAt: new Date(),
+            } },
+            { upsert: true },
+        );
+        const key = String(userEmail).toLowerCase();
+        if (suspended) _suspendedCache.add(key); else _suspendedCache.delete(key);
+        return true;
+    } catch { return false; }
+}
+
+// ── Global settings (configurable limits) ──────────────────────────────────
+
+let _globalSettingsCache = null;
+let _globalSettingsCacheAt = 0;
+
+function _defaultGlobalSettings() {
+    return {
+        guestInvoiceLimit: GUEST_INVOICE_LIMIT,
+        freeInvoiceLimit: FREE_INVOICE_LIMIT,
+        standardInvoiceLimit: STANDARD_INVOICE_LIMIT,
+    };
+}
+
+async function getGlobalSettings() {
+    const fallback = _defaultGlobalSettings();
+    if (!_isConnected) return fallback;
+    if (_globalSettingsCache && Date.now() - _globalSettingsCacheAt < 30000) {
+        return _globalSettingsCache;
+    }
+    try {
+        let doc = await GlobalSettingsModel.findOne({ key: 'global' }).lean();
+        if (!doc) doc = (await GlobalSettingsModel.create({ key: 'global' })).toObject();
+        _globalSettingsCache = { ...fallback, ...doc };
+        _globalSettingsCacheAt = Date.now();
+        return _globalSettingsCache;
+    } catch {
+        return fallback;
+    }
+}
+
+async function updateGlobalSettings(patch) {
+    if (!_isConnected) return null;
+    try {
+        const allowed = ['guestInvoiceLimit', 'freeInvoiceLimit', 'standardInvoiceLimit'];
+        const sanitized = { updatedAt: new Date() };
+        allowed.forEach(k => {
+            if (patch[k] !== undefined) {
+                const n = Number(patch[k]);
+                if (Number.isFinite(n) && n >= 0) sanitized[k] = n;
+            }
+        });
+        const doc = await GlobalSettingsModel.findOneAndUpdate(
+            { key: 'global' }, { $set: sanitized }, { new: true, upsert: true, lean: true },
+        );
+        _globalSettingsCache = null;
+        return doc;
+    } catch (err) {
+        console.error('[admin] updateGlobalSettings error:', err.message);
+        return null;
+    }
+}
+
+// ── Email templates ─────────────────────────────────────────────────────────
+
+async function getEmailTemplates() {
+    if (!_isConnected) return [];
+    try { return await EmailTemplateModel.find({}).sort({ createdAt: -1 }).lean(); }
+    catch { return []; }
+}
+
+async function createEmailTemplate(data) {
+    if (!_isConnected) return null;
+    try { return (await EmailTemplateModel.create(data)).toObject(); }
+    catch { return null; }
+}
+
+async function deleteEmailTemplate(id) {
+    if (!_isConnected) return false;
+    try { await EmailTemplateModel.deleteOne({ _id: id }); return true; }
+    catch { return false; }
+}
+
+// ── Scheduled emails ────────────────────────────────────────────────────────
+
+async function getScheduledEmails() {
+    if (!_isConnected) return [];
+    try { return await ScheduledEmailModel.find({}).sort({ sendAt: -1 }).limit(100).lean(); }
+    catch { return []; }
+}
+
+async function createScheduledEmail(data) {
+    if (!_isConnected) return null;
+    try { return (await ScheduledEmailModel.create(data)).toObject(); }
+    catch { return null; }
+}
+
+async function cancelScheduledEmail(id) {
+    if (!_isConnected) return false;
+    try {
+        const doc = await ScheduledEmailModel.findOneAndUpdate(
+            { _id: id, status: 'pending' }, { $set: { status: 'canceled' } }, { new: true },
+        );
+        return !!doc;
+    } catch { return false; }
+}
+
+async function getDueScheduledEmails() {
+    if (!_isConnected) return [];
+    try {
+        return await ScheduledEmailModel.find({ status: 'pending', sendAt: { $lte: new Date() } }).lean();
+    } catch { return []; }
+}
+
+// Atomically claim a scheduled email so the poller never double-sends.
+async function claimScheduledEmail(id) {
+    if (!_isConnected) return null;
+    try {
+        return await ScheduledEmailModel.findOneAndUpdate(
+            { _id: id, status: 'pending' }, { $set: { status: 'sending' } }, { new: true, lean: true },
+        );
+    } catch { return null; }
+}
+
+async function markScheduledEmail(id, status, result) {
+    if (!_isConnected) return;
+    try {
+        await ScheduledEmailModel.updateOne(
+            { _id: id },
+            { $set: { status, result: result || null, sentAt: new Date() } },
+        );
+    } catch { /* ignore */ }
+}
+
+// ── Webhook event log ───────────────────────────────────────────────────────
+
+async function logWebhookEvent(data) {
+    if (!_isConnected) return null;
+    try { return (await WebhookEventModel.create(data)).toObject(); }
+    catch { return null; }
+}
+
+async function getWebhookEvents(limit = 100) {
+    if (!_isConnected) return [];
+    try { return await WebhookEventModel.find({}).sort({ createdAt: -1 }).limit(limit).lean(); }
+    catch { return []; }
+}
+
+async function getWebhookEvent(id) {
+    if (!_isConnected) return null;
+    try { return await WebhookEventModel.findById(id).lean(); }
+    catch { return null; }
+}
+
+async function markWebhookEvent(id, status, error) {
+    if (!_isConnected) return;
+    try {
+        await WebhookEventModel.updateOne({ _id: id }, { $set: { status, error: error || null } });
+    } catch { /* ignore */ }
+}
+
+// ── Email bounces ───────────────────────────────────────────────────────────
+
+async function recordBounce(email, type, reason) {
+    if (!_isConnected) return false;
+    try {
+        await EmailBounceModel.create({ email, type: type || 'bounce', reason: reason || '' });
+        return true;
+    } catch { return false; }
+}
+
+async function getBounces(limit = 100) {
+    if (!_isConnected) return [];
+    try { return await EmailBounceModel.find({}).sort({ createdAt: -1 }).limit(limit).lean(); }
+    catch { return []; }
+}
+
 module.exports = {
     connectDB,
     InvoiceModel,
@@ -497,6 +928,7 @@ module.exports = {
     TokenModel,
     SubscriptionModel,
     PromoModel,
+    AuditLogModel,
     getUserInvoices,
     saveSingleInvoice,
     saveUserInvoices_FS,
@@ -518,5 +950,34 @@ module.exports = {
     updatePromo,
     deletePromo,
     applyPromoToUser,
+    logAdminAction,
+    getAuditLog,
+    getUserDetail,
+    getPromoStats,
+    getRevenueMetrics,
+    getDunningUsers,
+    isUserSuspended,
+    getUserMeta,
+    setUserNotes,
+    setUserSuspended,
+    getGlobalSettings,
+    updateGlobalSettings,
+    getEmailTemplates,
+    createEmailTemplate,
+    deleteEmailTemplate,
+    getScheduledEmails,
+    createScheduledEmail,
+    cancelScheduledEmail,
+    getDueScheduledEmails,
+    claimScheduledEmail,
+    markScheduledEmail,
+    logWebhookEvent,
+    getWebhookEvents,
+    getWebhookEvent,
+    markWebhookEvent,
+    recordBounce,
+    getBounces,
+    AdminUserMetaModel,
+    WebhookEventModel,
     isConnected: () => _isConnected
 };

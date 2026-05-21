@@ -46,6 +46,12 @@ export {
   Zap,
   Star,
   BadgeCheck,
+  Download,
+  RotateCcw,
+  Ban,
+  Clock,
+  HeartPulse,
+  Database,
 } from 'lucide-react'
 
 export const ICON_SM = 14
