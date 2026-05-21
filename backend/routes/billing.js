@@ -1,7 +1,10 @@
 'use strict';
 
 const { sendJson, readRawBody, parseBody } = require('../lib/utils');
-const { getSubscription, saveSubscription, getSubscriptionByCustomerId } = require('../lib/storage');
+const {
+    getSubscription, saveSubscription, getSubscriptionByCustomerId,
+    logWebhookEvent, markWebhookEvent,
+} = require('../lib/storage');
 const { isPro, isMax } = require('../lib/plan');
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
@@ -41,60 +44,80 @@ async function handleWebhook(req, res) {
         return sendJson(res, 400, { error: `Webhook signature error: ${err.message}` });
     }
 
-    const obj = event.data.object;
+    let logged = null;
+    try {
+        logged = await logWebhookEvent({
+            provider: 'stripe',
+            eventId: event.id,
+            type: event.type,
+            status: 'received',
+            payload: event,
+        });
+    } catch { /* logging is best-effort */ }
 
     try {
-        if (event.type === 'checkout.session.completed') {
-            const userEmail = obj.metadata?.userEmail;
-            const subscriptionId = obj.subscription;
-            if (userEmail && subscriptionId) {
-                const sub = await stripe.subscriptions.retrieve(subscriptionId);
-                const priceId = sub.items.data[0]?.price?.id;
-                await saveSubscription(userEmail, {
-                    stripeCustomerId: obj.customer,
-                    stripeSubscriptionId: subscriptionId,
-                    plan: getPlanFromPriceId(priceId),
-                    status: sub.status,
-                    interval: sub.items.data[0]?.price?.recurring?.interval || 'month',
-                    currentPeriodEnd: sub.current_period_end,
-                });
-            }
-        } else if (event.type === 'customer.subscription.updated') {
-            const sub = obj;
-            const existing = await getSubscriptionByCustomerId(sub.customer);
-            const userEmail = existing?.userEmail;
-            if (userEmail) {
-                const isActive = sub.status === 'active' || sub.status === 'trialing';
-                const priceId = sub.items.data[0]?.price?.id;
-                await saveSubscription(userEmail, {
-                    stripeCustomerId: sub.customer,
-                    stripeSubscriptionId: sub.id,
-                    plan: isActive ? getPlanFromPriceId(priceId) : 'free',
-                    status: sub.status,
-                    interval: sub.items.data[0]?.price?.recurring?.interval || 'month',
-                    currentPeriodEnd: sub.current_period_end,
-                });
-            }
-        } else if (event.type === 'customer.subscription.deleted') {
-            const sub = obj;
-            const existing = await getSubscriptionByCustomerId(sub.customer);
-            const userEmail = existing?.userEmail;
-            if (userEmail) {
-                await saveSubscription(userEmail, {
-                    stripeCustomerId: sub.customer,
-                    stripeSubscriptionId: sub.id,
-                    plan: 'free',
-                    status: 'canceled',
-                    interval: existing.interval,
-                    currentPeriodEnd: sub.current_period_end,
-                });
-            }
-        }
+        await processStripeEvent(event);
+        if (logged?._id) await markWebhookEvent(logged._id, 'processed', null);
     } catch (err) {
         console.error('[billing] Webhook handler error:', err.message);
+        if (logged?._id) await markWebhookEvent(logged._id, 'failed', err.message);
     }
 
     return sendJson(res, 200, { received: true });
+}
+
+// Applies a Stripe event to our subscription store. Pure of HTTP so it can be
+// re-run from the admin webhook event log (replay).
+async function processStripeEvent(event) {
+    if (!stripe) throw new Error('Stripe not configured');
+    const obj = event.data.object;
+
+    if (event.type === 'checkout.session.completed') {
+        const userEmail = obj.metadata?.userEmail;
+        const subscriptionId = obj.subscription;
+        if (userEmail && subscriptionId) {
+            const sub = await stripe.subscriptions.retrieve(subscriptionId);
+            const priceId = sub.items.data[0]?.price?.id;
+            await saveSubscription(userEmail, {
+                stripeCustomerId: obj.customer,
+                stripeSubscriptionId: subscriptionId,
+                plan: getPlanFromPriceId(priceId),
+                status: sub.status,
+                interval: sub.items.data[0]?.price?.recurring?.interval || 'month',
+                currentPeriodEnd: sub.current_period_end,
+            });
+        }
+    } else if (event.type === 'customer.subscription.updated') {
+        const sub = obj;
+        const existing = await getSubscriptionByCustomerId(sub.customer);
+        const userEmail = existing?.userEmail;
+        if (userEmail) {
+            const isActive = sub.status === 'active' || sub.status === 'trialing';
+            const priceId = sub.items.data[0]?.price?.id;
+            await saveSubscription(userEmail, {
+                stripeCustomerId: sub.customer,
+                stripeSubscriptionId: sub.id,
+                plan: isActive ? getPlanFromPriceId(priceId) : 'free',
+                status: sub.status,
+                interval: sub.items.data[0]?.price?.recurring?.interval || 'month',
+                currentPeriodEnd: sub.current_period_end,
+            });
+        }
+    } else if (event.type === 'customer.subscription.deleted') {
+        const sub = obj;
+        const existing = await getSubscriptionByCustomerId(sub.customer);
+        const userEmail = existing?.userEmail;
+        if (userEmail) {
+            await saveSubscription(userEmail, {
+                stripeCustomerId: sub.customer,
+                stripeSubscriptionId: sub.id,
+                plan: 'free',
+                status: 'canceled',
+                interval: existing.interval,
+                currentPeriodEnd: sub.current_period_end,
+            });
+        }
+    }
 }
 
 function getPlanFromPriceId(priceId) {
@@ -187,4 +210,4 @@ function attachProtected(router) {
     });
 }
 
-module.exports = { attachPublic, attachProtected };
+module.exports = { attachPublic, attachProtected, processStripeEvent };

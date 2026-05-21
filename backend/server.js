@@ -6,9 +6,10 @@ const cookieSession = require('cookie-session');
 require('@dotenvx/dotenvx').config({ path: path.join(__dirname, '..', '.env') });
 
 const { logDebug, sendJson, sendNotFound, SECURITY_HEADERS } = require('./lib/utils');
-const { connectDB } = require('./lib/storage');
+const { connectDB, isUserSuspended } = require('./lib/storage');
 const { getCurrentUserEmail } = require('./lib/auth');
 const { createRouter } = require('./routes/router');
+const { startScheduler } = require('./lib/scheduler');
 
 const isProd = process.env.NODE_ENV === 'production';
 const port = process.env.PORT || 5500;
@@ -51,6 +52,7 @@ const STATIC_MIMES = {
 
 // Build dispatch tables once at startup
 const billing = require('./routes/billing');
+const admin = require('./routes/admin');
 
 const publicRouter = createRouter();
 publicRouter.add('GET', '/health', ({ res }) => sendJson(res, 200, { status: 'ok' }));
@@ -60,6 +62,7 @@ require('./routes/vat').attach(publicRouter);
 require('./routes/exchangeRate').attach(publicRouter);
 require('./routes/auth').attach(publicRouter);
 billing.attachPublic(publicRouter);
+admin.attachPublic(publicRouter);
 
 const protectedRouter = createRouter();
 require('./routes/invoices').attach(protectedRouter);
@@ -70,7 +73,7 @@ require('./routes/drive').attach(protectedRouter);
 require('./routes/export').attach(protectedRouter);
 require('./routes/email').attach(protectedRouter);
 require('./routes/ai').attach(protectedRouter);
-require('./routes/admin').attach(protectedRouter);
+admin.attach(protectedRouter);
 billing.attachProtected(protectedRouter);
 
 function serveStatic(req, res, requestPath) {
@@ -126,11 +129,26 @@ const handleRequest = async (req, res) => {
     if (await publicRouter.dispatch(ctx)) return;
 
     if (requestPath.startsWith('/api/')) {
-        const userEmail = await getCurrentUserEmail(req);
-        if (!userEmail) {
+        const realEmail = await getCurrentUserEmail(req);
+        if (!realEmail) {
             return sendJson(res, 401, { error: 'Not authenticated', requireLogin: true });
         }
-        ctx.userEmail = userEmail;
+        ctx.realUserEmail = realEmail;
+
+        // Admin impersonation: a session flag set by /api/admin/impersonate.
+        // Only honored when the real session user is an admin.
+        let effective = realEmail;
+        const realIsAdmin = admin.isAdmin(realEmail);
+        if (realIsAdmin && req.session && req.session.impersonate) {
+            effective = req.session.impersonate;
+        }
+        ctx.userEmail = effective;
+
+        // Suspended users are locked out of the API. Admins are never blocked
+        // (so impersonation can still debug a suspended account). Fails open.
+        if (!realIsAdmin && !admin.isAdmin(effective) && await isUserSuspended(effective)) {
+            return sendJson(res, 403, { error: 'Account suspended', suspended: true });
+        }
     }
 
     if (await protectedRouter.dispatch(ctx)) return;
@@ -158,6 +176,7 @@ if (require.main === module) {
     server.listen(port, '0.0.0.0', () =>
         console.log(`[server] Running at http://0.0.0.0:${port}/ (${isProd ? 'production' : 'development'})`)
     );
+    startScheduler();
 }
 
 module.exports = requestHandler;
