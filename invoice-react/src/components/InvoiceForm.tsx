@@ -1088,6 +1088,14 @@ export default function InvoiceForm({
                 {lang === 'cs' ? 'Souhrn' : 'Summary'}
             </h3>
             <div style={{ display: 'grid', gap: 8 }}>
+                {formData.clientName && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderBottom: '1px dashed var(--border)', paddingBottom: 8, marginBottom: 4 }}>
+                        <span style={{ color: 'var(--muted)' }}>{lang === 'cs' ? 'Odběratel' : 'Client'}</span>
+                        <span style={{ fontWeight: 600, maxWidth: '65%', textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={formData.clientName}>
+                            {formData.clientName}
+                        </span>
+                    </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                     <span style={{ color: 'var(--muted)' }}>{lang === 'cs' ? 'Mezisoučet' : 'Subtotal'}</span>
                     <span style={{ fontFamily: 'var(--font-secondary, inherit)', fontWeight: 500 }}>{formData.taxBase} {formData.currency}</span>
