@@ -1089,9 +1089,11 @@ export default function InvoiceForm({
             </h3>
             <div style={{ display: 'grid', gap: 8 }}>
                 {formData.clientName && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderBottom: '1px dashed var(--border)', paddingBottom: 8, marginBottom: 4 }}>
-                        <span style={{ color: 'var(--muted)' }}>{lang === 'cs' ? 'Odběratel' : 'Client'}</span>
-                        <span style={{ fontWeight: 600, maxWidth: '65%', textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={formData.clientName}>
+                    <div style={{ display: 'grid', gap: 2, borderBottom: '1px dashed var(--border)', paddingBottom: 8, marginBottom: 4 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                            {lang === 'cs' ? 'Odběratel' : 'Client'}
+                        </span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={formData.clientName}>
                             {formData.clientName}
                         </span>
                     </div>
