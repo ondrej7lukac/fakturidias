@@ -868,7 +868,7 @@ export default function InvoiceForm({
                 : 'You must be logged in to send emails.')
         }
         const currentData = getCurrentInvoiceData()
-        if (!currentData.client.email) {
+        if (!currentData.client.email && !currentData.client.emailCopy) {
             return alert(t.alertEmailMissing)
         }
         setIsGenerating(true)

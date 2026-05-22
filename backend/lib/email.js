@@ -59,7 +59,10 @@ async function sendEmail(invoice, pdfBase64, lang) {
         throw err;
     }
 
-    const toEmail = invoice?.client?.email;
+    let toEmail = invoice?.client?.email;
+    if (!toEmail && invoice?.client?.emailCopy) {
+        toEmail = invoice.client.emailCopy;
+    }
     if (!toEmail) {
         const err = new Error('Client email is missing');
         err.statusCode = 400;
@@ -70,7 +73,9 @@ async function sendEmail(invoice, pdfBase64, lang) {
     const senderName = invoice?.supplier?.name || 'Fakturidias';
     const from = `${senderName} <${senderSlug}@fakturidias.app>`;
     const to = [toEmail];
-    if (invoice?.client?.emailCopy) to.push(invoice.client.emailCopy);
+    if (invoice?.client?.emailCopy && invoice.client.emailCopy !== toEmail) {
+        to.push(invoice.client.emailCopy);
+    }
 
     const subject = lang === 'cs'
         ? `Faktura ${invoice.invoiceNumber}`
