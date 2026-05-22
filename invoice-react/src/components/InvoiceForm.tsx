@@ -1096,6 +1096,26 @@ export default function InvoiceForm({
                         </span>
                     </div>
                 )}
+                {items && items.some(it => it.name && it.name.trim() !== '') && (
+                    <div style={{ display: 'grid', gap: 6, padding: '2px 0 8px', borderBottom: '1px dashed var(--border)', marginBottom: 4 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 2 }}>
+                            {lang === 'cs' ? 'Položky' : 'Items'}
+                        </div>
+                        {items.map((it, idx) => {
+                            if (!it.name || !it.name.trim()) return null
+                            return (
+                                <div key={it.id || idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                    <span style={{ color: 'var(--muted)', maxWidth: '65%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {it.name} <span style={{ fontSize: 10, color: 'var(--muted2)' }}>({it.qty} {it.unit || 'ks'})</span>
+                                    </span>
+                                    <span style={{ fontFamily: 'var(--font-secondary, inherit)', fontWeight: 500 }}>
+                                        {money(it.total)}
+                                    </span>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                     <span style={{ color: 'var(--muted)' }}>{lang === 'cs' ? 'Mezisoučet' : 'Subtotal'}</span>
                     <span style={{ fontFamily: 'var(--font-secondary, inherit)', fontWeight: 500 }}>{formData.taxBase} {formData.currency}</span>
