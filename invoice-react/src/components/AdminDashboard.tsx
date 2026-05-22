@@ -895,7 +895,7 @@ function UserDetailDrawer({
             <span className="admin-drawer__email">{email}</span>
             {suspended && <span className="admin-suspended-tag">Suspended</span>}
           </div>
-          <button className="admin-copy-btn" onClick={onClose} title="Close">
+          <button className="admin-copy-btn" onClick={onClose} title="Close" aria-label="Close drawer">
             <X size={ICON_MD} strokeWidth={STROKE} />
           </button>
         </div>
@@ -2138,15 +2138,17 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="admin-tabs">
+      <div className="admin-tabs" role="tablist" aria-label="Admin sections">
         {tabs.map(t => (
           <button
             key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
             className={`admin-tab ${tab === t.id ? 'admin-tab--active' : ''}`}
             onClick={() => setTab(t.id)}
           >
             {t.icon}
-            {t.label}
+            <span className="admin-tab-label">{t.label}</span>
           </button>
         ))}
       </div>
