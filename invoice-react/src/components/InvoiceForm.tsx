@@ -81,7 +81,20 @@ export default function InvoiceForm({
         taxAmount: '0.00'
     })
 
-    const [items, setItems] = useState([])
+    const [items, setItems] = useState<any[]>([
+        {
+            id: randomUUID(),
+            name: '',
+            qty: 1,
+            unit: 'ks',
+            price: 0,
+            discount: 0,
+            taxRate: 21,
+            subtotal: 0,
+            taxAmount: 0,
+            total: 0
+        }
+    ])
     const stateRef = useRef({ formData, items })
     const itemSuggestionsRef = useRef(null)
     // Stable ID for this new-invoice session — generated once, reused across all auto-saves
@@ -220,9 +233,22 @@ export default function InvoiceForm({
                 taxRate: prev.taxRate,
                 taxAmount: '0.00'
             }))
-            setItems([])  // ← ONLY cleared here, when truly starting a new invoice
+            setItems([
+                {
+                    id: randomUUID(),
+                    name: '',
+                    qty: 1,
+                    unit: 'ks',
+                    price: 0,
+                    discount: 0,
+                    taxRate: defaultSupplier?.isVatPayer ? 21 : 0,
+                    subtotal: 0,
+                    taxAmount: 0,
+                    total: 0
+                }
+            ])  // ← Clear to one empty item with default unit ks when truly starting a new invoice
         }
-    }, [invoice]) // ← ONLY invoice as dependency
+    }, [invoice, defaultSupplier]) // ← Added defaultSupplier dependency
 
     // ─── Effect 2: Generate invoice number once invoices are loaded ────────────
     useEffect(() => {
@@ -725,7 +751,7 @@ export default function InvoiceForm({
             id: randomUUID(),
             name: '',
             qty: 1,
-            unit: 'h',
+            unit: 'ks',
             price: 0,
             discount: 0,
             taxRate: formData.isVatPayer ? 21 : 0,
@@ -1355,11 +1381,11 @@ export default function InvoiceForm({
                                     />
                                     <select
                                         className="ap-select"
-                                        value={(it as any).unit || 'h'}
+                                        value={(it as any).unit || 'ks'}
                                         onChange={e => updateItem(i, 'unit', e.target.value)}
                                     >
-                                        <option value="h">{lang === 'cs' ? 'h' : 'h'}</option>
                                         <option value="ks">{lang === 'cs' ? 'ks' : 'pcs'}</option>
+                                        <option value="h">{lang === 'cs' ? 'h' : 'h'}</option>
                                         <option value="m">{lang === 'cs' ? 'měsíc' : 'month'}</option>
                                     </select>
                                     <input

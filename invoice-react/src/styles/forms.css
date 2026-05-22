@@ -61,3 +61,23 @@ select {
     min-width: 0 !important;
   }
 }
+
+/* Styling for option dropdowns to fix dark mode contrast issues in native selects */
+select option {
+  background-color: #ffffff;
+  color: #0f1430;
+}
+
+html.theme-dark select option,
+.dark select option {
+  background-color: #121833;
+  color: #e9ecff;
+}
+
+@media (prefers-color-scheme: dark) {
+  select option {
+    background-color: #121833;
+    color: #e9ecff;
+  }
+}
+
