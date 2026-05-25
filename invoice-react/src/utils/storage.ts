@@ -1,15 +1,3 @@
-// Helper to get current user ID
-export function getUserId() {
-    try {
-        const config = localStorage.getItem('smtpConfig');
-        if (config) {
-            const { fromEmail } = JSON.parse(config);
-            return fromEmail || 'default';
-        }
-    } catch (e) { }
-    return 'default';
-}
-
 // Server-based storage functions
 
 

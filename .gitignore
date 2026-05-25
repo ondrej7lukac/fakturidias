@@ -38,6 +38,12 @@ Thumbs.db
 # Data storage
 data/
 
+# E2E test generated files and reports
+e2e/.features-gen/
+e2e/node_modules/
+e2e/playwright-report/
+e2e/test-results/
+
 # Local Documentation & Guides
 VERCEL_SETUP_REQUIRED.md
 VERCEL_DEPLOYMENT_GUIDE.md

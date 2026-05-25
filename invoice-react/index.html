@@ -291,23 +291,7 @@
     }
     </script>
 
-    <!-- ── Google Analytics 4 ────────────────────────────────────────────────── -->
-    <!-- Consent Mode v2: storage denied by default until user accepts cookie banner -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=%VITE_GA4_ID%"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('consent', 'default', {
-            analytics_storage: 'denied',
-            ad_storage: 'denied',
-            ad_user_data: 'denied',
-            ad_personalization: 'denied',
-            wait_for_update: 500
-        });
-        gtag('config', '%VITE_GA4_ID%', { anonymize_ip: true });
-    </script>
-    <!-- Microsoft Clarity loaded conditionally by CookieBanner.tsx after user consent (VITE_CLARITY_ID) -->
+    <!-- Google Analytics 4 + Clarity loaded by src/analytics.ts; inline JSON-LD blocks above are type="application/ld+json" (non-executable, not subject to script-src) -->
 </head>
 
 <body>

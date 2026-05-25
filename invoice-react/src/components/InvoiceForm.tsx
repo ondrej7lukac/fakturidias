@@ -1,6 +1,6 @@
 import './InvoiceForm.css'
 import { useState, useEffect, useRef } from 'react'
-import { formatInvoiceNumber, addDays, formatDate, money, getUserId } from '../utils/storage'
+import { formatInvoiceNumber, addDays, formatDate, money } from '../utils/storage'
 import { searchAres, parseAresItem, lookupAresByIco } from '../utils/ares'
 import { Pencil, Eye, AlertTriangle, Cloud, FileText, RefreshCw, ArrowLeftRight, Check, Mail, Contact, Wallet, Search, X, Send, Save, ICON_MD, ICON_SM, STROKE } from '@/lib/icons'
 
@@ -132,7 +132,6 @@ export default function InvoiceForm({
     const [saveTimer, setSaveTimer] = useState(null)
     const [aresAutoFilled, setAresAutoFilled] = useState(false)
     const [supplierAresAutoFilled, setSupplierAresAutoFilled] = useState(false)
-    const pendingPreviewModeRef = useRef(false)
     const supplierSuggestionsRef = useRef(null)
     const supplierAresDebounceRef = useRef(null)
 
@@ -434,7 +433,7 @@ export default function InvoiceForm({
             if (invoiceData.client && invoiceData.client.name) {
                 fetch('/api/customers', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-user-id': getUserId() },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ customer: invoiceData.client })
                 }).catch(e => console.error(e))
             }
@@ -446,12 +445,12 @@ export default function InvoiceForm({
     useEffect(() => {
         const loadSavedData = async () => {
             try {
-                const resItems = await fetch('/api/items', { headers: { 'x-user-id': getUserId() } })
+                const resItems = await fetch('/api/items')
                 if (resItems.ok) {
                     const data = await resItems.json()
                     setSavedItems(data.items || [])
                 }
-                const resCust = await fetch('/api/customers', { headers: { 'x-user-id': getUserId() } })
+                const resCust = await fetch('/api/customers')
                 if (resCust.ok) {
                     const data = await resCust.json()
                     setSavedCustomers(data.customers || [])
@@ -690,10 +689,7 @@ export default function InvoiceForm({
         try {
             await fetch('/api/items', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-user-id': getUserId()
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     item: {
                         name: newItem.name,
@@ -702,7 +698,7 @@ export default function InvoiceForm({
                     }
                 })
             })
-            const response = await fetch('/api/items', { headers: { 'x-user-id': getUserId() } })
+            const response = await fetch('/api/items')
             if (response.ok) {
                 const data = await response.json()
                 setSavedItems(data.items || [])
@@ -985,15 +981,6 @@ export default function InvoiceForm({
                 return { id: randomUUID(), name: String(item.name || ''), qty, price, discount: 0, taxRate, subtotal, taxAmount, total: subtotal + taxAmount }
             }))
         }
-        if (pendingPreviewModeRef.current) {
-            setPreviewMode(true)
-            pendingPreviewModeRef.current = false
-        }
-    }
-
-    const handleAIPreview = (data: any) => {
-        pendingPreviewModeRef.current = true
-        handleAIFill(data)
     }
 
     // Supplier section — rendered in sidebar
@@ -1192,7 +1179,7 @@ export default function InvoiceForm({
                     <div className="ap-create__main">
 
                     {/* AI dictation card */}
-                    <AIPrompt lang={lang} onFillForm={handleAIFill} onPreviewInvoice={handleAIPreview} isGuest={!isAuthenticated} />
+                    <AIPrompt lang={lang} onFillForm={handleAIFill} isGuest={!isAuthenticated} />
 
                     {/* Region/Tax Warning */}
                     {defaultSupplier?.region === 'CZ' && defaultSupplier?.taxStatus === 'non-payer' && formData.clientCountry !== 'CZ' && (

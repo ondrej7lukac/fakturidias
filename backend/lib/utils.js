@@ -13,7 +13,22 @@ const SECURITY_HEADERS = {
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'SAMEORIGIN',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'X-Permitted-Cross-Domain-Policies': 'none'
+    'X-Permitted-Cross-Domain-Policies': 'none',
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+    'Content-Security-Policy': [
+        "default-src 'self'",
+        "script-src 'self' https://www.googletagmanager.com https://www.clarity.ms https://c.clarity.ms https://scripts.clarity.ms",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "img-src 'self' data: https:",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://region1.analytics.google.com https://www.googletagmanager.com https://www.clarity.ms https://c.clarity.ms https://scripts.clarity.ms https://e.clarity.ms",
+        "frame-src 'none'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'self'"
+    ].join('; '),
 };
 
 const CORS_HEADERS = {
@@ -44,7 +59,7 @@ function sendNotFound(res) {
     res.end('Not found');
 }
 
-function readJsonBody(req, callback) {
+function readJsonBody(req, callback, maxBytes = MAX_BODY_BYTES) {
     let data = '';
     let byteCount = 0;
     let settled = false;
@@ -58,7 +73,7 @@ function readJsonBody(req, callback) {
     req.on('data', (chunk) => {
         if (settled) return;
         byteCount += chunk.length;
-        if (byteCount > MAX_BODY_BYTES) {
+        if (byteCount > maxBytes) {
             done(new Error('Request body too large'));
             req.socket?.destroy();
             return;
@@ -76,9 +91,10 @@ function readJsonBody(req, callback) {
     req.on('error', (err) => done(err));
 }
 
-function parseBody(req) {
+function parseBody(req, options = {}) {
+    const maxBytes = options.maxBytes || MAX_BODY_BYTES;
     return new Promise((resolve, reject) => {
-        readJsonBody(req, (err, body) => (err ? reject(err) : resolve(body)));
+        readJsonBody(req, (err, body) => (err ? reject(err) : resolve(body)), maxBytes);
     });
 }
 

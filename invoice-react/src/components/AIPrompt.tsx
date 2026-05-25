@@ -1,5 +1,40 @@
 import { useState, useRef } from 'react'
-import { Sparkles, Mic, MicOff, X, ICON_MD, ICON_LG, ICON_SM, STROKE } from '@/lib/icons'
+import { Sparkles, Mic, MicOff, X, Camera, Upload, ScanLine, Loader2, ICON_MD, ICON_LG, ICON_SM, STROKE } from '@/lib/icons'
+
+const MAX_IMAGE_DIM = 1800
+const JPEG_QUALITY = 0.78
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
+
+async function resizeImage(file: File): Promise<{ base64: string; mimeType: string; dataUrl: string }> {
+    const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error('read-failed'))
+        reader.readAsDataURL(file)
+    })
+
+    const img: HTMLImageElement = await new Promise((resolve, reject) => {
+        const el = new Image()
+        el.onload = () => resolve(el)
+        el.onerror = () => reject(new Error('image-decode-failed'))
+        el.src = dataUrl
+    })
+
+    const scale = Math.min(1, MAX_IMAGE_DIM / Math.max(img.width, img.height))
+    const w = Math.max(1, Math.round(img.width * scale))
+    const h = Math.max(1, Math.round(img.height * scale))
+
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('canvas-unavailable')
+    ctx.drawImage(img, 0, 0, w, h)
+
+    const outUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY)
+    const base64 = outUrl.split(',')[1] || ''
+    return { base64, mimeType: 'image/jpeg', dataUrl: outUrl }
+}
 
 const SAMPLES = {
     cs: [
@@ -17,16 +52,19 @@ const SAMPLES = {
 interface AIPromptProps {
     lang: string
     onFillForm: (data: any) => void
-    onPreviewInvoice: (data: any) => void
     isGuest?: boolean
 }
 
-export default function AIPrompt({ lang, onFillForm, onPreviewInvoice, isGuest }: AIPromptProps) {
+export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
     const [prompt, setPrompt] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [isListening, setIsListening] = useState(false)
     const [error, setError] = useState('')
     const recognitionRef = useRef<any>(null)
+    const cameraInputRef = useRef<HTMLInputElement>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+    const [isScanning, setIsScanning] = useState(false)
+    const [scanPreview, setScanPreview] = useState<{ dataUrl: string; name: string } | null>(null)
 
     const isCz = lang === 'cs'
     const samples = SAMPLES[lang as keyof typeof SAMPLES] || SAMPLES.en
@@ -60,7 +98,51 @@ export default function AIPrompt({ lang, onFillForm, onPreviewInvoice, isGuest }
         setIsListening(true)
     }
 
-    const processPrompt = async (mode: 'form' | 'preview') => {
+    const handleImageFile = async (file: File | undefined | null) => {
+        if (!file) return
+        setError('')
+        if (file.size > 20 * 1024 * 1024) {
+            setError(isCz ? 'Soubor je příliš velký (max 20 MB).' : 'File is too large (max 20 MB).')
+            return
+        }
+        if (file.type && !ALLOWED_TYPES.includes(file.type)) {
+            setError(isCz ? 'Nepodporovaný formát obrázku.' : 'Unsupported image format.')
+            return
+        }
+
+        setIsScanning(true)
+        try {
+            const { base64, mimeType, dataUrl } = await resizeImage(file)
+            setScanPreview({ dataUrl, name: file.name || (isCz ? 'fotografie' : 'photo') })
+
+            const res = await fetch('/api/ai/invoice-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: base64, mimeType, lang }),
+            })
+            const result = await res.json()
+            if (!res.ok) throw new Error(result.message || result.error)
+            onFillForm(result.data)
+        } catch (err: any) {
+            setError(err?.message || (isCz ? 'Nepodařilo se přečíst fakturu z obrázku.' : 'Failed to read invoice from image.'))
+        } finally {
+            setIsScanning(false)
+        }
+    }
+
+    const onCameraChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const f = e.target.files?.[0]
+        e.target.value = ''
+        handleImageFile(f)
+    }
+
+    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const f = e.target.files?.[0]
+        e.target.value = ''
+        handleImageFile(f)
+    }
+
+    const processPrompt = async () => {
         const text = prompt.trim()
         if (!text) return
         setIsLoading(true)
@@ -73,8 +155,7 @@ export default function AIPrompt({ lang, onFillForm, onPreviewInvoice, isGuest }
             })
             const result = await res.json()
             if (!res.ok) throw new Error(result.message || result.error)
-            if (mode === 'form') onFillForm(result.data)
-            else onPreviewInvoice(result.data)
+            onFillForm(result.data)
         } catch (err: any) {
             setError(err.message || (isCz ? 'Chyba při zpracování.' : 'Processing failed.'))
         } finally {
@@ -128,7 +209,7 @@ export default function AIPrompt({ lang, onFillForm, onPreviewInvoice, isGuest }
                         onKeyDown={e => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault()
-                                processPrompt('form')
+                                processPrompt()
                             }
                         }}
                     />
@@ -148,11 +229,11 @@ export default function AIPrompt({ lang, onFillForm, onPreviewInvoice, isGuest }
                     <button
                         type="button"
                         className="ap-btn ap-btn--primary"
-                        onClick={() => processPrompt('form')}
+                        onClick={() => processPrompt()}
                         disabled={isLoading || !prompt.trim()}
                     >
                         <Sparkles size={ICON_SM} strokeWidth={STROKE} />
-                        {isLoading ? (isCz ? 'Zpracovávám…' : 'Processing…') : (isCz ? 'Vygenerovat' : 'Generate')}
+                        {isLoading ? (isCz ? 'Zpracovávám…' : 'Processing…') : (isCz ? 'Vyplnit formulář' : 'Fill form')}
                     </button>
                     <button
                         type="button"
@@ -166,6 +247,76 @@ export default function AIPrompt({ lang, onFillForm, onPreviewInvoice, isGuest }
             </div>
 
             {error && <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8, marginBottom: 0 }}>{error}</p>}
+
+            <div className="ap-ai__divider">{isCz ? 'nebo naskenujte fakturu' : 'or scan an invoice'}</div>
+
+            <div className="ap-ai__scan">
+                <button
+                    type="button"
+                    className="ap-ai__scan-btn"
+                    onClick={() => cameraInputRef.current?.click()}
+                    disabled={isScanning || isLoading}
+                >
+                    {isScanning
+                        ? <Loader2 size={ICON_MD} strokeWidth={STROKE} className="ap-ai__scan-spin" />
+                        : <Camera size={ICON_MD} strokeWidth={STROKE} />}
+                    {isCz ? 'Vyfotit fakturu' : 'Take photo'}
+                </button>
+                <button
+                    type="button"
+                    className="ap-ai__scan-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isScanning || isLoading}
+                >
+                    <Upload size={ICON_MD} strokeWidth={STROKE} />
+                    {isCz ? 'Nahrát obrázek' : 'Upload image'}
+                </button>
+            </div>
+
+            <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                hidden
+                onChange={onCameraChange}
+            />
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                hidden
+                onChange={onFileChange}
+            />
+
+            <p className="ap-ai__scan-hint">
+                <ScanLine size={ICON_SM} strokeWidth={STROKE} style={{ verticalAlign: '-2px', marginRight: 6 }} />
+                {isCz
+                    ? 'AI vyplní formulář z fotografie. Fakturu si zkontrolujte před uložením.'
+                    : 'AI fills the form from your photo. Review the fields before saving.'}
+            </p>
+
+            {scanPreview && (
+                <div className="ap-ai__scan-preview">
+                    <img className="ap-ai__scan-thumb" src={scanPreview.dataUrl} alt="" />
+                    <div className="ap-ai__scan-meta">
+                        <span className="ap-ai__scan-meta-name">{scanPreview.name}</span>
+                        <span className="ap-ai__scan-meta-sub">
+                            {isScanning
+                                ? (isCz ? 'Zpracovávám obrázek…' : 'Processing image…')
+                                : (isCz ? 'Pole byla vyplněna – zkontrolujte je.' : 'Fields filled — please review.')}
+                        </span>
+                    </div>
+                    <button
+                        type="button"
+                        className="ap-btn ap-btn--ghost"
+                        onClick={() => setScanPreview(null)}
+                        aria-label={isCz ? 'Zavřít' : 'Dismiss'}
+                    >
+                        <X size={ICON_SM} strokeWidth={STROKE} />
+                    </button>
+                </div>
+            )}
 
             <div className="ap-ai__hints">
                 <div className="ap-ai__hints-title">{isCz ? 'Příklady:' : 'Examples:'}</div>

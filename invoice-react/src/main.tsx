@@ -6,6 +6,7 @@ if (typeof window !== 'undefined') {
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import './analytics'
 import './globals.css'
 import './index.css'
 import App from './App'
