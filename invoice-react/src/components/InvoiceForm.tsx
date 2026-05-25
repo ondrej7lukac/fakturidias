@@ -132,7 +132,6 @@ export default function InvoiceForm({
     const [saveTimer, setSaveTimer] = useState(null)
     const [aresAutoFilled, setAresAutoFilled] = useState(false)
     const [supplierAresAutoFilled, setSupplierAresAutoFilled] = useState(false)
-    const pendingPreviewModeRef = useRef(false)
     const supplierSuggestionsRef = useRef(null)
     const supplierAresDebounceRef = useRef(null)
 
@@ -982,15 +981,6 @@ export default function InvoiceForm({
                 return { id: randomUUID(), name: String(item.name || ''), qty, price, discount: 0, taxRate, subtotal, taxAmount, total: subtotal + taxAmount }
             }))
         }
-        if (pendingPreviewModeRef.current) {
-            setPreviewMode(true)
-            pendingPreviewModeRef.current = false
-        }
-    }
-
-    const handleAIPreview = (data: any) => {
-        pendingPreviewModeRef.current = true
-        handleAIFill(data)
     }
 
     // Supplier section — rendered in sidebar
@@ -1189,7 +1179,7 @@ export default function InvoiceForm({
                     <div className="ap-create__main">
 
                     {/* AI dictation card */}
-                    <AIPrompt lang={lang} onFillForm={handleAIFill} onPreviewInvoice={handleAIPreview} isGuest={!isAuthenticated} />
+                    <AIPrompt lang={lang} onFillForm={handleAIFill} isGuest={!isAuthenticated} />
 
                     {/* Region/Tax Warning */}
                     {defaultSupplier?.region === 'CZ' && defaultSupplier?.taxStatus === 'non-payer' && formData.clientCountry !== 'CZ' && (
