@@ -59,7 +59,7 @@ function sendNotFound(res) {
     res.end('Not found');
 }
 
-function readJsonBody(req, callback) {
+function readJsonBody(req, callback, maxBytes = MAX_BODY_BYTES) {
     let data = '';
     let byteCount = 0;
     let settled = false;
@@ -73,7 +73,7 @@ function readJsonBody(req, callback) {
     req.on('data', (chunk) => {
         if (settled) return;
         byteCount += chunk.length;
-        if (byteCount > MAX_BODY_BYTES) {
+        if (byteCount > maxBytes) {
             done(new Error('Request body too large'));
             req.socket?.destroy();
             return;
@@ -91,9 +91,10 @@ function readJsonBody(req, callback) {
     req.on('error', (err) => done(err));
 }
 
-function parseBody(req) {
+function parseBody(req, options = {}) {
+    const maxBytes = options.maxBytes || MAX_BODY_BYTES;
     return new Promise((resolve, reject) => {
-        readJsonBody(req, (err, body) => (err ? reject(err) : resolve(body)));
+        readJsonBody(req, (err, body) => (err ? reject(err) : resolve(body)), maxBytes);
     });
 }
 

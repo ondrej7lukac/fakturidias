@@ -521,6 +521,97 @@
 }
 .ap-ai__hint:hover { border-color: var(--border); color: var(--text); background: var(--card); }
 
+/* ── SCAN INVOICE (photo upload) ──────────────────────────────── */
+.ap-ai__divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted2);
+}
+.ap-ai__divider::before,
+.ap-ai__divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.ap-ai__scan {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ap-ai__scan-btn {
+  flex: 1;
+  min-width: 140px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  background: var(--card2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.ap-ai__scan-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--card);
+}
+.ap-ai__scan-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.ap-ai__scan-btn svg { flex: none; }
+.ap-ai__scan-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted2);
+}
+.ap-ai__scan-preview {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card2);
+}
+.ap-ai__scan-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex: none;
+}
+.ap-ai__scan-meta {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ap-ai__scan-meta-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ap-ai__scan-meta-sub { font-size: 12px; color: var(--muted2); }
+.ap-ai__scan-spin { animation: ap-spin 0.9s linear infinite; }
+@keyframes ap-spin { to { transform: rotate(360deg); } }
+
 /* ── LINE ITEMS TABLE ────────────────────────────────────────── */
 .ap-items {
   border: 1px solid var(--border);

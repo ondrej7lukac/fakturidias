@@ -21,6 +21,27 @@ Rules:
 - Text field values (item names, paymentNote) must be in ${outputLang}`;
 }
 
+function buildImageSystemPrompt(lang = 'en') {
+    const today = new Date().toISOString().split('T')[0];
+    const outputLang = lang === 'cs' ? 'Czech' : 'English';
+    return `You are an invoice data extractor for a Czech/Slovak invoice application.
+Extract invoice fields from the photo/scan provided. The image is an existing invoice, receipt, or bill.
+
+Today's date is ${today}. Use this when a date is missing or relative.
+
+Rules:
+- Treat the entity that ISSUED the invoice (top of document, with IČO/DIČ, "Dodavatel") as the supplier — fill supplierName / supplierIco / supplierVat / supplierAddress if visible.
+- Treat the RECIPIENT ("Odběratel", "Bill to") as the client — fill clientName / clientIco / clientVat / clientAddress / clientArea / clientEmail / clientPhone if visible.
+- clientCountry: infer from address; "CZ" or "SK" if Czech/Slovak, else "OTHER". Default "CZ".
+- currency: read from the invoice; CZK, EUR or USD only. Default "CZK".
+- issueDate / dueDate: YYYY-MM-DD. If only one date is shown, set issueDate; default dueDate to issueDate + 14 days.
+- variableSymbol: numeric only if shown.
+- items: one row per line item. price = unit price excluding VAT (plain number). qty = quantity. taxRate = VAT % as number (0, 12, 15, or 21). If only totals are shown and line items aren't itemized, create a single item with the total as price and qty 1.
+- If a field is not visible, return an empty string (or 0 for numeric).
+- DO NOT invent data. Do not hallucinate IČO or VAT numbers.
+- Text field values (item names, paymentNote) must be in ${outputLang}.`;
+}
+
 function buildResponseSchema() {
     return {
         type: 'object',
@@ -158,4 +179,69 @@ async function parseInvoiceWithAI(prompt, lang = 'en') {
     return data;
 }
 
-module.exports = { parseInvoiceWithAI };
+function callGeminiImageApi(imageBase64, mimeType, lang = 'en') {
+    const apiKey = process.env.GEMINI_API_KEY;
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
+    if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
+
+    const payload = JSON.stringify({
+        system_instruction: { parts: [{ text: buildImageSystemPrompt(lang) }] },
+        contents: [{
+            role: 'user',
+            parts: [
+                { text: 'Extract invoice data from this image.' },
+                { inline_data: { mime_type: mimeType, data: imageBase64 } }
+            ]
+        }],
+        generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 2048,
+            responseMimeType: 'application/json',
+            responseSchema: buildResponseSchema()
+        }
+    });
+
+    return new Promise((resolve, reject) => {
+        const options = {
+            hostname: 'generativelanguage.googleapis.com',
+            path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+            }
+        };
+
+        const req = https.request(options, (response) => {
+            let raw = '';
+            response.on('data', chunk => raw += chunk);
+            response.on('end', () => {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (parsed.error) return reject(new Error(parsed.error.message || 'Gemini API error'));
+                    const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (!text) return reject(new Error('Empty response from Gemini API'));
+                    resolve(JSON.parse(text));
+                } catch (err) {
+                    reject(new Error('Failed to parse Gemini API response: ' + err.message));
+                }
+            });
+        });
+
+        req.on('error', reject);
+        req.write(payload);
+        req.end();
+    });
+}
+
+async function parseInvoiceImageWithAI(imageBase64, mimeType, lang = 'en') {
+    const data = await callGeminiImageApi(imageBase64, mimeType, lang);
+    await Promise.all([
+        enrichWithAres(data).catch(() => {}),
+        enrichSupplierWithAres(data).catch(() => {})
+    ]);
+    return data;
+}
+
+module.exports = { parseInvoiceWithAI, parseInvoiceImageWithAI };

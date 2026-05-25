@@ -52,6 +52,10 @@ export {
   Clock,
   HeartPulse,
   Database,
+  Camera,
+  Upload,
+  ScanLine,
+  Loader2,
 } from 'lucide-react'
 
 export const ICON_SM = 14
