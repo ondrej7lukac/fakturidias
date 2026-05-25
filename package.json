@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "build": "npm install --prefix invoice-react && npm run build --prefix invoice-react",
-    "start": "node backend/server.js"
+    "start": "node backend/server.js",
+    "test:e2e": "npm test --prefix e2e"
   },
   "dependencies": {
     "@dotenvx/dotenvx": "^1.66.0",
