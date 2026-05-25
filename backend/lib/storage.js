@@ -244,6 +244,23 @@ function saveUserInvoices_FS(userEmail, invoices) {
     } catch { return false; }
 }
 
+async function saveInvoice(userEmail, invoice) {
+    if (_isConnected) return saveSingleInvoice(userEmail, invoice);
+    const invoices = await getUserInvoices(userEmail);
+    const idx = invoices.findIndex(inv => inv.id === invoice.id);
+    if (idx >= 0) invoices[idx] = invoice; else invoices.push(invoice);
+    return saveUserInvoices_FS(userEmail, invoices);
+}
+
+async function deleteInvoice(userEmail, id) {
+    if (_isConnected) {
+        try { await InvoiceModel.deleteOne({ userEmail, id }); return true; }
+        catch { return false; }
+    }
+    const invoices = await getUserInvoices(userEmail);
+    return saveUserInvoices_FS(userEmail, invoices.filter(inv => inv.id !== id));
+}
+
 async function getUserCustomers(userEmail) {
     if (_isConnected) {
         try {
@@ -694,6 +711,39 @@ async function getDunningUsers() {
     } catch { return []; }
 }
 
+async function getAnalytics() {
+    if (!_isConnected) return null;
+    try {
+        const [planCounts, monthlyInvoices, recentSignups] = await Promise.all([
+            SubscriptionModel.aggregate([
+                { $group: { _id: '$plan', count: { $sum: 1 } } },
+            ]),
+            InvoiceModel.aggregate([
+                {
+                    $group: {
+                        _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+                        count: { $sum: 1 },
+                        revenue: { $sum: '$amount' },
+                    },
+                },
+                { $sort: { '_id.year': 1, '_id.month': 1 } },
+                { $limit: 12 },
+            ]),
+            SubscriptionModel.aggregate([
+                { $sort: { updatedAt: -1 } },
+                { $limit: 10 },
+                { $project: { userEmail: 1, plan: 1, status: 1, updatedAt: 1 } },
+            ]),
+        ]);
+        const plans = {};
+        planCounts.forEach(p => { plans[p._id || 'free'] = p.count; });
+        return { plans, monthlyInvoices, recentSignups };
+    } catch (err) {
+        if (process.env.NODE_ENV !== 'production') console.error('[getAnalytics]', err);
+        return null;
+    }
+}
+
 // ── Admin user meta (notes + suspension) ───────────────────────────────────
 
 let _suspendedCache = new Set();
@@ -932,6 +982,8 @@ module.exports = {
     getUserInvoices,
     saveSingleInvoice,
     saveUserInvoices_FS,
+    saveInvoice,
+    deleteInvoice,
     getUserCustomers,
     saveUserCustomer,
     getUserItems,
@@ -956,6 +1008,7 @@ module.exports = {
     getPromoStats,
     getRevenueMetrics,
     getDunningUsers,
+    getAnalytics,
     isUserSuspended,
     getUserMeta,
     setUserNotes,

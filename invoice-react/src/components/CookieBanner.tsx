@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react'
+import ReactGA from 'react-ga4'
 import Clarity from '@microsoft/clarity'
 import './CookieBanner.css'
 
 const CLARITY_ID = import.meta.env.VITE_CLARITY_ID as string
+const GA_ID = import.meta.env.VITE_GA4_ID as string | undefined
 const STORAGE_KEY = 'cookie_consent' // 'accepted' | 'declined'
 
 function grantGA4Consent() {
-    if (typeof (window as any).gtag === 'function') {
-        ;(window as any).gtag('consent', 'update', {
-            analytics_storage: 'granted',
-            ad_storage: 'granted',
-            ad_user_data: 'granted',
-            ad_personalization: 'granted',
-        })
-    }
+    if (!GA_ID) return
+    ReactGA.gtag('consent', 'update', {
+        analytics_storage: 'granted',
+        ad_storage: 'granted',
+        ad_user_data: 'granted',
+        ad_personalization: 'granted',
+    })
 }
 
 // Loaded only after the user accepts the cookie banner — keeps the GDPR
