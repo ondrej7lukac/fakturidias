@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { safeStripeRedirect, safeGoogleOAuthPopup } from './lib/security'
 import Header from './components/Header'
 import InvoiceForm from './components/InvoiceForm'
 import InvoiceList from './components/InvoiceList'
@@ -70,7 +71,7 @@ function App() {
                 body: JSON.stringify({ interval: 'month', plan }),
             })
                 .then(r => r.ok ? r.json() : null)
-                .then(data => { if (data?.url) window.location.href = data.url })
+                .then(data => { if (data?.url) safeStripeRedirect(data.url) })
                 .catch(() => {})
         }
     }, [user])
@@ -376,7 +377,7 @@ function App() {
             if (!res.ok) throw new Error('Failed to start login')
             const data = await res.json()
             if (data.url && popup) {
-                popup.location.href = data.url
+                safeGoogleOAuthPopup(popup, data.url)
             } else {
                 popup?.close()
             }

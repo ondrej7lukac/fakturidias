@@ -3,10 +3,8 @@
 const { sendJson, parseBody } = require('../lib/utils');
 const {
     getUserInvoices,
-    saveSingleInvoice,
-    saveUserInvoices_FS,
-    isConnected,
-    InvoiceModel,
+    saveInvoice,
+    deleteInvoice,
     getSubscription,
     getGlobalSettings
 } = require('../lib/storage');
@@ -42,29 +40,14 @@ function attach(router) {
             }
         }
 
-        let success = false;
-        if (isConnected()) {
-            success = await saveSingleInvoice(userEmail, invoice);
-        } else {
-            const invoices = await getUserInvoices(userEmail);
-            const idx = invoices.findIndex(inv => inv.id === invoice.id);
-            if (idx >= 0) invoices[idx] = invoice; else invoices.push(invoice);
-            success = saveUserInvoices_FS(userEmail, invoices);
-        }
+        const success = await saveInvoice(userEmail, invoice);
         return success
             ? sendJson(res, 200, { success: true, invoice })
             : sendJson(res, 500, { error: 'Failed to save' });
     });
 
     router.add('DELETE', '/api/invoices/:id', async ({ res, userEmail, params }) => {
-        const { id } = params;
-        if (isConnected()) {
-            await InvoiceModel.deleteOne({ userEmail, id });
-            return sendJson(res, 200, { success: true });
-        }
-        const invoices = await getUserInvoices(userEmail);
-        const filtered = invoices.filter(inv => inv.id !== id);
-        const success = saveUserInvoices_FS(userEmail, filtered);
+        const success = await deleteInvoice(userEmail, params.id);
         return success
             ? sendJson(res, 200, { success: true })
             : sendJson(res, 500, { error: 'Failed to delete' });

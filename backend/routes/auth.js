@@ -8,16 +8,16 @@ const {
 } = require('../lib/auth');
 
 function attach(router) {
-  router.add('GET', '/auth/google/url', ({ req, res }) =>
+  router.add('GET', '/auth/google/url', async ({ req, res }) =>
     handleAuthUrl(req, res),
   );
-  router.add('GET', '/auth/google/callback', ({ req, res, url }) =>
+  router.add('GET', '/auth/google/callback', async ({ req, res, url }) =>
     handleAuthCallback(req, res, url),
   );
-  router.add('GET', '/auth/google/status', ({ req, res }) =>
+  router.add('GET', '/auth/google/status', async ({ req, res }) =>
     handleAuthStatus(req, res),
   );
-  router.add('POST', '/auth/google/disconnect', ({ req, res }) =>
+  router.add('POST', '/auth/google/disconnect', async ({ req, res }) =>
     handleAuthDisconnect(req, res),
   );
 }

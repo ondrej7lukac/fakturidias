@@ -1,5 +1,6 @@
 import './Settings.css'
 import { useState, useEffect } from 'react'
+import { safeStripeRedirect } from '@/lib/security'
 import { parseIban, calculateIban } from '../utils/bank'
 import AresSearch from './AresSearch'
 import {
@@ -189,7 +190,7 @@ export default function Settings({
         body: JSON.stringify({ interval, plan }),
       })
       const data = await res.json()
-      if (data.url) window.location.href = data.url
+      if (data.url) safeStripeRedirect(data.url)
       else alert(isCz ? 'Nepodařilo se spustit platbu.' : 'Failed to start checkout.')
     } catch {
       alert(isCz ? 'Nepodařilo se spustit platbu.' : 'Failed to start checkout.')
@@ -202,7 +203,7 @@ export default function Settings({
     try {
       const res = await fetch('/api/billing/portal', { method: 'POST' })
       const data = await res.json()
-      if (data.url) window.location.href = data.url
+      if (data.url) safeStripeRedirect(data.url)
       else alert(isCz ? 'Nepodařilo se otevřít správu.' : 'Failed to open billing portal.')
     } catch {
       alert(isCz ? 'Nepodařilo se otevřít správu.' : 'Failed to open billing portal.')

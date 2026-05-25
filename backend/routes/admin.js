@@ -3,7 +3,7 @@
 const os = require('os');
 const { sendJson, parseBody } = require('../lib/utils');
 const { sendSegmentBroadcast } = require('../lib/email');
-const { processStripeEvent } = require('./billing');
+const { stripe, getPlanFromPriceId, processStripeEvent } = require('../lib/stripe');
 const {
     getAllUsersWithStats,
     setUserPlanOverride,
@@ -22,6 +22,7 @@ const {
     getPromoStats,
     getRevenueMetrics,
     getDunningUsers,
+    getAnalytics,
     getUserMeta,
     setUserNotes,
     setUserSuspended,
@@ -38,8 +39,6 @@ const {
     markWebhookEvent,
     getBounces,
     recordBounce,
-    InvoiceModel,
-    SubscriptionModel,
     isConnected,
 } = require('../lib/storage');
 
@@ -53,21 +52,6 @@ const ADMIN_SUPER_EMAILS = (process.env.ADMIN_SUPER_EMAILS || '')
     .split(',')
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);
-
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-let stripe = null;
-if (STRIPE_SECRET_KEY) {
-    stripe = require('stripe')(STRIPE_SECRET_KEY);
-}
-
-const STRIPE_MAX_PRICE_IDS = [
-    process.env.STRIPE_PRICE_MAX_MONTHLY,
-    process.env.STRIPE_PRICE_MAX_ANNUAL,
-].filter(Boolean);
-
-function planFromPriceId(priceId) {
-    return STRIPE_MAX_PRICE_IDS.includes(priceId) ? 'max' : 'standard';
-}
 
 // An env var counts as "configured" only if it's present and looks like a
 // real value — placeholders such as `sk_live_xxx` should not show as green.
@@ -127,7 +111,7 @@ async function readBody(ctx) {
 
 function attach(router) {
     // Current admin's role + impersonation state
-    router.add('GET', '/api/admin/check', (ctx) => {
+    router.add('GET', '/api/admin/check', async (ctx) => {
         const real = adminEmail(ctx);
         return sendJson(ctx.res, 200, {
             isAdmin: isAdmin(real),
@@ -177,46 +161,9 @@ function attach(router) {
     // Aggregate analytics
     router.add('GET', '/api/admin/analytics', async (ctx) => {
         if (!guardAdmin(ctx)) return true;
-        if (!isConnected()) return sendJson(ctx.res, 503, { error: 'DB not connected' });
-
-        try {
-            const [planCounts, monthlyRevenue, recentSignups] = await Promise.all([
-                SubscriptionModel.aggregate([
-                    { $group: { _id: '$plan', count: { $sum: 1 } } }
-                ]),
-                InvoiceModel.aggregate([
-                    {
-                        $group: {
-                            _id: {
-                                year: { $year: '$createdAt' },
-                                month: { $month: '$createdAt' },
-                            },
-                            count: { $sum: 1 },
-                            revenue: { $sum: '$amount' },
-                        }
-                    },
-                    { $sort: { '_id.year': 1, '_id.month': 1 } },
-                    { $limit: 12 },
-                ]),
-                SubscriptionModel.aggregate([
-                    { $sort: { updatedAt: -1 } },
-                    { $limit: 10 },
-                    { $project: { userEmail: 1, plan: 1, status: 1, updatedAt: 1 } },
-                ]),
-            ]);
-
-            const planMap = {};
-            planCounts.forEach(p => { planMap[p._id || 'free'] = p.count; });
-
-            return sendJson(ctx.res, 200, {
-                plans: planMap,
-                monthlyInvoices: monthlyRevenue,
-                recentSignups,
-            });
-        } catch (err) {
-            console.error('[admin] analytics error:', err.message);
-            return sendJson(ctx.res, 500, { error: 'Analytics query failed' });
-        }
+        const data = await getAnalytics();
+        if (!data) return sendJson(ctx.res, 503, { error: 'DB not connected' });
+        return sendJson(ctx.res, 200, data);
     });
 
     // Recurring revenue metrics (MRR / ARR / churn)
@@ -474,7 +421,7 @@ function attach(router) {
             const updated = {
                 stripeCustomerId: stripeSub.customer,
                 stripeSubscriptionId: stripeSub.id,
-                plan: isActive ? planFromPriceId(priceId) : 'free',
+                plan: isActive ? getPlanFromPriceId(priceId) : 'free',
                 status: stripeSub.status,
                 interval: stripeSub.items.data[0]?.price?.recurring?.interval || 'month',
                 currentPeriodEnd: stripeSub.current_period_end,
