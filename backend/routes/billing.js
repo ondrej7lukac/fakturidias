@@ -6,7 +6,7 @@ const {
     logWebhookEvent, markWebhookEvent,
 } = require('../lib/storage');
 const { isPro, isMax } = require('../lib/plan');
-const { stripe, getPlanFromPriceId, processStripeEvent } = require('../lib/stripe');
+const { stripe, processStripeEvent } = require('../lib/stripe');
 
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 // Standard tier — reuses the original STRIPE_PRICE_MONTHLY/ANNUAL keys

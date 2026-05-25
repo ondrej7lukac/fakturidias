@@ -738,7 +738,10 @@ async function getAnalytics() {
         const plans = {};
         planCounts.forEach(p => { plans[p._id || 'free'] = p.count; });
         return { plans, monthlyInvoices, recentSignups };
-    } catch { return null; }
+    } catch (err) {
+        if (process.env.NODE_ENV !== 'production') console.error('[getAnalytics]', err);
+        return null;
+    }
 }
 
 // ── Admin user meta (notes + suspension) ───────────────────────────────────

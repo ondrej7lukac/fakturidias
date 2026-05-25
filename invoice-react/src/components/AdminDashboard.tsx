@@ -1,5 +1,5 @@
 import './AdminDashboard.css'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ReactNode } from 'react'
 import {
   Shield, Users, Tag, Trash2, Crown, UserCheck, Activity,
@@ -2117,6 +2117,22 @@ export default function AdminDashboard() {
 
   useEffect(() => { loadUsers() }, [loadUsers])
 
+  const tabListRef = useRef<HTMLDivElement>(null)
+
+  const handleTabKeyDown = (e: React.KeyboardEvent, idx: number) => {
+    const els = tabListRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+    if (!els) return
+    let next = idx
+    if (e.key === 'ArrowRight') next = (idx + 1) % tabs.length
+    else if (e.key === 'ArrowLeft') next = (idx - 1 + tabs.length) % tabs.length
+    else if (e.key === 'Home') next = 0
+    else if (e.key === 'End') next = tabs.length - 1
+    else return
+    e.preventDefault()
+    setTab(tabs[next].id)
+    els[next].focus()
+  }
+
   const tabs: { id: TabId; label: string; icon: ReactNode }[] = [
     { id: 'overview', label: 'Overview', icon: <Activity size={ICON_SM} strokeWidth={STROKE} /> },
     { id: 'users', label: 'Users', icon: <Users size={ICON_SM} strokeWidth={STROKE} /> },
@@ -2138,14 +2154,18 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="admin-tabs" role="tablist" aria-label="Admin sections">
-        {tabs.map(t => (
+      <div className="admin-tabs" role="tablist" aria-label="Admin sections" ref={tabListRef}>
+        {tabs.map((t, idx) => (
           <button
             key={t.id}
+            id={`admin-tab-${t.id}`}
             role="tab"
             aria-selected={tab === t.id}
+            aria-controls={`admin-panel-${t.id}`}
+            tabIndex={tab === t.id ? 0 : -1}
             className={`admin-tab ${tab === t.id ? 'admin-tab--active' : ''}`}
             onClick={() => setTab(t.id)}
+            onKeyDown={(e) => handleTabKeyDown(e, idx)}
           >
             {t.icon}
             <span className="admin-tab-label">{t.label}</span>
@@ -2153,20 +2173,22 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {loading && tab === 'overview' ? (
-        <div className="admin-empty">Loading data...</div>
-      ) : (
-        <>
-          {tab === 'overview' && <OverviewTab users={users} analytics={analytics} onOpenUser={setDrawerUser} />}
-          {tab === 'users' && <UsersTab users={users} onRefresh={loadUsers} onOpenUser={setDrawerUser} isSuper={role.isSuper} />}
-          {tab === 'promos' && <PromosTab />}
-          {tab === 'email' && <EmailTab />}
-          {tab === 'webhooks' && <WebhooksTab />}
-          {tab === 'audit' && <AuditTab />}
-          {tab === 'settings' && <SettingsTab isSuper={role.isSuper} />}
-          {tab === 'system' && <SystemTab />}
-        </>
-      )}
+      <div id={`admin-panel-${tab}`} role="tabpanel" aria-labelledby={`admin-tab-${tab}`}>
+        {loading && tab === 'overview' ? (
+          <div className="admin-empty">Loading data...</div>
+        ) : (
+          <>
+            {tab === 'overview' && <OverviewTab users={users} analytics={analytics} onOpenUser={setDrawerUser} />}
+            {tab === 'users' && <UsersTab users={users} onRefresh={loadUsers} onOpenUser={setDrawerUser} isSuper={role.isSuper} />}
+            {tab === 'promos' && <PromosTab />}
+            {tab === 'email' && <EmailTab />}
+            {tab === 'webhooks' && <WebhooksTab />}
+            {tab === 'audit' && <AuditTab />}
+            {tab === 'settings' && <SettingsTab isSuper={role.isSuper} />}
+            {tab === 'system' && <SystemTab />}
+          </>
+        )}
+      </div>
 
       {drawerUser && (
         <UserDetailDrawer
