@@ -21,6 +21,25 @@ Rules:
 - Text field values (item names, paymentNote) must be in ${outputLang}`;
 }
 
+function buildAudioSystemPrompt(lang = 'en') {
+    const today = new Date().toISOString().split('T')[0];
+    const outputLang = lang === 'cs' ? 'Czech' : 'English';
+    return `You are an invoice data extractor for a Czech/Slovak invoice application.
+The user has recorded a spoken description of an invoice they want to create. Extract the invoice information from their speech.
+
+Today's date is ${today}. Use this when computing relative dates like "due in 14 days" or "due end of month".
+
+Rules:
+- supplierName / supplierIco: only set if explicitly mentioned in speech; otherwise return empty string
+- clientCountry: "CZ" for Czech clients, "SK" for Slovak clients, default "CZ"
+- currency: "CZK" unless EUR is explicitly mentioned
+- prices are plain numbers, no currency symbols
+- qty is a plain number
+- taxRate per item: 0 if VAT not mentioned, otherwise 21 (CZ standard rate)
+- dueDate: calculate from today (${today}); default to 14 days if not mentioned
+- Text field values (item names, paymentNote) must be in ${outputLang}`;
+}
+
 function buildImageSystemPrompt(lang = 'en') {
     const today = new Date().toISOString().split('T')[0];
     const outputLang = lang === 'cs' ? 'Czech' : 'English';
@@ -244,4 +263,69 @@ async function parseInvoiceImageWithAI(imageBase64, mimeType, lang = 'en') {
     return data;
 }
 
-module.exports = { parseInvoiceWithAI, parseInvoiceImageWithAI };
+function callGeminiAudioApi(audioBase64, mimeType, lang = 'en') {
+    const apiKey = process.env.GEMINI_API_KEY;
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
+    if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
+
+    const payload = JSON.stringify({
+        system_instruction: { parts: [{ text: buildAudioSystemPrompt(lang) }] },
+        contents: [{
+            role: 'user',
+            parts: [
+                { text: 'Extract invoice data from this voice recording.' },
+                { inline_data: { mime_type: mimeType, data: audioBase64 } }
+            ]
+        }],
+        generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 1024,
+            responseMimeType: 'application/json',
+            responseSchema: buildResponseSchema()
+        }
+    });
+
+    return new Promise((resolve, reject) => {
+        const options = {
+            hostname: 'generativelanguage.googleapis.com',
+            path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+            }
+        };
+
+        const req = https.request(options, (response) => {
+            let raw = '';
+            response.on('data', chunk => raw += chunk);
+            response.on('end', () => {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (parsed.error) return reject(new Error(parsed.error.message || 'Gemini API error'));
+                    const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (!text) return reject(new Error('Empty response from Gemini API'));
+                    resolve(JSON.parse(text));
+                } catch (err) {
+                    reject(new Error('Failed to parse Gemini API response: ' + err.message));
+                }
+            });
+        });
+
+        req.on('error', reject);
+        req.write(payload);
+        req.end();
+    });
+}
+
+async function parseInvoiceAudioWithAI(audioBase64, mimeType, lang = 'en') {
+    const data = await callGeminiAudioApi(audioBase64, mimeType, lang);
+    await Promise.all([
+        enrichWithAres(data).catch(() => {}),
+        enrichSupplierWithAres(data).catch(() => {})
+    ]);
+    return data;
+}
+
+module.exports = { parseInvoiceWithAI, parseInvoiceImageWithAI, parseInvoiceAudioWithAI };

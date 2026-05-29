@@ -1,6 +1,13 @@
 import { useState, useRef } from 'react'
 import { Sparkles, Mic, MicOff, X, Camera, Upload, ScanLine, Loader2, ICON_MD, ICON_LG, ICON_SM, STROKE } from '@/lib/icons'
 
+const PREFERRED_AUDIO_TYPES = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/ogg',
+]
+
 const MAX_IMAGE_DIM = 1800
 const JPEG_QUALITY = 0.78
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
@@ -60,7 +67,8 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [isListening, setIsListening] = useState(false)
     const [error, setError] = useState('')
-    const recognitionRef = useRef<any>(null)
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+    const streamRef = useRef<MediaStream | null>(null)
     const cameraInputRef = useRef<HTMLInputElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isScanning, setIsScanning] = useState(false)
@@ -69,33 +77,72 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
     const isCz = lang === 'cs'
     const samples = SAMPLES[lang as keyof typeof SAMPLES] || SAMPLES.en
 
-    const handleVoice = () => {
-        const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-        if (!SR) {
-            setError(isCz ? 'Hlasový vstup není podporován ve vašem prohlížeči.' : 'Voice input is not supported in your browser.')
-            return
-        }
+    const handleVoice = async () => {
         if (isListening) {
-            recognitionRef.current?.stop()
+            mediaRecorderRef.current?.stop()
             setIsListening(false)
             return
         }
-        const recognition = new SR()
-        recognition.lang = isCz ? 'cs-CZ' : 'en-US'
-        recognition.continuous = false
-        recognition.interimResults = false
-        recognition.onresult = (e: any) => {
-            const transcript: string = e.results[0][0].transcript
-            setPrompt(prev => prev ? `${prev} ${transcript}` : transcript)
+
+        setError('')
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+            streamRef.current = stream
+
+            const mimeType = PREFERRED_AUDIO_TYPES.find(t => MediaRecorder.isTypeSupported(t)) || ''
+            const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+            const chunks: Blob[] = []
+
+            recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+
+            recorder.onstop = async () => {
+                streamRef.current?.getTracks().forEach(t => t.stop())
+                streamRef.current = null
+
+                if (chunks.length === 0) return
+
+                const blob = new Blob(chunks, { type: recorder.mimeType })
+                const baseMime = recorder.mimeType.split(';')[0]
+
+                let base64 = ''
+                try {
+                    base64 = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader()
+                        reader.onload = () => resolve((reader.result as string).split(',')[1] || '')
+                        reader.onerror = () => reject(new Error('read-failed'))
+                        reader.readAsDataURL(blob)
+                    })
+                } catch {
+                    setError(isCz ? 'Chyba při čtení nahrávky.' : 'Failed to read recording.')
+                    return
+                }
+
+                setIsLoading(true)
+                try {
+                    const res = await fetch('/api/ai/invoice-audio', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ audio: base64, mimeType: baseMime, lang }),
+                    })
+                    const result = await res.json()
+                    if (!res.ok) throw new Error(result.message || result.error)
+                    onFillForm(result.data)
+                } catch (err: any) {
+                    setError(err?.message || (isCz ? 'Nepodařilo se zpracovat nahrávku.' : 'Failed to process recording.'))
+                } finally {
+                    setIsLoading(false)
+                }
+            }
+
+            recorder.start()
+            mediaRecorderRef.current = recorder
+            setIsListening(true)
+        } catch (err: any) {
+            const denied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError'
+            setError(denied
+                ? (isCz ? 'Přístup k mikrofonu byl zamítnut.' : 'Microphone access was denied.')
+                : (isCz ? 'Nelze získat přístup k mikrofonu.' : 'Cannot access microphone.'))
         }
-        recognition.onend = () => setIsListening(false)
-        recognition.onerror = () => {
-            setIsListening(false)
-            setError(isCz ? 'Chyba rozpoznávání hlasu.' : 'Voice recognition error.')
-        }
-        recognitionRef.current = recognition
-        recognition.start()
-        setIsListening(true)
     }
 
     const handleImageFile = async (file: File | undefined | null) => {
@@ -217,11 +264,14 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
                         type="button"
                         className={`ap-ai__mic${isListening ? ' ap-ai__mic--active' : ''}`}
                         onClick={handleVoice}
+                        disabled={isLoading}
                         aria-label={isCz ? 'Mikrofon' : 'Mic'}
                     >
-                        {isListening
-                            ? <MicOff size={ICON_LG} strokeWidth={STROKE} />
-                            : <Mic size={ICON_LG} strokeWidth={STROKE} />}
+                        {isLoading
+                            ? <Loader2 size={ICON_LG} strokeWidth={STROKE} className="ap-ai__scan-spin" />
+                            : isListening
+                                ? <MicOff size={ICON_LG} strokeWidth={STROKE} />
+                                : <Mic size={ICON_LG} strokeWidth={STROKE} />}
                     </button>
                 </div>
 
