@@ -1,10 +1,13 @@
 'use strict';
 
 const { sendJson, sendCors, parseBody } = require('../lib/utils');
-const { parseInvoiceWithAI, parseInvoiceImageWithAI } = require('../lib/gemini');
+const { parseInvoiceWithAI, parseInvoiceImageWithAI, parseInvoiceAudioWithAI } = require('../lib/gemini');
 
 const IMAGE_MAX_BYTES = 12 * 1024 * 1024;
 const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
+
+const AUDIO_MAX_BYTES = 10 * 1024 * 1024;
+const ALLOWED_AUDIO_MIME = new Set(['audio/webm', 'audio/ogg', 'audio/wav', 'audio/mp4', 'audio/mpeg', 'audio/mp3']);
 
 function attach(router) {
     router.add('OPTIONS', '/api/ai/invoice', ({ res }) => sendCors(res));
@@ -43,6 +46,31 @@ function attach(router) {
 
         try {
             const data = await parseInvoiceImageWithAI(image, mime, body.lang || 'en');
+            return sendJson(res, 200, { success: true, data });
+        } catch (err) {
+            return sendJson(res, err.statusCode || 500, { error: err.message || 'AI processing failed' });
+        }
+    });
+
+    router.add('OPTIONS', '/api/ai/invoice-audio', ({ res }) => sendCors(res));
+
+    router.add('POST', '/api/ai/invoice-audio', async ({ req, res }) => {
+        let body;
+        try { body = await parseBody(req, { maxBytes: AUDIO_MAX_BYTES }); }
+        catch (err) {
+            const status = /too large/i.test(err.message) ? 413 : 400;
+            return sendJson(res, status, { error: err.message || 'Invalid request body' });
+        }
+
+        const audio = typeof body.audio === 'string' ? body.audio.trim() : '';
+        const mime = typeof body.mimeType === 'string' ? body.mimeType.toLowerCase() : '';
+        if (!audio) return sendJson(res, 400, { error: 'audio is required (base64)' });
+        if (!ALLOWED_AUDIO_MIME.has(mime)) {
+            return sendJson(res, 400, { error: 'Unsupported audio type. Use WebM, OGG, WAV, or MP4.' });
+        }
+
+        try {
+            const data = await parseInvoiceAudioWithAI(audio, mime, body.lang || 'en');
             return sendJson(res, 200, { success: true, data });
         } catch (err) {
             return sendJson(res, err.statusCode || 500, { error: err.message || 'AI processing failed' });
