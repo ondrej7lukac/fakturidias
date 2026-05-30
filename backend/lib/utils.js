@@ -1,128 +1,133 @@
-'use strict';
-const isProd = process.env.NODE_ENV === 'production';
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
+"use strict";
+const isProd = process.env.NODE_ENV === "production";
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 const MAX_BODY_BYTES = 1 * 1024 * 1024; // 1 MB
 
 function logDebug(location, message, data) {
-    if (!isProd) {
-        console.debug(`[${location}]`, message, data != null ? data : '');
-    }
+  if (!isProd) {
+    console.debug(`[${location}]`, message, data != null ? data : "");
+  }
 }
 
 const SECURITY_HEADERS = {
-    'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'SAMEORIGIN',
-    'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'X-Permitted-Cross-Domain-Policies': 'none',
-    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
-    'Content-Security-Policy': [
-        "default-src 'self'",
-        "script-src 'self' https://www.googletagmanager.com https://www.clarity.ms https://c.clarity.ms https://scripts.clarity.ms",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "img-src 'self' data: https:",
-        "font-src 'self' data: https://fonts.gstatic.com",
-        "connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://region1.analytics.google.com https://www.googletagmanager.com https://www.clarity.ms https://c.clarity.ms https://scripts.clarity.ms https://e.clarity.ms",
-        "frame-src 'none'",
-        "object-src 'none'",
-        "base-uri 'self'",
-        "form-action 'self'",
-        "frame-ancestors 'self'"
-    ].join('; '),
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "SAMEORIGIN",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "X-Permitted-Cross-Domain-Policies": "none",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Permissions-Policy":
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "script-src 'self' https://www.googletagmanager.com https://www.clarity.ms https://c.clarity.ms https://scripts.clarity.ms",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "img-src 'self' data: https:",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://region1.analytics.google.com https://www.googletagmanager.com https://www.clarity.ms https://c.clarity.ms https://scripts.clarity.ms https://e.clarity.ms",
+    "frame-src 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'self'",
+  ].join("; "),
 };
 
 const CORS_HEADERS = {
-    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
-    'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+  "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
 };
 
 function sendJson(res, status, payload) {
-    res.writeHead(status, {
-        'Content-Type': 'application/json; charset=utf-8',
-        ...CORS_HEADERS,
-        ...SECURITY_HEADERS
-    });
-    res.end(JSON.stringify(payload));
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    ...CORS_HEADERS,
+    ...SECURITY_HEADERS,
+  });
+  res.end(JSON.stringify(payload));
 }
 
 function sendCors(res) {
-    res.writeHead(204, CORS_HEADERS);
-    res.end();
+  res.writeHead(204, CORS_HEADERS);
+  res.end();
 }
 
 function sendNotFound(res) {
-    res.writeHead(404, {
-        'Content-Type': 'text/plain; charset=utf-8',
-        ...SECURITY_HEADERS
-    });
-    res.end('Not found');
+  res.writeHead(404, {
+    "Content-Type": "text/plain; charset=utf-8",
+    ...SECURITY_HEADERS,
+  });
+  res.end("Not found");
 }
 
 function readJsonBody(req, callback, maxBytes = MAX_BODY_BYTES) {
-    let data = '';
-    let byteCount = 0;
-    let settled = false;
+  let data = "";
+  let byteCount = 0;
+  let settled = false;
 
-    const done = (err, result) => {
-        if (settled) return;
-        settled = true;
-        callback(err, result);
-    };
+  const done = (err, result) => {
+    if (settled) return;
+    settled = true;
+    callback(err, result);
+  };
 
-    req.on('data', (chunk) => {
-        if (settled) return;
-        byteCount += chunk.length;
-        if (byteCount > maxBytes) {
-            done(new Error('Request body too large'));
-            req.socket?.destroy();
-            return;
-        }
-        data += chunk;
-    });
-    req.on('end', () => {
-        if (settled) return;
-        try {
-            done(null, JSON.parse(data || '{}'));
-        } catch {
-            done(new Error('Invalid JSON body'));
-        }
-    });
-    req.on('error', (err) => done(err));
+  req.on("data", (chunk) => {
+    if (settled) return;
+    byteCount += chunk.length;
+    if (byteCount > maxBytes) {
+      done(new Error("Request body too large"));
+      req.socket?.destroy();
+      return;
+    }
+    data += chunk;
+  });
+  req.on("end", () => {
+    if (settled) return;
+    try {
+      done(null, JSON.parse(data || "{}"));
+    } catch {
+      done(new Error("Invalid JSON body"));
+    }
+  });
+  req.on("error", (err) => done(err));
 }
 
 function parseBody(req, options = {}) {
-    const maxBytes = options.maxBytes || MAX_BODY_BYTES;
-    return new Promise((resolve, reject) => {
-        readJsonBody(req, (err, body) => (err ? reject(err) : resolve(body)), maxBytes);
-    });
+  const maxBytes = options.maxBytes || MAX_BODY_BYTES;
+  return new Promise((resolve, reject) => {
+    readJsonBody(
+      req,
+      (err, body) => (err ? reject(err) : resolve(body)),
+      maxBytes,
+    );
+  });
 }
 
-function readRawBody(req) {
-    return new Promise((resolve, reject) => {
-        const chunks = [];
-        let byteCount = 0;
-        req.on('data', chunk => {
-            byteCount += chunk.length;
-            if (byteCount > MAX_BODY_BYTES) {
-                reject(new Error('Request body too large'));
-                req.socket?.destroy();
-                return;
-            }
-            chunks.push(chunk);
-        });
-        req.on('end', () => resolve(Buffer.concat(chunks)));
-        req.on('error', reject);
+function readRawBody(req, maxBytes = MAX_BODY_BYTES) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let byteCount = 0;
+    req.on("data", (chunk) => {
+      byteCount += chunk.length;
+      if (byteCount > maxBytes) {
+        reject(new Error("Request body too large"));
+        req.socket?.destroy();
+        return;
+      }
+      chunks.push(chunk);
     });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
 }
 
 module.exports = {
-    logDebug,
-    sendJson,
-    sendCors,
-    sendNotFound,
-    readJsonBody,
-    parseBody,
-    readRawBody,
-    SECURITY_HEADERS
+  logDebug,
+  sendJson,
+  sendCors,
+  sendNotFound,
+  readJsonBody,
+  parseBody,
+  readRawBody,
+  SECURITY_HEADERS,
 };
