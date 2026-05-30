@@ -1,15 +1,15 @@
-"use strict";
+'use strict';
 
-const crypto = require("crypto");
-const { sendJson, readRawBody } = require("../lib/utils");
-const { getMailboxByAddress, saveReceivedInvoice } = require("../lib/storage");
+const crypto = require('crypto');
+const { sendJson, readRawBody } = require('../lib/utils');
+const { getMailboxByAddress, saveReceivedInvoice } = require('../lib/storage');
 const {
   verifySvixSignature,
   normalizeInboundEvent,
   fetchReceivedEmail,
   fetchReceivedAttachmentBytes,
-} = require("../lib/inbound");
-const { parseInvoiceImageWithAI } = require("../lib/gemini");
+} = require('../lib/inbound');
+const { parseInvoiceImageWithAI } = require('../lib/gemini');
 
 const INBOUND_SECRET = process.env.INBOUND_WEBHOOK_SECRET;
 // The webhook itself is metadata-only and tiny; 256 KB is plenty.
@@ -17,44 +17,45 @@ const INBOUND_MAX_BYTES = 256 * 1024;
 
 // File types Gemini can read directly for invoice extraction.
 const PARSEABLE = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
 ]);
 
 function attach(router) {
   // Public webhook hit by Resend Inbound on every received email.
   // Resend sends `email.received` with METADATA ONLY — we fetch body and
   // attachment bytes from the Receiving API using the email_id.
-  router.add("POST", "/api/inbound/resend", async ({ req, res }) => {
+  router.add('POST', '/api/inbound/resend', async ({ req, res }) => {
     let raw;
     try {
       raw = await readRawBody(req, INBOUND_MAX_BYTES);
     } catch {
-      return sendJson(res, 400, { error: "Failed to read body" });
+      return sendJson(res, 400, { error: 'Failed to read body' });
     }
 
-    // In production a secret must be configured; reject unsigned requests.
-    if (
-      INBOUND_SECRET &&
-      !verifySvixSignature(raw, req.headers, INBOUND_SECRET)
-    ) {
-      return sendJson(res, 401, { error: "Invalid signature" });
+    // Inbound receiving must be explicitly configured.
+    if (!INBOUND_SECRET) {
+      return sendJson(res, 503, { error: 'Inbound webhook not configured' });
+    }
+
+    if (!verifySvixSignature(raw, req.headers, INBOUND_SECRET)) {
+      return sendJson(res, 401, { error: 'Invalid signature' });
     }
 
     let event;
     try {
-      event = JSON.parse(raw.toString("utf8") || "{}");
+      event = JSON.parse(raw.toString('utf8') || '{}');
     } catch {
-      return sendJson(res, 400, { error: "Invalid JSON" });
+      return sendJson(res, 400, { error: 'Invalid JSON' });
     }
 
     const evt = normalizeInboundEvent(event);
     // Only act on inbound-received events; ack anything else.
-    if (evt.type && evt.type !== "email.received") {
+    if (evt.type && evt.type !== 'email.received') {
       return sendJson(res, 200, { received: true, ignored: evt.type });
     }
 
@@ -72,14 +73,14 @@ function attach(router) {
     try {
       if (evt.emailId) full = await fetchReceivedEmail(evt.emailId);
     } catch (err) {
-      console.error("[inbound] fetchReceivedEmail failed:", err.message);
+      console.error('[inbound] fetchReceivedEmail failed:', err.message);
     }
 
-    const subject = (full && full.subject) || evt.subject || "";
+    const subject = (full && full.subject) || evt.subject || '';
     const plain =
       (full &&
-        (full.text || String(full.html || "").replace(/<[^>]+>/g, " "))) ||
-      "";
+        (full.text || String(full.html || '').replace(/<[^>]+>/g, ' '))) ||
+      '';
     const attachmentList = (full && full.attachments) || evt.attachments || [];
 
     // Download attachment bytes so the in-app preview and re-parsing work even
@@ -87,20 +88,20 @@ function attach(router) {
     const storedAttachments = [];
     let parseTarget = null; // { contentType, data } for the first parseable file
     for (const a of attachmentList) {
-      const contentType = (a.content_type || a.contentType || "").toLowerCase();
-      let data = "";
+      const contentType = (a.content_type || a.contentType || '').toLowerCase();
+      let data = '';
       if (evt.emailId && a.id) {
         try {
           const fetched = await fetchReceivedAttachmentBytes(evt.emailId, a.id);
-          data = fetched.buffer.toString("base64");
+          data = fetched.buffer.toString('base64');
         } catch (err) {
-          console.error("[inbound] attachment download failed:", err.message);
+          console.error('[inbound] attachment download failed:', err.message);
         }
       }
       const record = {
-        filename: a.filename || "attachment",
+        filename: a.filename || 'attachment',
         contentType,
-        size: data ? Buffer.byteLength(data, "base64") : 0,
+        size: data ? Buffer.byteLength(data, 'base64') : 0,
         data,
       };
       storedAttachments.push(record);
@@ -111,33 +112,33 @@ function attach(router) {
 
     const received = {
       id: crypto.randomUUID(),
-      status: "pending",
+      status: 'pending',
       receivedAt: new Date(),
       from: evt.from,
       fromName: evt.fromName,
       to: mailbox.address,
       subject,
-      textPreview: plain.replace(/\s+/g, " ").trim().slice(0, 1000),
+      textPreview: plain.replace(/\s+/g, ' ').trim().slice(0, 1000),
       attachments: storedAttachments,
       parsed: null,
-      parseStatus: "none",
+      parseStatus: 'none',
       parseError: null,
       approvedInvoiceId: null,
     };
 
     // Auto-extract invoice fields from the first parseable attachment.
     if (parseTarget) {
-      received.parseStatus = "pending";
+      received.parseStatus = 'pending';
       try {
         received.parsed = await parseInvoiceImageWithAI(
           parseTarget.data,
           parseTarget.contentType,
-          "cs",
+          'cs',
         );
-        received.parseStatus = "done";
+        received.parseStatus = 'done';
       } catch (err) {
-        received.parseStatus = "failed";
-        received.parseError = err.message || "AI parsing failed";
+        received.parseStatus = 'failed';
+        received.parseError = err.message || 'AI parsing failed';
       }
     }
 
