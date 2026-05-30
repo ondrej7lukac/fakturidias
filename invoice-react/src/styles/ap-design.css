@@ -329,6 +329,25 @@
 @media (prefers-color-scheme: light) {
   .ap-input, .ap-select, .ap-textarea { background: rgba(255, 255, 255, 0.6); }
 }
+
+.ap-select option {
+  background-color: #ffffff;
+  color: #0f1430;
+}
+
+html.theme-dark .ap-select option,
+.dark .ap-select option {
+  background-color: #121833;
+  color: #e9ecff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ap-select option {
+    background-color: #121833;
+    color: #e9ecff;
+  }
+}
+
 .ap-input:focus, .ap-select:focus, .ap-textarea:focus {
   outline: none;
   border-color: rgba(124, 247, 212, 0.55);

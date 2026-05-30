@@ -1,5 +1,13 @@
 import React from 'react'
-import { Document, Page, Text, View, StyleSheet, Image, pdf as renderPdf } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Image, pdf as renderPdf, Font } from '@react-pdf/renderer'
+
+Font.register({
+    family: 'Roboto',
+    fonts: [
+        { src: 'https://fonts.gstatic.com/l/font?kit=KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWubEbVmaiA4&skey=a0a0114a1dcab3ac&v=v51' },
+        { src: 'https://fonts.gstatic.com/l/font?kit=KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuYjalmUiA4&skey=a0a0114a1dcab3ac&v=v51', fontWeight: 'bold' }
+    ]
+})
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -19,21 +27,21 @@ const C = {
 }
 
 const S = StyleSheet.create({
-    page: { fontFamily: 'Helvetica', fontSize: 10, color: C.gray900, backgroundColor: '#ffffff', padding: 40 },
+    page: { fontFamily: 'Roboto', fontSize: 10, color: C.gray900, backgroundColor: '#ffffff', padding: 40 },
 
     // Header
     header:      { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 2, borderBottomColor: C.indigo, paddingBottom: 14, marginBottom: 22 },
-    headerTitle: { fontSize: 26, fontFamily: 'Helvetica-Bold', color: C.indigo },
+    headerTitle: { fontSize: 26, fontFamily: 'Roboto', fontWeight: 'bold', color: C.indigo },
     headerNum:   { fontSize: 12, color: C.slate500, marginTop: 4 },
     dateRow:     { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 3 },
-    dateLabel:   { fontFamily: 'Helvetica-Bold', fontSize: 10 },
+    dateLabel:   { fontFamily: 'Roboto', fontWeight: 'bold', fontSize: 10 },
     dateValue:   { fontSize: 10, marginLeft: 4 },
 
     // Parties
     parties:     { flexDirection: 'row', marginBottom: 22 },
     partyBlock:  { flex: 1, paddingRight: 20 },
-    partyLabel:  { fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.slate500, marginBottom: 6 },
-    partyName:   { fontSize: 14, fontFamily: 'Helvetica-Bold', marginBottom: 4 },
+    partyLabel:  { fontSize: 9, fontFamily: 'Roboto', fontWeight: 'bold', color: C.slate500, marginBottom: 6 },
+    partyName:   { fontSize: 14, fontFamily: 'Roboto', fontWeight: 'bold', marginBottom: 4 },
     partyAddr:   { fontSize: 10, color: C.gray700, lineHeight: 1.5, marginBottom: 2 },
     partyDetail: { fontSize: 9, color: C.gray500, marginTop: 1 },
     nonVat:      { fontSize: 9, color: C.slate500, marginTop: 6, fontStyle: 'italic' },
@@ -42,7 +50,7 @@ const S = StyleSheet.create({
     tblSection:    { marginBottom: 22 },
     tblHeaderRow:  { flexDirection: 'row', borderBottomWidth: 2, borderBottomColor: C.gray200, paddingBottom: 6, marginBottom: 2 },
     tblRow:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.gray200, paddingTop: 8, paddingBottom: 8 },
-    tblHead:       { fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.slate500 },
+    tblHead:       { fontSize: 8, fontFamily: 'Roboto', fontWeight: 'bold', color: C.slate500 },
     tblCell:       { fontSize: 10, color: C.gray900 },
     colDesc:       { flex: 3 },
     colQty:        { flex: 0.8, textAlign: 'center' },
@@ -53,11 +61,11 @@ const S = StyleSheet.create({
 
     // VAT box
     vatBox:   { backgroundColor: C.greenBg, borderWidth: 1, borderColor: C.greenBorder, borderRadius: 6, padding: 12, marginBottom: 18 },
-    vatTitle: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.green800, marginBottom: 8 },
+    vatTitle: { fontSize: 9, fontFamily: 'Roboto', fontWeight: 'bold', color: C.green800, marginBottom: 8 },
     vatRow:   { flexDirection: 'row' },
     vatCol:   { flex: 1 },
     vatLabel: { fontSize: 9, color: C.green800 },
-    vatVal:   { fontSize: 11, fontFamily: 'Helvetica-Bold', color: C.green700, marginTop: 2 },
+    vatVal:   { fontSize: 11, fontFamily: 'Roboto', fontWeight: 'bold', color: C.green700, marginTop: 2 },
 
     // QR + totals
     footerRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 18 },
@@ -65,10 +73,10 @@ const S = StyleSheet.create({
     totalsBlock: { width: 190 },
     totRow:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
     totLabel:    { color: C.slate500, fontSize: 10 },
-    totVal:      { fontSize: 10, fontFamily: 'Helvetica-Bold' },
+    totVal:      { fontSize: 10, fontFamily: 'Roboto', fontWeight: 'bold' },
     grandRow:    { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 2, borderTopColor: C.indigo, paddingTop: 8, marginTop: 4 },
-    grandLabel:  { fontSize: 14, fontFamily: 'Helvetica-Bold' },
-    grandVal:    { fontSize: 14, fontFamily: 'Helvetica-Bold', color: C.indigo },
+    grandLabel:  { fontSize: 14, fontFamily: 'Roboto', fontWeight: 'bold' },
+    grandVal:    { fontSize: 14, fontFamily: 'Roboto', fontWeight: 'bold', color: C.indigo },
 
     // Tax note
     noteBox: { borderWidth: 1, borderColor: C.slate200, borderRadius: 6, backgroundColor: C.slate50, padding: 10, marginBottom: 14, fontSize: 10 },
@@ -77,7 +85,7 @@ const S = StyleSheet.create({
     payBar:   { backgroundColor: C.slate50, borderTopWidth: 1, borderTopColor: C.slate200, padding: 10, flexDirection: 'row', flexWrap: 'wrap' },
     payItem:  { flexDirection: 'row', marginRight: 16, marginBottom: 4 },
     payLabel: { color: C.slate500, fontSize: 10 },
-    payVal:   { fontSize: 10, fontFamily: 'Helvetica-Bold', marginLeft: 3 },
+    payVal:   { fontSize: 10, fontFamily: 'Roboto', fontWeight: 'bold', marginLeft: 3 },
 
     thanks: { marginTop: 14, textAlign: 'center', fontSize: 9, color: C.slate400 },
 })
@@ -213,7 +221,7 @@ function InvoicePDF({ invoice, t, qrDataUrl }: { invoice: any; t: any; qrDataUrl
                     <View style={S.noteBox}>
                         {!!invoice.reverseChargeText && (
                             <Text style={{ marginBottom: (invoice.exchangeRate && invoice.exchangeRate !== '1.0000') ? 5 : 0 }}>
-                                <Text style={{ fontFamily: 'Helvetica-Bold' }}>{t.reverseCharge}: </Text>
+                                <Text style={{ fontFamily: 'Roboto', fontWeight: 'bold' }}>{t.reverseCharge}: </Text>
                                 {invoice.reverseChargeText}
                             </Text>
                         )}
