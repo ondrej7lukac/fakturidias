@@ -2,9 +2,11 @@ import './Settings.css'
 import { useState, useEffect } from 'react'
 import { safeStripeRedirect } from '@/lib/security'
 import { parseIban, calculateIban } from '../utils/bank'
+import { previewInvoiceNumber, InvoiceNumberFormat } from '../utils/storage'
 import AresSearch from './AresSearch'
 import {
   Contact, Wallet, Plug, Save, Mail, Cloud, Search, Check, RefreshCw, CreditCard, TrendingUp,
+  Upload, FileText,
   ICON_SM, ICON_MD, STROKE,
 } from '@/lib/icons'
 
@@ -29,6 +31,7 @@ interface Supplier {
   email?: string
   phone?: string
   web?: string
+  invoiceNumberFormat?: InvoiceNumberFormat
   [key: string]: unknown
 }
 
@@ -37,6 +40,11 @@ interface Subscription {
   status: string
   interval: string | null
   currentPeriodEnd: number | null
+}
+
+interface BankSync {
+  fioToken?: string
+  lastSyncAt?: string
 }
 
 interface SettingsProps {
@@ -50,6 +58,9 @@ interface SettingsProps {
   t: Record<string, string>
   subscription?: Subscription | null
   invoiceCount?: number
+  bankSync?: BankSync | null
+  setBankSync?: (fn: (prev: BankSync | null) => BankSync) => void
+  onInvoicesRefresh?: () => void
 }
 
 export default function Settings({
@@ -61,6 +72,9 @@ export default function Settings({
   t,
   subscription,
   invoiceCount = 0,
+  bankSync,
+  setBankSync,
+  onInvoicesRefresh,
 }: SettingsProps) {
   const [tab, setTab] = useState(1)
   const [checkoutLoading, setCheckoutLoading] = useState<'month' | 'year' | null>(null)
@@ -73,6 +87,14 @@ export default function Settings({
   })
   const [smtpConfig, setSmtpConfig] = useState({ useGoogle: false, fromEmail: '' })
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [fioToken, setFioToken] = useState(bankSync?.fioToken || '')
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle')
+  const [syncResult, setSyncResult] = useState<{ matched: number; updated: { invoiceNumber: string }[] } | null>(null)
+  const [syncError, setSyncError] = useState('')
+  const [importStatus, setImportStatus] = useState<'idle' | 'importing' | 'done' | 'error'>('idle')
+  const [importResult, setImportResult] = useState<{ parsed: number; matched: number; updated: { invoiceNumber: string }[] } | null>(null)
+  const [importError, setImportError] = useState('')
+  const [importFileName, setImportFileName] = useState('')
 
   const isCz = lang === 'cs'
 
@@ -166,17 +188,90 @@ export default function Settings({
 
   const handleSave = async () => {
     setSaveStatus('saving')
+    const newBankSync = { ...(bankSync || {}), fioToken: fioToken.trim() || undefined }
     try {
       const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: { defaultSupplier } }),
+        body: JSON.stringify({ settings: { defaultSupplier, bankSync: newBankSync } }),
       })
+      if (res.ok && setBankSync) {
+        setBankSync(() => newBankSync)
+      }
       setSaveStatus(res.ok ? 'saved' : 'idle')
     } catch {
       setSaveStatus('idle')
     }
     setTimeout(() => setSaveStatus('idle'), 2200)
+  }
+
+  const handleBankSync = async () => {
+    setSyncStatus('syncing')
+    setSyncResult(null)
+    setSyncError('')
+    try {
+      // Save token first if changed
+      if (fioToken.trim() !== (bankSync?.fioToken || '')) {
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ settings: { bankSync: { ...(bankSync || {}), fioToken: fioToken.trim() } } }),
+        })
+        if (setBankSync) setBankSync(prev => ({ ...(prev || {}), fioToken: fioToken.trim() }))
+      }
+      const res = await fetch('/api/bank/sync', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setSyncError(data.error || (isCz ? 'Synchronizace selhala.' : 'Sync failed.'))
+        setSyncStatus('error')
+      } else {
+        setSyncResult(data)
+        if (setBankSync) setBankSync(prev => ({ ...(prev || {}), lastSyncAt: new Date().toISOString() }))
+        if (data.matched > 0 && onInvoicesRefresh) onInvoicesRefresh()
+        setSyncStatus('done')
+      }
+    } catch {
+      setSyncError(isCz ? 'Chyba připojení k serveru.' : 'Server connection error.')
+      setSyncStatus('error')
+    }
+  }
+
+  const handleStatementImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportFileName(file.name)
+    setImportStatus('importing')
+    setImportResult(null)
+    setImportError('')
+    const reader = new FileReader()
+    reader.onload = async (ev) => {
+      const content = ev.target?.result as string
+      try {
+        const res = await fetch('/api/bank/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, filename: file.name }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          setImportError(data.error || (isCz ? 'Import selhal.' : 'Import failed.'))
+          setImportStatus('error')
+        } else {
+          setImportResult(data)
+          if (data.matched > 0 && onInvoicesRefresh) onInvoicesRefresh()
+          setImportStatus('done')
+        }
+      } catch {
+        setImportError(isCz ? 'Chyba připojení k serveru.' : 'Server connection error.')
+        setImportStatus('error')
+      }
+    }
+    reader.onerror = () => {
+      setImportError(isCz ? 'Nepodařilo se přečíst soubor.' : 'Could not read file.')
+      setImportStatus('error')
+    }
+    reader.readAsText(file, 'utf-8')
+    e.target.value = ''
   }
 
   const unlock = (field: string) => setLockedFields(prev => ({ ...prev, [field]: false }))
@@ -559,6 +654,92 @@ export default function Settings({
             </div>
           </div>
 
+          {/* Invoice numbering card */}
+          <div className="ap-card">
+            <h3 className="ap-card__title">
+              <Wallet size={ICON_MD} strokeWidth={STROKE} />
+              {isCz ? 'Číslování faktur' : 'Invoice numbering'}
+            </h3>
+            <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 16px' }}>
+              {isCz
+                ? 'Nastavte formát čísla faktury. Pořadové číslo se doplní automaticky.'
+                : 'Configure the invoice number format. The sequence counter is filled automatically.'}
+            </p>
+            <div className="ap-grid ap-grid--2">
+              <div className="ap-field">
+                <label>{isCz ? 'Předpona (prefix)' : 'Prefix'}</label>
+                <input
+                  className="ap-input"
+                  placeholder={isCz ? 'např. FA nebo prázdné' : 'e.g. FA or leave empty'}
+                  value={String(defaultSupplier?.invoiceNumberFormat?.prefix ?? '')}
+                  onChange={e => setDefaultSupplier(prev => ({
+                    ...prev!,
+                    invoiceNumberFormat: { ...prev?.invoiceNumberFormat, prefix: e.target.value },
+                  }))}
+                />
+              </div>
+              <div className="ap-field">
+                <label>{isCz ? 'Oddělovač' : 'Separator'}</label>
+                <select
+                  className="ap-select"
+                  value={String(defaultSupplier?.invoiceNumberFormat?.separator ?? '')}
+                  onChange={e => setDefaultSupplier(prev => ({
+                    ...prev!,
+                    invoiceNumberFormat: { ...prev?.invoiceNumberFormat, separator: e.target.value },
+                  }))}
+                >
+                  <option value="">{isCz ? 'žádný — 2025001' : 'none — 2025001'}</option>
+                  <option value="-">- pomlčka — FA-2025-001</option>
+                  <option value="/">{isCz ? '/ lomítko — FA/2025/001' : '/ slash — FA/2025/001'}</option>
+                </select>
+              </div>
+              <div className="ap-field">
+                <label>{isCz ? 'Počet číslic pořadí' : 'Sequence digits'}</label>
+                <select
+                  className="ap-select"
+                  value={String(defaultSupplier?.invoiceNumberFormat?.padding ?? 3)}
+                  onChange={e => setDefaultSupplier(prev => ({
+                    ...prev!,
+                    invoiceNumberFormat: { ...prev?.invoiceNumberFormat, padding: Number(e.target.value) },
+                  }))}
+                >
+                  <option value="2">2 — 01</option>
+                  <option value="3">3 — 001</option>
+                  <option value="4">4 — 0001</option>
+                </select>
+              </div>
+              <div className="ap-field">
+                <label>{isCz ? 'Zahrnout rok' : 'Include year'}</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 38 }}>
+                  <button
+                    type="button"
+                    className="ap-toggle"
+                    data-on={String(defaultSupplier?.invoiceNumberFormat?.includeYear !== false)}
+                    aria-label={isCz ? 'Zahrnout rok' : 'Include year'}
+                    onClick={() => setDefaultSupplier(prev => ({
+                      ...prev!,
+                      invoiceNumberFormat: {
+                        ...prev?.invoiceNumberFormat,
+                        includeYear: prev?.invoiceNumberFormat?.includeYear === false ? true : false,
+                      },
+                    }))}
+                  />
+                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+                    {defaultSupplier?.invoiceNumberFormat?.includeYear !== false
+                      ? (isCz ? 'Ano' : 'Yes')
+                      : (isCz ? 'Ne' : 'No')}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--bg2)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{isCz ? 'Náhled:' : 'Preview:'}</span>
+              <code style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)', letterSpacing: '0.02em' }}>
+                {previewInvoiceNumber(defaultSupplier?.invoiceNumberFormat as InvoiceNumberFormat)}
+              </code>
+            </div>
+          </div>
+
           <div className="ap-save-bar">
             <button className="ap-btn ap-btn--ghost" type="button">{isCz ? 'Zrušit' : 'Cancel'}</button>
             <button className="ap-btn ap-btn--primary" type="button" onClick={handleSave}>
@@ -685,6 +866,122 @@ export default function Settings({
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Fio Bank payment matching card */}
+          <div className="ap-card">
+            <h3 className="ap-card__title">
+              <Wallet size={ICON_MD} strokeWidth={STROKE} />
+              {isCz ? 'Fio banka — automatické párování plateb' : 'Fio Bank — automatic payment matching'}
+              {bankSync?.fioToken && (
+                <span className="ap-pill paid" style={{ fontSize: 10.5, padding: '2px 8px' }}>
+                  {isCz ? 'Připojeno' : 'Connected'}
+                </span>
+              )}
+            </h3>
+            <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 14px' }}>
+              {isCz
+                ? 'Zadejte API token z Fio banky (Internet banking → API). Aplikace načte příchozí platby a automaticky označí odpovídající faktury jako zaplacené podle variabilního symbolu a částky.'
+                : 'Enter your Fio Bank API token (Internet banking → API). The app will fetch incoming payments and automatically mark matching invoices as paid based on variable symbol and amount.'}
+            </p>
+            <div className="ap-field" style={{ marginBottom: 14 }}>
+              <label>{isCz ? 'Fio API token' : 'Fio API token'}</label>
+              <input
+                className="ap-input"
+                type="password"
+                placeholder={isCz ? 'Vložte token z Fio Internet Bankingu' : 'Paste token from Fio Internet Banking'}
+                value={fioToken}
+                onChange={e => setFioToken(e.target.value)}
+                autoComplete="off"
+              />
+            </div>
+            {bankSync?.lastSyncAt && (
+              <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 12px' }}>
+                {isCz ? 'Poslední synchronizace:' : 'Last sync:'}{' '}
+                {new Date(bankSync.lastSyncAt).toLocaleString(isCz ? 'cs-CZ' : 'en-GB')}
+              </p>
+            )}
+            {syncStatus === 'done' && syncResult && (
+              <div style={{ padding: '10px 14px', background: 'rgba(45,215,166,0.1)', border: '1px solid rgba(45,215,166,0.3)', borderRadius: 8, marginBottom: 12, fontSize: 13, color: 'var(--text)' }}>
+                {syncResult.matched === 0
+                  ? (isCz ? 'Žádné nové platby ke spárování.' : 'No new payments to match.')
+                  : (isCz
+                    ? `Spárováno ${syncResult.matched} faktur: ${syncResult.updated.map(u => u.invoiceNumber).join(', ')}`
+                    : `Matched ${syncResult.matched} invoice(s): ${syncResult.updated.map(u => u.invoiceNumber).join(', ')}`)}
+              </div>
+            )}
+            {syncStatus === 'error' && (
+              <div style={{ padding: '10px 14px', background: 'rgba(227,61,99,0.1)', border: '1px solid rgba(227,61,99,0.3)', borderRadius: 8, marginBottom: 12, fontSize: 13, color: 'var(--danger)' }}>
+                {syncError}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                className="ap-btn ap-btn--primary"
+                type="button"
+                disabled={!fioToken.trim() || syncStatus === 'syncing'}
+                onClick={handleBankSync}
+              >
+                <RefreshCw size={ICON_SM} strokeWidth={STROKE} />
+                {syncStatus === 'syncing'
+                  ? (isCz ? 'Synchronizuji…' : 'Syncing…')
+                  : (isCz ? 'Synchronizovat platby' : 'Sync payments')}
+              </button>
+            </div>
+          </div>
+
+          {/* Bank statement import card */}
+          <div className="ap-card">
+            <h3 className="ap-card__title">
+              <Upload size={ICON_MD} strokeWidth={STROKE} />
+              {isCz ? 'Import výpisu — všechny banky' : 'Import bank statement — all banks'}
+            </h3>
+            <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 6px' }}>
+              {isCz
+                ? 'Nahrajte CSV nebo XML výpis z internet bankingu. Funguje s Fio, Air Bank, KB, ČS, ČSOB, Raiffeisenbank, mBank a Moneta.'
+                : 'Upload a CSV or XML export from your internet banking. Works with Fio, Air Bank, KB, ČS, ČSOB, Raiffeisenbank, mBank and Moneta.'}
+            </p>
+            <p style={{ color: 'var(--muted)', fontSize: 12, margin: '0 0 14px' }}>
+              {isCz
+                ? 'Faktury se statusem Odeslaná nebo Po splatnosti jsou automaticky označeny jako Zaplacené podle variabilního symbolu a částky.'
+                : 'Invoices with status Sent or Overdue are automatically marked as Paid based on variable symbol and amount.'}
+            </p>
+
+            {importStatus === 'done' && importResult && (
+              <div style={{ padding: '10px 14px', background: 'rgba(45,215,166,0.1)', border: '1px solid rgba(45,215,166,0.3)', borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
+                <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                  {importFileName && <><FileText size={12} strokeWidth={STROKE} style={{ marginRight: 4 }} />{importFileName} — </>}
+                  {isCz ? `${importResult.parsed} transakcí načteno` : `${importResult.parsed} transactions parsed`}
+                </div>
+                {importResult.matched === 0
+                  ? (isCz ? 'Žádné faktury ke spárování.' : 'No invoices matched.')
+                  : (isCz
+                    ? `Spárováno ${importResult.matched} faktur: ${importResult.updated.map(u => u.invoiceNumber).join(', ')}`
+                    : `Matched ${importResult.matched} invoice(s): ${importResult.updated.map(u => u.invoiceNumber).join(', ')}`)}
+              </div>
+            )}
+            {importStatus === 'error' && (
+              <div style={{ padding: '10px 14px', background: 'rgba(227,61,99,0.1)', border: '1px solid rgba(227,61,99,0.3)', borderRadius: 8, marginBottom: 12, fontSize: 13, color: 'var(--danger)' }}>
+                {importError}
+              </div>
+            )}
+
+            <label
+              className={`ap-btn ${importStatus === 'importing' ? 'ap-btn--secondary' : 'ap-btn--primary'}`}
+              style={{ cursor: importStatus === 'importing' ? 'not-allowed' : 'pointer', display: 'inline-flex', gap: 6, alignItems: 'center' }}
+            >
+              <Upload size={ICON_SM} strokeWidth={STROKE} />
+              {importStatus === 'importing'
+                ? (isCz ? 'Zpracovávám…' : 'Processing…')
+                : (isCz ? 'Nahrát výpis' : 'Upload statement')}
+              <input
+                type="file"
+                accept=".csv,.xml,.txt"
+                style={{ display: 'none' }}
+                disabled={importStatus === 'importing'}
+                onChange={handleStatementImport}
+              />
+            </label>
           </div>
 
           {/* Sync card */}
