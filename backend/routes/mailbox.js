@@ -1,6 +1,6 @@
-"use strict";
+'use strict';
 
-const { sendJson, parseBody, SECURITY_HEADERS } = require("../lib/utils");
+const { sendJson, parseBody, SECURITY_HEADERS } = require('../lib/utils');
 const {
   getMailboxByUser,
   claimMailbox,
@@ -8,9 +8,21 @@ const {
   getReceivedInvoice,
   saveReceivedInvoice,
   deleteReceivedInvoice,
-} = require("../lib/storage");
+} = require('../lib/storage');
 
-const INBOUND_DOMAIN = process.env.INBOUND_DOMAIN || "fakturidias.app";
+const INBOUND_DOMAIN = process.env.INBOUND_DOMAIN || 'fakturidias.app';
+
+function inboundSetupStatus() {
+  const missing = [];
+  if (!process.env.RESEND_API_KEY) missing.push('RESEND_API_KEY');
+  if (!process.env.INBOUND_WEBHOOK_SECRET)
+    missing.push('INBOUND_WEBHOOK_SECRET');
+  if (!process.env.INBOUND_DOMAIN) missing.push('INBOUND_DOMAIN');
+  return {
+    ready: missing.length === 0,
+    missing,
+  };
+}
 
 function publicMailbox(m) {
   if (!m) return null;
@@ -30,7 +42,7 @@ function stripAttachments(r) {
     subject: r.subject,
     textPreview: r.textPreview,
     parsed: r.parsed || null,
-    parseStatus: r.parseStatus || "none",
+    parseStatus: r.parseStatus || 'none',
     parseError: r.parseError || null,
     approvedInvoiceId: r.approvedInvoiceId || null,
     attachments: (r.attachments || []).map((a, index) => ({
@@ -44,21 +56,22 @@ function stripAttachments(r) {
 
 function attach(router) {
   // Current user's mailbox address (or null if not set up yet).
-  router.add("GET", "/api/mailbox", async ({ res, userEmail }) => {
+  router.add('GET', '/api/mailbox', async ({ res, userEmail }) => {
     const m = await getMailboxByUser(userEmail);
     return sendJson(res, 200, {
       mailbox: publicMailbox(m),
       domain: INBOUND_DOMAIN,
+      inbound: inboundSetupStatus(),
     });
   });
 
   // Claim / change the mailbox slug (companyname → companyname@domain).
-  router.add("POST", "/api/mailbox", async ({ req, res, userEmail }) => {
+  router.add('POST', '/api/mailbox', async ({ req, res, userEmail }) => {
     let body;
     try {
       body = await parseBody(req);
     } catch {
-      return sendJson(res, 400, { error: "Invalid request body" });
+      return sendJson(res, 400, { error: 'Invalid request body' });
     }
 
     const result = await claimMailbox(userEmail, body.slug, INBOUND_DOMAIN);
@@ -66,28 +79,29 @@ function attach(router) {
     return sendJson(res, 200, {
       mailbox: publicMailbox(result.mailbox),
       domain: INBOUND_DOMAIN,
+      inbound: inboundSetupStatus(),
     });
   });
 
   // List received bills awaiting review.
-  router.add("GET", "/api/mailbox/received", async ({ res, userEmail }) => {
+  router.add('GET', '/api/mailbox/received', async ({ res, userEmail }) => {
     const list = await getReceivedInvoices(userEmail);
     return sendJson(res, 200, { received: list.map(stripAttachments) });
   });
 
   router.add(
-    "GET",
-    "/api/mailbox/received/:id",
+    'GET',
+    '/api/mailbox/received/:id',
     async ({ res, userEmail, params }) => {
       const r = await getReceivedInvoice(userEmail, params.id);
-      if (!r) return sendJson(res, 404, { error: "Not found" });
+      if (!r) return sendJson(res, 404, { error: 'Not found' });
       return sendJson(res, 200, { received: stripAttachments(r) });
     },
   );
 
   router.add(
-    "DELETE",
-    "/api/mailbox/received/:id",
+    'DELETE',
+    '/api/mailbox/received/:id',
     async ({ res, userEmail, params }) => {
       await deleteReceivedInvoice(userEmail, params.id);
       return sendJson(res, 200, { success: true });
@@ -96,26 +110,26 @@ function attach(router) {
 
   // Serve a single attachment's raw bytes (for inline preview/download).
   router.add(
-    "GET",
-    "/api/mailbox/attachment/:id",
+    'GET',
+    '/api/mailbox/attachment/:id',
     async ({ res, userEmail, params, url }) => {
       const r = await getReceivedInvoice(userEmail, params.id);
-      if (!r) return sendJson(res, 404, { error: "Not found" });
+      if (!r) return sendJson(res, 404, { error: 'Not found' });
 
-      const index = Number(url.searchParams.get("index") || 0);
+      const index = Number(url.searchParams.get('index') || 0);
       const att = (r.attachments || [])[index];
       if (!att || !att.data)
-        return sendJson(res, 404, { error: "Attachment not found" });
+        return sendJson(res, 404, { error: 'Attachment not found' });
 
-      const buf = Buffer.from(att.data, "base64");
-      const safeName = String(att.filename || "attachment").replace(
+      const buf = Buffer.from(att.data, 'base64');
+      const safeName = String(att.filename || 'attachment').replace(
         /["\r\n]/g,
-        "",
+        '',
       );
       res.writeHead(200, {
-        "Content-Type": att.contentType || "application/octet-stream",
-        "Content-Disposition": `inline; filename="${safeName}"`,
-        "Content-Length": buf.length,
+        'Content-Type': att.contentType || 'application/octet-stream',
+        'Content-Disposition': `inline; filename="${safeName}"`,
+        'Content-Length': buf.length,
         ...SECURITY_HEADERS,
       });
       return res.end(buf);
@@ -124,25 +138,25 @@ function attach(router) {
 
   // Approve a parsed bill — persist the (possibly edited) fields.
   router.add(
-    "POST",
-    "/api/mailbox/approve",
+    'POST',
+    '/api/mailbox/approve',
     async ({ req, res, userEmail }) => {
       let body;
       try {
         body = await parseBody(req);
       } catch {
-        return sendJson(res, 400, { error: "Invalid request body" });
+        return sendJson(res, 400, { error: 'Invalid request body' });
       }
-      if (!body.id) return sendJson(res, 400, { error: "id is required" });
+      if (!body.id) return sendJson(res, 400, { error: 'id is required' });
 
       const r = await getReceivedInvoice(userEmail, body.id);
-      if (!r) return sendJson(res, 404, { error: "Not found" });
+      if (!r) return sendJson(res, 404, { error: 'Not found' });
 
       const updated = {
         ...r,
-        status: "approved",
+        status: 'approved',
         parsed: body.parsed || r.parsed,
-        parseStatus: r.parseStatus === "none" ? "done" : r.parseStatus,
+        parseStatus: r.parseStatus === 'none' ? 'done' : r.parseStatus,
       };
       const saved = await saveReceivedInvoice(userEmail, updated);
       return sendJson(res, 200, {
@@ -152,21 +166,21 @@ function attach(router) {
   );
 
   // Reject a bill (keeps it in the list, marked rejected).
-  router.add("POST", "/api/mailbox/reject", async ({ req, res, userEmail }) => {
+  router.add('POST', '/api/mailbox/reject', async ({ req, res, userEmail }) => {
     let body;
     try {
       body = await parseBody(req);
     } catch {
-      return sendJson(res, 400, { error: "Invalid request body" });
+      return sendJson(res, 400, { error: 'Invalid request body' });
     }
-    if (!body.id) return sendJson(res, 400, { error: "id is required" });
+    if (!body.id) return sendJson(res, 400, { error: 'id is required' });
 
     const r = await getReceivedInvoice(userEmail, body.id);
-    if (!r) return sendJson(res, 404, { error: "Not found" });
+    if (!r) return sendJson(res, 404, { error: 'Not found' });
 
     const saved = await saveReceivedInvoice(userEmail, {
       ...r,
-      status: "rejected",
+      status: 'rejected',
     });
     return sendJson(res, 200, { received: stripAttachments(saved || r) });
   });

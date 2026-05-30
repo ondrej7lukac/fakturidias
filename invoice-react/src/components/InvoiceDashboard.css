@@ -195,7 +195,11 @@ html.theme-dark .invoice-export-modal-overlay {
   padding: 1rem;
   background:
     radial-gradient(circle at top, var(--export-overlay-glow), transparent 38%),
-    linear-gradient(180deg, var(--export-overlay-start), var(--export-overlay-end));
+    linear-gradient(
+      180deg,
+      var(--export-overlay-start),
+      var(--export-overlay-end)
+    );
   backdrop-filter: blur(14px);
 }
 
@@ -209,7 +213,11 @@ html.theme-dark .invoice-export-modal-overlay {
   max-height: min(80vh, 720px);
   overflow: auto;
   overscroll-behavior: contain;
-  background: linear-gradient(180deg, var(--export-surface-top), var(--export-surface-bottom));
+  background: linear-gradient(
+    180deg,
+    var(--export-surface-top),
+    var(--export-surface-bottom)
+  );
   border: 1px solid var(--export-border);
   border-radius: 22px;
   box-shadow:
@@ -319,7 +327,8 @@ html.theme-dark .invoice-export-modal-overlay {
   border-radius: 14px;
   background: var(--export-select-popup-bg);
   color: var(--export-check-text);
-  box-shadow: var(--export-select-popup-shadow),
+  box-shadow:
+    var(--export-select-popup-shadow),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(18px);
 }
@@ -378,7 +387,11 @@ html.theme-dark .invoice-export-modal-overlay {
   gap: 0.8rem;
   padding: 0.72rem 0.82rem;
   border-radius: 15px;
-  background: linear-gradient(180deg, var(--export-summary-top), var(--export-summary-bottom));
+  background: linear-gradient(
+    180deg,
+    var(--export-summary-top),
+    var(--export-summary-bottom)
+  );
   border: 1px solid var(--export-summary-border);
   color: var(--export-summary-text);
 }

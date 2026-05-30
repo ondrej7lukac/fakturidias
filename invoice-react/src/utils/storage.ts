@@ -153,6 +153,11 @@ export interface MailboxInfo {
   createdAt?: string;
 }
 
+export interface MailboxInboundStatus {
+  ready: boolean;
+  missing: string[];
+}
+
 export interface ReceivedAttachment {
   index: number;
   filename: string;
@@ -181,6 +186,7 @@ export interface ReceivedInvoice {
 export async function getMailbox(): Promise<{
   mailbox: MailboxInfo | null;
   domain: string;
+  inbound: MailboxInboundStatus;
 }> {
   const res = await fetch('/api/mailbox');
   if (!res.ok) throw new Error('Failed to load mailbox');
@@ -189,7 +195,11 @@ export async function getMailbox(): Promise<{
 
 export async function claimMailbox(
   slug: string,
-): Promise<{ mailbox: MailboxInfo; domain: string }> {
+): Promise<{
+  mailbox: MailboxInfo;
+  domain: string;
+  inbound: MailboxInboundStatus;
+}> {
   const res = await fetch('/api/mailbox', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
