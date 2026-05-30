@@ -22,6 +22,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   BarChart2,
   X,
   AlertTriangle,
@@ -874,106 +881,157 @@ export default function InvoiceDashboard({
             <div className='invoice-export-modal__grid'>
               <label className='invoice-export-modal__field'>
                 <span>{L.exportYear}</span>
-                <select
-                  className='ap-select'
-                  value={exportYear}
-                  onChange={(event) => setExportYear(event.target.value)}
-                >
-                  {availableYears.map((year) => (
-                    <option key={year} value={String(year)}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
+                <Select value={exportYear} onValueChange={setExportYear}>
+                  <SelectTrigger className='invoice-export-modal__select'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent
+                    align='start'
+                    className='invoice-export-modal__select-content'
+                    positionerClassName='z-[100002]'
+                  >
+                    {availableYears.map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </label>
 
               <label className='invoice-export-modal__field'>
                 <span>{L.exportPaymentFilter}</span>
-                <select
-                  className='ap-select'
+                <Select
                   value={exportPaymentFilter}
-                  onChange={(event) =>
-                    setExportPaymentFilter(
-                      event.target.value as AccountantPaymentFilter,
-                    )
+                  onValueChange={(value) =>
+                    setExportPaymentFilter(value as AccountantPaymentFilter)
                   }
                 >
-                  <option value='all'>{L.exportFilterAll}</option>
-                  <option value='paid'>{L.exportFilterPaid}</option>
-                  <option value='unpaid'>{L.exportFilterUnpaid}</option>
-                </select>
+                  <SelectTrigger className='invoice-export-modal__select'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent
+                    align='start'
+                    className='invoice-export-modal__select-content'
+                    positionerClassName='z-[100002]'
+                  >
+                    <SelectItem value='all'>{L.exportFilterAll}</SelectItem>
+                    <SelectItem value='paid'>{L.exportFilterPaid}</SelectItem>
+                    <SelectItem value='unpaid'>
+                      {L.exportFilterUnpaid}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </label>
 
               <label className='invoice-export-modal__field'>
                 <span>{L.exportTerritory}</span>
-                <select
-                  className='ap-select'
+                <Select
                   value={exportTerritoryFilter}
-                  onChange={(event) =>
-                    setExportTerritoryFilter(
-                      event.target.value as AccountantTerritoryFilter,
-                    )
+                  onValueChange={(value) =>
+                    setExportTerritoryFilter(value as AccountantTerritoryFilter)
                   }
                 >
-                  <option value='all'>{L.exportTerritoryAll}</option>
-                  <option value='domestic'>{L.exportTerritoryDomestic}</option>
-                  <option value='eu'>{L.exportTerritoryEu}</option>
-                  <option value='foreign'>{L.exportTerritoryForeign}</option>
-                </select>
+                  <SelectTrigger className='invoice-export-modal__select'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent
+                    align='start'
+                    className='invoice-export-modal__select-content'
+                    positionerClassName='z-[100002]'
+                  >
+                    <SelectItem value='all'>{L.exportTerritoryAll}</SelectItem>
+                    <SelectItem value='domestic'>
+                      {L.exportTerritoryDomestic}
+                    </SelectItem>
+                    <SelectItem value='eu'>{L.exportTerritoryEu}</SelectItem>
+                    <SelectItem value='foreign'>
+                      {L.exportTerritoryForeign}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </label>
 
               <label className='invoice-export-modal__field'>
                 <span>{L.exportDateBasis}</span>
-                <select
-                  className='ap-select'
+                <Select
                   value={exportDateBasis}
-                  onChange={(event) =>
-                    setExportDateBasis(
-                      event.target.value as AccountantDateBasis,
-                    )
+                  onValueChange={(value) =>
+                    setExportDateBasis(value as AccountantDateBasis)
                   }
                 >
-                  <option value='taxableSupplyDate'>
-                    {L.exportDateBasisTaxable}
-                  </option>
-                  <option value='issueDate'>{L.exportDateBasisIssue}</option>
-                </select>
+                  <SelectTrigger className='invoice-export-modal__select'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent
+                    align='start'
+                    className='invoice-export-modal__select-content'
+                    positionerClassName='z-[100002]'
+                  >
+                    <SelectItem value='taxableSupplyDate'>
+                      {L.exportDateBasisTaxable}
+                    </SelectItem>
+                    <SelectItem value='issueDate'>
+                      {L.exportDateBasisIssue}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </label>
 
               <div className='invoice-export-modal__field invoice-export-modal__field--full'>
                 <span>{L.exportVariant}</span>
-                <select
-                  className='ap-select'
+                <Select
                   value={exportVariant}
-                  onChange={(event) =>
-                    setExportVariant(
-                      event.target.value as AccountantExportVariant,
-                    )
+                  onValueChange={(value) =>
+                    setExportVariant(value as AccountantExportVariant)
                   }
                 >
-                  <option value='detail'>{L.exportVariantDetail}</option>
-                  <option value='monthly'>{L.exportVariantMonthly}</option>
-                  <option value='vat'>{L.exportVariantVat}</option>
-                  <option value='smallBusiness'>
-                    {L.exportVariantSmallBusiness}
-                  </option>
-                </select>
+                  <SelectTrigger className='invoice-export-modal__select'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent
+                    align='start'
+                    className='invoice-export-modal__select-content'
+                    positionerClassName='z-[100002]'
+                  >
+                    <SelectItem value='detail'>
+                      {L.exportVariantDetail}
+                    </SelectItem>
+                    <SelectItem value='monthly'>
+                      {L.exportVariantMonthly}
+                    </SelectItem>
+                    <SelectItem value='vat'>{L.exportVariantVat}</SelectItem>
+                    <SelectItem value='smallBusiness'>
+                      {L.exportVariantSmallBusiness}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <label className='invoice-export-modal__field invoice-export-modal__field--full'>
                 <span>{L.exportDocumentScope}</span>
-                <select
-                  className='ap-select'
+                <Select
                   value={exportDocumentScope}
-                  onChange={(event) =>
-                    setExportDocumentScope(
-                      event.target.value as AccountantDocumentScope,
-                    )
+                  onValueChange={(value) =>
+                    setExportDocumentScope(value as AccountantDocumentScope)
                   }
                 >
-                  <option value='issued'>{L.exportDocumentScopeIssued}</option>
-                  <option value='all'>{L.exportDocumentScopeAll}</option>
-                </select>
+                  <SelectTrigger className='invoice-export-modal__select'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent
+                    align='start'
+                    className='invoice-export-modal__select-content'
+                    positionerClassName='z-[100002]'
+                  >
+                    <SelectItem value='issued'>
+                      {L.exportDocumentScopeIssued}
+                    </SelectItem>
+                    <SelectItem value='all'>
+                      {L.exportDocumentScopeAll}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </label>
 
               <div className='invoice-export-modal__field invoice-export-modal__field--full'>
