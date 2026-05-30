@@ -1,5 +1,5 @@
-import "./Mailbox.css";
-import { useEffect, useMemo, useState } from "react";
+import './Mailbox.css';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Mail,
   RefreshCw,
@@ -16,7 +16,7 @@ import {
   ICON_SM,
   ICON_MD,
   STROKE,
-} from "@/lib/icons";
+} from '@/lib/icons';
 import {
   getMailbox,
   claimMailbox,
@@ -27,8 +27,9 @@ import {
   attachmentUrl,
   money,
   type MailboxInfo,
+  type MailboxInboundStatus,
   type ReceivedInvoice,
-} from "../utils/storage";
+} from '../utils/storage';
 
 interface MailboxProps {
   lang: string;
@@ -47,13 +48,17 @@ function calcTotal(parsed: any): number {
 }
 
 export default function Mailbox({ lang, user }: MailboxProps) {
-  const isCz = lang === "cs";
+  const isCz = lang === 'cs';
   const [loading, setLoading] = useState(true);
   const [mailbox, setMailbox] = useState<MailboxInfo | null>(null);
-  const [domain, setDomain] = useState("fakturidias.app");
-  const [slugInput, setSlugInput] = useState("");
+  const [domain, setDomain] = useState('fakturidias.app');
+  const [inbound, setInbound] = useState<MailboxInboundStatus>({
+    ready: true,
+    missing: [],
+  });
+  const [slugInput, setSlugInput] = useState('');
   const [claiming, setClaiming] = useState(false);
-  const [claimError, setClaimError] = useState("");
+  const [claimError, setClaimError] = useState('');
   const [copied, setCopied] = useState(false);
 
   const [received, setReceived] = useState<ReceivedInvoice[]>([]);
@@ -72,6 +77,7 @@ export default function Mailbox({ lang, user }: MailboxProps) {
       const info = await getMailbox();
       setMailbox(info.mailbox);
       setDomain(info.domain);
+      setInbound(info.inbound || { ready: true, missing: [] });
       if (info.mailbox) {
         const list = await getReceivedInvoices();
         setReceived(list);
@@ -98,16 +104,17 @@ export default function Mailbox({ lang, user }: MailboxProps) {
   }, [selectedId, selected?.parseStatus]);
 
   const handleClaim = async () => {
-    setClaimError("");
+    setClaimError('');
     setClaiming(true);
     try {
       const res = await claimMailbox(slugInput);
       setMailbox(res.mailbox);
       setDomain(res.domain);
+      setInbound(res.inbound || { ready: true, missing: [] });
       await loadAll();
     } catch (err: any) {
       setClaimError(
-        err?.message || (isCz ? "Nepodařilo se uložit" : "Failed to save"),
+        err?.message || (isCz ? 'Nepodařilo se uložit' : 'Failed to save'),
       );
     } finally {
       setClaiming(false);
@@ -160,7 +167,7 @@ export default function Mailbox({ lang, user }: MailboxProps) {
 
   const handleDelete = async () => {
     if (!selected) return;
-    if (!window.confirm(isCz ? "Smazat tuto položku?" : "Delete this item?"))
+    if (!window.confirm(isCz ? 'Smazat tuto položku?' : 'Delete this item?'))
       return;
     setBusy(true);
     try {
@@ -178,14 +185,14 @@ export default function Mailbox({ lang, user }: MailboxProps) {
   // ── Render guards ──────────────────────────────────────────────────────────
   if (!user) {
     return (
-      <div className="mbx-wrap">
-        <div className="mbx-empty card">
+      <div className='mbx-wrap'>
+        <div className='mbx-empty card'>
           <Mail size={32} strokeWidth={1.5} />
-          <h2>{isCz ? "Schránka faktur" : "Invoice mailbox"}</h2>
+          <h2>{isCz ? 'Schránka faktur' : 'Invoice mailbox'}</h2>
           <p>
             {isCz
-              ? "Pro vytvoření e-mailové schránky se prosím přihlaste."
-              : "Please sign in to create your invoice mailbox."}
+              ? 'Pro vytvoření e-mailové schránky se prosím přihlaste.'
+              : 'Please sign in to create your invoice mailbox.'}
           </p>
         </div>
       </div>
@@ -194,10 +201,10 @@ export default function Mailbox({ lang, user }: MailboxProps) {
 
   if (loading) {
     return (
-      <div className="mbx-wrap">
-        <div className="mbx-empty card">
-          <Loader2 size={28} className="mbx-spin" />
-          <p>{isCz ? "Načítání…" : "Loading…"}</p>
+      <div className='mbx-wrap'>
+        <div className='mbx-empty card'>
+          <Loader2 size={28} className='mbx-spin' />
+          <p>{isCz ? 'Načítání…' : 'Loading…'}</p>
         </div>
       </div>
     );
@@ -206,50 +213,58 @@ export default function Mailbox({ lang, user }: MailboxProps) {
   // ── Mailbox setup ──────────────────────────────────────────────────────────
   if (!mailbox) {
     return (
-      <div className="mbx-wrap">
-        <div className="mbx-setup card">
-          <div className="mbx-setup__icon">
+      <div className='mbx-wrap'>
+        <div className='mbx-setup card'>
+          <div className='mbx-setup__icon'>
             <Mail size={28} strokeWidth={1.5} />
           </div>
           <h2>
             {isCz
-              ? "Vytvořte si schránku faktur"
-              : "Create your invoice mailbox"}
+              ? 'Vytvořte si schránku faktur'
+              : 'Create your invoice mailbox'}
           </h2>
-          <p className="mbx-setup__lead">
+          <p className='mbx-setup__lead'>
             {isCz
-              ? "Získejte vlastní e-mailovou adresu. Faktury, které na ni přijdou, automaticky načteme a připravíme ke schválení."
-              : "Get a dedicated email address. Invoices sent there are auto-parsed and queued for your approval."}
+              ? 'Získejte vlastní e-mailovou adresu. Faktury, které na ni přijdou, automaticky načteme a připravíme ke schválení.'
+              : 'Get a dedicated email address. Invoices sent there are auto-parsed and queued for your approval.'}
           </p>
-          <label className="mbx-setup__label">
-            {isCz ? "Název schránky" : "Mailbox name"}
+          {!inbound.ready && (
+            <div className='mbx-banner mbx-banner--warn mbx-setup__warn'>
+              <AlertTriangle size={ICON_SM} />
+              {isCz
+                ? `Inbound e-mail ještě není plně nastaven: ${inbound.missing.join(', ')}`
+                : `Inbound email is not fully configured yet: ${inbound.missing.join(', ')}`}
+            </div>
+          )}
+          <label className='mbx-setup__label'>
+            {isCz ? 'Název schránky' : 'Mailbox name'}
           </label>
-          <div className="mbx-setup__row">
+          <div className='mbx-setup__row'>
             <input
-              className="mbx-setup__input"
+              className='mbx-setup__input'
               value={slugInput}
-              placeholder={isCz ? "napr-mojefirma" : "e-g-mycompany"}
+              placeholder={isCz ? 'napr-mojefirma' : 'e-g-mycompany'}
               onChange={(e) => setSlugInput(e.target.value)}
               autoFocus
             />
-            <span className="mbx-setup__suffix">@{domain}</span>
+            <span className='mbx-setup__suffix'>@{domain}</span>
           </div>
           {claimError && (
-            <p className="mbx-setup__error">
+            <p className='mbx-setup__error'>
               <AlertTriangle size={ICON_SM} /> {claimError}
             </p>
           )}
           <button
-            className="mbx-btn mbx-btn--primary mbx-setup__btn"
+            className='mbx-btn mbx-btn--primary mbx-setup__btn'
             onClick={handleClaim}
             disabled={claiming || slugInput.trim().length < 3}
           >
             {claiming ? (
-              <Loader2 size={ICON_SM} className="mbx-spin" />
+              <Loader2 size={ICON_SM} className='mbx-spin' />
             ) : (
               <Check size={ICON_SM} strokeWidth={STROKE} />
             )}
-            {isCz ? "Vytvořit schránku" : "Create mailbox"}
+            {isCz ? 'Vytvořit schránku' : 'Create mailbox'}
           </button>
         </div>
       </div>
@@ -258,20 +273,20 @@ export default function Mailbox({ lang, user }: MailboxProps) {
 
   // ── Mailbox + inbox ────────────────────────────────────────────────────────
   return (
-    <div className="mbx-wrap">
-      <div className="mbx-head card">
-        <div className="mbx-head__left">
-          <div className="mbx-head__icon">
+    <div className='mbx-wrap'>
+      <div className='mbx-head card'>
+        <div className='mbx-head__left'>
+          <div className='mbx-head__icon'>
             <Mail size={ICON_MD} strokeWidth={STROKE} />
           </div>
           <div>
-            <div className="mbx-head__label">
-              {isCz ? "Vaše schránka faktur" : "Your invoice mailbox"}
+            <div className='mbx-head__label'>
+              {isCz ? 'Vaše schránka faktur' : 'Your invoice mailbox'}
             </div>
             <button
-              className="mbx-address"
+              className='mbx-address'
               onClick={copyAddress}
-              title={isCz ? "Kopírovat" : "Copy"}
+              title={isCz ? 'Kopírovat' : 'Copy'}
             >
               {mailbox.address}
               {copied ? (
@@ -282,52 +297,61 @@ export default function Mailbox({ lang, user }: MailboxProps) {
             </button>
           </div>
         </div>
-        <button className="mbx-btn mbx-btn--ghost" onClick={loadAll}>
+        <button className='mbx-btn mbx-btn--ghost' onClick={loadAll}>
           <RefreshCw size={ICON_SM} strokeWidth={STROKE} />
-          {isCz ? "Obnovit" : "Refresh"}
+          {isCz ? 'Obnovit' : 'Refresh'}
         </button>
       </div>
 
-      <div className="mbx-grid">
+      {!inbound.ready && (
+        <div className='mbx-banner mbx-banner--warn card'>
+          <AlertTriangle size={ICON_SM} />
+          {isCz
+            ? `Inbound e-mail není plně nastaven. Chybí: ${inbound.missing.join(', ')}`
+            : `Inbound email is not fully configured. Missing: ${inbound.missing.join(', ')}`}
+        </div>
+      )}
+
+      <div className='mbx-grid'>
         {/* List */}
-        <div className="mbx-list card">
+        <div className='mbx-list card'>
           {received.length === 0 ? (
-            <div className="mbx-list__empty">
+            <div className='mbx-list__empty'>
               <Clock size={22} strokeWidth={1.5} />
-              <p>{isCz ? "Zatím žádné faktury" : "No invoices yet"}</p>
+              <p>{isCz ? 'Zatím žádné faktury' : 'No invoices yet'}</p>
               <span>
                 {isCz
-                  ? "Přeposlané faktury se objeví zde."
-                  : "Forwarded invoices will appear here."}
+                  ? 'Přeposlané faktury se objeví zde.'
+                  : 'Forwarded invoices will appear here.'}
               </span>
             </div>
           ) : (
             received.map((r) => (
               <button
                 key={r.id}
-                className={`mbx-item${r.id === selectedId ? " mbx-item--active" : ""}`}
+                className={`mbx-item${r.id === selectedId ? ' mbx-item--active' : ''}`}
                 onClick={() => setSelectedId(r.id)}
               >
-                <div className="mbx-item__top">
-                  <span className="mbx-item__from">
+                <div className='mbx-item__top'>
+                  <span className='mbx-item__from'>
                     {r.fromName ||
                       r.from ||
-                      (isCz ? "Neznámý odesílatel" : "Unknown sender")}
+                      (isCz ? 'Neznámý odesílatel' : 'Unknown sender')}
                   </span>
                   <StatusPill status={r.status} isCz={isCz} />
                 </div>
-                <div className="mbx-item__subject">
-                  {r.subject || (isCz ? "(bez předmětu)" : "(no subject)")}
+                <div className='mbx-item__subject'>
+                  {r.subject || (isCz ? '(bez předmětu)' : '(no subject)')}
                 </div>
-                <div className="mbx-item__meta">
+                <div className='mbx-item__meta'>
                   <span>
                     {new Date(r.receivedAt).toLocaleDateString(
-                      isCz ? "cs-CZ" : "en-GB",
+                      isCz ? 'cs-CZ' : 'en-GB',
                     )}
                   </span>
                   {r.parsed && (
-                    <span className="mbx-item__amount">
-                      {money(calcTotal(r.parsed))} {r.parsed.currency || ""}
+                    <span className='mbx-item__amount'>
+                      {money(calcTotal(r.parsed))} {r.parsed.currency || ''}
                     </span>
                   )}
                 </div>
@@ -337,22 +361,22 @@ export default function Mailbox({ lang, user }: MailboxProps) {
         </div>
 
         {/* Detail */}
-        <div className="mbx-detail card">
+        <div className='mbx-detail card'>
           {!selected ? (
-            <div className="mbx-list__empty">
+            <div className='mbx-list__empty'>
               <FileText size={22} strokeWidth={1.5} />
-              <p>{isCz ? "Vyberte fakturu" : "Select an invoice"}</p>
+              <p>{isCz ? 'Vyberte fakturu' : 'Select an invoice'}</p>
             </div>
           ) : (
             <>
-              <div className="mbx-detail__head">
+              <div className='mbx-detail__head'>
                 <div>
-                  <div className="mbx-detail__subject">
+                  <div className='mbx-detail__subject'>
                     {selected.subject ||
-                      (isCz ? "(bez předmětu)" : "(no subject)")}
+                      (isCz ? '(bez předmětu)' : '(no subject)')}
                   </div>
-                  <div className="mbx-detail__from">
-                    {selected.fromName ? `${selected.fromName} · ` : ""}
+                  <div className='mbx-detail__from'>
+                    {selected.fromName ? `${selected.fromName} · ` : ''}
                     {selected.from}
                   </div>
                 </div>
@@ -360,58 +384,58 @@ export default function Mailbox({ lang, user }: MailboxProps) {
               </div>
 
               {/* Parse status banner */}
-              {selected.parseStatus === "pending" && (
-                <div className="mbx-banner mbx-banner--info">
-                  <Loader2 size={ICON_SM} className="mbx-spin" />{" "}
-                  {isCz ? "Zpracování…" : "Processing…"}
+              {selected.parseStatus === 'pending' && (
+                <div className='mbx-banner mbx-banner--info'>
+                  <Loader2 size={ICON_SM} className='mbx-spin' />{' '}
+                  {isCz ? 'Zpracování…' : 'Processing…'}
                 </div>
               )}
-              {selected.parseStatus === "failed" && (
-                <div className="mbx-banner mbx-banner--warn">
-                  <AlertTriangle size={ICON_SM} />{" "}
+              {selected.parseStatus === 'failed' && (
+                <div className='mbx-banner mbx-banner--warn'>
+                  <AlertTriangle size={ICON_SM} />{' '}
                   {isCz
-                    ? "Automatické čtení selhalo — vyplňte ručně."
-                    : "Auto-read failed — fill in manually."}
+                    ? 'Automatické čtení selhalo — vyplňte ručně.'
+                    : 'Auto-read failed — fill in manually.'}
                 </div>
               )}
-              {selected.parseStatus === "done" && (
-                <div className="mbx-banner mbx-banner--ok">
-                  <Sparkles size={ICON_SM} />{" "}
+              {selected.parseStatus === 'done' && (
+                <div className='mbx-banner mbx-banner--ok'>
+                  <Sparkles size={ICON_SM} />{' '}
                   {isCz
-                    ? "Údaje vyčteny automaticky — zkontrolujte je."
-                    : "Fields read automatically — please review."}
+                    ? 'Údaje vyčteny automaticky — zkontrolujte je.'
+                    : 'Fields read automatically — please review.'}
                 </div>
               )}
 
               {/* Attachment preview */}
               {selected.attachments.length > 0 && (
-                <div className="mbx-attach">
+                <div className='mbx-attach'>
                   {selected.attachments.map((a) => {
                     const url = attachmentUrl(selected.id, a.index);
-                    const isImg = a.contentType.startsWith("image/");
-                    const isPdf = a.contentType === "application/pdf";
+                    const isImg = a.contentType.startsWith('image/');
+                    const isPdf = a.contentType === 'application/pdf';
                     return (
-                      <div key={a.index} className="mbx-attach__item">
+                      <div key={a.index} className='mbx-attach__item'>
                         {isImg ? (
                           <img
                             src={url}
                             alt={a.filename}
-                            className="mbx-attach__img"
+                            className='mbx-attach__img'
                           />
                         ) : isPdf ? (
                           <iframe
                             src={url}
                             title={a.filename}
-                            className="mbx-attach__frame"
+                            className='mbx-attach__frame'
                           />
                         ) : null}
                         <a
                           href={url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mbx-attach__link"
+                          target='_blank'
+                          rel='noreferrer'
+                          className='mbx-attach__link'
                         >
-                          <FileText size={ICON_SM} strokeWidth={STROKE} />{" "}
+                          <FileText size={ICON_SM} strokeWidth={STROKE} />{' '}
                           {a.filename}
                         </a>
                       </div>
@@ -422,149 +446,149 @@ export default function Mailbox({ lang, user }: MailboxProps) {
 
               {/* Editable parsed fields */}
               {draft ? (
-                <div className="mbx-fields">
-                  <div className="mbx-field mbx-field--wide">
-                    <label>{isCz ? "Dodavatel" : "Supplier"}</label>
+                <div className='mbx-fields'>
+                  <div className='mbx-field mbx-field--wide'>
+                    <label>{isCz ? 'Dodavatel' : 'Supplier'}</label>
                     <input
-                      value={draft.supplierName || ""}
-                      onChange={(e) => setField("supplierName", e.target.value)}
+                      value={draft.supplierName || ''}
+                      onChange={(e) => setField('supplierName', e.target.value)}
                     />
                   </div>
-                  <div className="mbx-field">
+                  <div className='mbx-field'>
                     <label>IČO</label>
                     <input
-                      value={draft.supplierIco || ""}
-                      onChange={(e) => setField("supplierIco", e.target.value)}
+                      value={draft.supplierIco || ''}
+                      onChange={(e) => setField('supplierIco', e.target.value)}
                     />
                   </div>
-                  <div className="mbx-field">
-                    <label>{isCz ? "Měna" : "Currency"}</label>
+                  <div className='mbx-field'>
+                    <label>{isCz ? 'Měna' : 'Currency'}</label>
                     <input
-                      value={draft.currency || ""}
-                      onChange={(e) => setField("currency", e.target.value)}
+                      value={draft.currency || ''}
+                      onChange={(e) => setField('currency', e.target.value)}
                     />
                   </div>
-                  <div className="mbx-field">
-                    <label>{isCz ? "Datum vystavení" : "Issue date"}</label>
+                  <div className='mbx-field'>
+                    <label>{isCz ? 'Datum vystavení' : 'Issue date'}</label>
                     <input
-                      type="date"
-                      value={draft.issueDate || ""}
-                      onChange={(e) => setField("issueDate", e.target.value)}
+                      type='date'
+                      value={draft.issueDate || ''}
+                      onChange={(e) => setField('issueDate', e.target.value)}
                     />
                   </div>
-                  <div className="mbx-field">
-                    <label>{isCz ? "Splatnost" : "Due date"}</label>
+                  <div className='mbx-field'>
+                    <label>{isCz ? 'Splatnost' : 'Due date'}</label>
                     <input
-                      type="date"
-                      value={draft.dueDate || ""}
-                      onChange={(e) => setField("dueDate", e.target.value)}
+                      type='date'
+                      value={draft.dueDate || ''}
+                      onChange={(e) => setField('dueDate', e.target.value)}
                     />
                   </div>
-                  <div className="mbx-field">
+                  <div className='mbx-field'>
                     <label>
-                      {isCz ? "Variabilní symbol" : "Variable symbol"}
+                      {isCz ? 'Variabilní symbol' : 'Variable symbol'}
                     </label>
                     <input
-                      value={draft.variableSymbol || ""}
+                      value={draft.variableSymbol || ''}
                       onChange={(e) =>
-                        setField("variableSymbol", e.target.value)
+                        setField('variableSymbol', e.target.value)
                       }
                     />
                   </div>
 
                   {(draft.items || []).length > 0 && (
-                    <div className="mbx-items mbx-field--wide">
-                      <label>{isCz ? "Položky" : "Line items"}</label>
+                    <div className='mbx-items mbx-field--wide'>
+                      <label>{isCz ? 'Položky' : 'Line items'}</label>
                       {(draft.items || []).map((it: any, idx: number) => (
-                        <div key={idx} className="mbx-item-row">
+                        <div key={idx} className='mbx-item-row'>
                           <input
-                            className="mbx-item-row__name"
-                            value={it.name || ""}
+                            className='mbx-item-row__name'
+                            value={it.name || ''}
                             onChange={(e) =>
-                              setItemField(idx, "name", e.target.value)
+                              setItemField(idx, 'name', e.target.value)
                             }
-                            placeholder={isCz ? "Popis" : "Description"}
+                            placeholder={isCz ? 'Popis' : 'Description'}
                           />
                           <input
-                            className="mbx-item-row__num"
-                            type="number"
-                            value={it.qty ?? ""}
+                            className='mbx-item-row__num'
+                            type='number'
+                            value={it.qty ?? ''}
                             onChange={(e) =>
-                              setItemField(idx, "qty", Number(e.target.value))
+                              setItemField(idx, 'qty', Number(e.target.value))
                             }
-                            placeholder={isCz ? "Ks" : "Qty"}
+                            placeholder={isCz ? 'Ks' : 'Qty'}
                           />
                           <input
-                            className="mbx-item-row__num"
-                            type="number"
-                            value={it.price ?? ""}
+                            className='mbx-item-row__num'
+                            type='number'
+                            value={it.price ?? ''}
                             onChange={(e) =>
-                              setItemField(idx, "price", Number(e.target.value))
+                              setItemField(idx, 'price', Number(e.target.value))
                             }
-                            placeholder={isCz ? "Cena" : "Price"}
+                            placeholder={isCz ? 'Cena' : 'Price'}
                           />
                           <input
-                            className="mbx-item-row__num"
-                            type="number"
-                            value={it.taxRate ?? ""}
+                            className='mbx-item-row__num'
+                            type='number'
+                            value={it.taxRate ?? ''}
                             onChange={(e) =>
                               setItemField(
                                 idx,
-                                "taxRate",
+                                'taxRate',
                                 Number(e.target.value),
                               )
                             }
-                            placeholder="%"
+                            placeholder='%'
                           />
                         </div>
                       ))}
                     </div>
                   )}
 
-                  <div className="mbx-total mbx-field--wide">
-                    <span>{isCz ? "Celkem" : "Total"}</span>
+                  <div className='mbx-total mbx-field--wide'>
+                    <span>{isCz ? 'Celkem' : 'Total'}</span>
                     <strong>
-                      {money(calcTotal(draft))} {draft.currency || ""}
+                      {money(calcTotal(draft))} {draft.currency || ''}
                     </strong>
                   </div>
                 </div>
               ) : (
                 selected.textPreview && (
-                  <p className="mbx-preview">{selected.textPreview}</p>
+                  <p className='mbx-preview'>{selected.textPreview}</p>
                 )
               )}
 
               {/* Actions */}
-              <div className="mbx-actions">
+              <div className='mbx-actions'>
                 <button
-                  className="mbx-btn mbx-btn--primary"
+                  className='mbx-btn mbx-btn--primary'
                   onClick={handleApprove}
-                  disabled={busy || selected.status === "approved"}
+                  disabled={busy || selected.status === 'approved'}
                 >
                   <CheckCircle2 size={ICON_SM} strokeWidth={STROKE} />
-                  {selected.status === "approved"
+                  {selected.status === 'approved'
                     ? isCz
-                      ? "Schváleno"
-                      : "Approved"
+                      ? 'Schváleno'
+                      : 'Approved'
                     : isCz
-                      ? "Schválit"
-                      : "Approve"}
+                      ? 'Schválit'
+                      : 'Approve'}
                 </button>
                 <button
-                  className="mbx-btn mbx-btn--ghost"
+                  className='mbx-btn mbx-btn--ghost'
                   onClick={handleReject}
-                  disabled={busy || selected.status === "rejected"}
+                  disabled={busy || selected.status === 'rejected'}
                 >
                   <X size={ICON_SM} strokeWidth={STROKE} />
-                  {isCz ? "Zamítnout" : "Reject"}
+                  {isCz ? 'Zamítnout' : 'Reject'}
                 </button>
                 <button
-                  className="mbx-btn mbx-btn--danger"
+                  className='mbx-btn mbx-btn--danger'
                   onClick={handleDelete}
                   disabled={busy}
                 >
                   <Trash2 size={ICON_SM} strokeWidth={STROKE} />
-                  {isCz ? "Smazat" : "Delete"}
+                  {isCz ? 'Smazat' : 'Delete'}
                 </button>
               </div>
             </>
@@ -577,16 +601,16 @@ export default function Mailbox({ lang, user }: MailboxProps) {
 
 function StatusPill({ status, isCz }: { status: string; isCz: boolean }) {
   const label =
-    status === "approved"
+    status === 'approved'
       ? isCz
-        ? "Schváleno"
-        : "Approved"
-      : status === "rejected"
+        ? 'Schváleno'
+        : 'Approved'
+      : status === 'rejected'
         ? isCz
-          ? "Zamítnuto"
-          : "Rejected"
+          ? 'Zamítnuto'
+          : 'Rejected'
         : isCz
-          ? "Ke schválení"
-          : "Pending";
+          ? 'Ke schválení'
+          : 'Pending';
   return <span className={`mbx-pill mbx-pill--${status}`}>{label}</span>;
 }

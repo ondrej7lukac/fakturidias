@@ -427,6 +427,10 @@
   margin-bottom: 1.5rem;
 }
 
+.mbx-setup__warn {
+  margin-bottom: 1rem;
+}
+
 .mbx-setup__label {
   display: block;
   text-align: left;
