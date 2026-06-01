@@ -169,6 +169,7 @@ button.lp-btn, button.lp-nav__link, button.lp-brand {
   cursor: pointer;
   font: inherit;
 }
+button.lp-nav__link { background: none; }
 
 .lp-header__actions {
   margin-left: auto;
