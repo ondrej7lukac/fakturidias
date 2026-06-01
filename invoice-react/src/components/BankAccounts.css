@@ -1,0 +1,61 @@
+.bank-accounts__hint {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 14px;
+}
+
+.bank-accounts__create {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.bank-accounts__create .ap-input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.bank-accounts__error {
+  color: var(--danger);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.bank-accounts__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bank-accounts__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.bank-accounts__label {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.bank-accounts__iban-text {
+  flex: 1;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.bank-accounts__del {
+  flex: none;
+  color: var(--danger);
+  padding: 6px 8px;
+}

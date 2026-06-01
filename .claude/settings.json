@@ -22,18 +22,6 @@
     ]
   },
   "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "jq -r '.tool_input.file_path // empty' | { read -r f; [[ \"$f\" =~ \\.(js|jsx|ts|tsx|mjs)$ ]] && npx eslint --fix \"$f\" 2>/dev/null; [[ \"$f\" =~ \\.(js|jsx|ts|tsx|mjs|css|md|json)$ ]] && npx prettier --write \"$f\" 2>/dev/null; } || true",
-            "statusMessage": "Linting & formatting..."
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Bash",

@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const baseDir = path.join(__dirname, '..', '..');
 const dataDir = path.join(baseDir, 'data');
@@ -21,6 +22,8 @@ const InvoiceSchema = new mongoose.Schema({
   userEmail: { type: String, required: true, index: true },
   id: { type: String, required: true, unique: true },
   invoiceNumber: String,
+  documentType: { type: String, default: 'invoice' },
+  recurringId: String,
   issueDate: String,
   dueDate: String,
   taxableSupplyDate: String,
@@ -36,6 +39,11 @@ const InvoiceSchema = new mongoose.Schema({
   taxBase: String,
   taxRate: String,
   taxAmount: String,
+  remindersSent: { type: Number, default: 0 },
+  lastReminderAt: { type: Date, default: null },
+  publicToken: { type: String, default: null, index: true },
+  viewCount: { type: Number, default: 0 },
+  viewedAt: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
@@ -67,8 +75,11 @@ CustomerSchema.index({ userEmail: 1, name: 1 }, { unique: true });
 const SettingsSchema = new mongoose.Schema({
   userEmail: { type: String, required: true, unique: true },
   defaultSupplier: Object,
+  supplierProfiles: Array, // [{ id, name, supplier }] — multi-company
+  bankAccounts: Array, // [{ id, label, iban, accountNumber, bankCode, prefix, bic }]
   smtp: Object,
   bankSync: Object,
+  reminders: Object, // { enabled: boolean }
   updatedAt: { type: Date, default: Date.now },
 });
 
@@ -191,6 +202,58 @@ const ReceivedInvoiceSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
+// A blueprint that the scheduler turns into invoices on a recurring cadence.
+const RecurringTemplateSchema = new mongoose.Schema({
+  userEmail: { type: String, required: true, index: true },
+  id: { type: String, required: true, unique: true },
+  name: { type: String, default: '' },
+  active: { type: Boolean, default: true },
+  cadence: { type: String, default: 'monthly' }, // weekly|monthly|quarterly|yearly
+  intervalCount: { type: Number, default: 1 },
+  dueDays: { type: Number, default: 14 },
+  autoSend: { type: Boolean, default: false },
+  nextRunAt: { type: Date, required: true, index: true },
+  lastRunAt: { type: Date, default: null },
+  endDate: { type: Date, default: null },
+  occurrencesLeft: { type: Number, default: null }, // null = unlimited
+  template: { type: Object, default: {} }, // captured invoice payload
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+// Public-API access key. Only the SHA-256 hash is stored; the raw key is shown
+// to the user exactly once at creation time.
+const ApiKeySchema = new mongoose.Schema({
+  userEmail: { type: String, required: true, index: true },
+  id: { type: String, required: true, unique: true },
+  name: { type: String, default: '' },
+  prefix: { type: String, default: '' }, // first chars, for display only
+  keyHash: { type: String, required: true, index: true },
+  revoked: { type: Boolean, default: false },
+  lastUsedAt: { type: Date, default: null },
+  createdAt: { type: Date, default: Date.now },
+});
+
+// An owner granting another user (e.g. their accountant) access to their data.
+const AccessGrantSchema = new mongoose.Schema({
+  ownerEmail: { type: String, required: true, index: true },
+  granteeEmail: { type: String, required: true, index: true },
+  role: { type: String, default: 'accountant' }, // accountant = read-only
+  createdAt: { type: Date, default: Date.now },
+});
+
+// Outgoing webhook endpoint registered by a user (distinct from the inbound
+// Stripe WebhookEvent log above).
+const WebhookEndpointSchema = new mongoose.Schema({
+  userEmail: { type: String, required: true, index: true },
+  id: { type: String, required: true, unique: true },
+  url: { type: String, required: true },
+  events: { type: [String], default: [] }, // e.g. ['invoice.created','invoice.paid']
+  secret: { type: String, default: '' }, // for HMAC signing
+  active: { type: Boolean, default: true },
+  createdAt: { type: Date, default: Date.now },
+});
+
 const InvoiceModel =
   mongoose.models.Invoice || mongoose.model('Invoice', InvoiceSchema);
 const ItemModel = mongoose.models.Item || mongoose.model('Item', ItemSchema);
@@ -230,6 +293,17 @@ const MailboxModel =
 const ReceivedInvoiceModel =
   mongoose.models.ReceivedInvoice ||
   mongoose.model('ReceivedInvoice', ReceivedInvoiceSchema);
+const RecurringTemplateModel =
+  mongoose.models.RecurringTemplate ||
+  mongoose.model('RecurringTemplate', RecurringTemplateSchema);
+const ApiKeyModel =
+  mongoose.models.ApiKey || mongoose.model('ApiKey', ApiKeySchema);
+const WebhookEndpointModel =
+  mongoose.models.WebhookEndpoint ||
+  mongoose.model('WebhookEndpoint', WebhookEndpointSchema);
+const AccessGrantModel =
+  mongoose.models.AccessGrant ||
+  mongoose.model('AccessGrant', AccessGrantSchema);
 
 const connectDB = async () => {
   if (_isConnected) return;
@@ -1207,6 +1281,488 @@ async function markScheduledEmail(id, status, result) {
   }
 }
 
+// ── Recurring invoice templates ─────────────────────────────────────────────
+
+async function getRecurringTemplates(userEmail) {
+  if (_isConnected) {
+    try {
+      return await RecurringTemplateModel.find({ userEmail })
+        .sort({ createdAt: -1 })
+        .lean();
+    } catch {
+      return [];
+    }
+  }
+  const filePath = getUserPath(userEmail, 'recurring.json');
+  if (!filePath || !fs.existsSync(filePath)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+async function saveRecurringTemplate(userEmail, template) {
+  if (_isConnected) {
+    try {
+      await RecurringTemplateModel.findOneAndUpdate(
+        { userEmail, id: template.id },
+        { ...template, userEmail, updatedAt: new Date() },
+        { upsert: true },
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const filePath = getUserPath(userEmail, 'recurring.json');
+  if (!filePath) return false;
+  try {
+    const templates = await getRecurringTemplates(userEmail);
+    const idx = templates.findIndex((tpl) => tpl.id === template.id);
+    if (idx >= 0) templates[idx] = { ...templates[idx], ...template };
+    else templates.push(template);
+    fs.writeFileSync(filePath, JSON.stringify(templates, null, 2), 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function deleteRecurringTemplate(userEmail, id) {
+  if (_isConnected) {
+    try {
+      await RecurringTemplateModel.deleteOne({ userEmail, id });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const filePath = getUserPath(userEmail, 'recurring.json');
+  if (!filePath) return false;
+  try {
+    const templates = await getRecurringTemplates(userEmail);
+    fs.writeFileSync(
+      filePath,
+      JSON.stringify(
+        templates.filter((tpl) => tpl.id !== id),
+        null,
+        2,
+      ),
+      'utf8',
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Scheduler helpers — Mongo-only (the poller runs a global cross-user query).
+async function getDueRecurringTemplates() {
+  if (!_isConnected) return [];
+  try {
+    return await RecurringTemplateModel.find({
+      active: true,
+      nextRunAt: { $lte: new Date() },
+    }).lean();
+  } catch {
+    return [];
+  }
+}
+
+async function updateRecurringAfterRun(id, patch) {
+  if (!_isConnected) return;
+  try {
+    await RecurringTemplateModel.updateOne(
+      { _id: id },
+      { $set: { ...patch, updatedAt: new Date() } },
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+// ── Payment reminders ───────────────────────────────────────────────────────
+
+// Coarse cross-user query for the reminder poller (Mongo-only): unpaid invoices
+// already past their due date. Cadence/cap filtering happens in the scheduler.
+async function getInvoicesPastDue() {
+  if (!_isConnected) return [];
+  try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    // dueDate is an ISO 'YYYY-MM-DD' string, so lexical < is chronological.
+    return await InvoiceModel.find({
+      status: { $in: ['sent', 'overdue'] },
+      dueDate: { $lt: todayStr, $nin: [null, ''] },
+    }).lean();
+  } catch {
+    return [];
+  }
+}
+
+async function recordInvoiceReminder(userEmail, id, remindersSent) {
+  if (!_isConnected) return;
+  try {
+    await InvoiceModel.updateOne(
+      { userEmail, id },
+      {
+        $set: {
+          remindersSent,
+          lastReminderAt: new Date(),
+          status: 'overdue',
+          updatedAt: new Date(),
+        },
+      },
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+// ── Public invoice share links ──────────────────────────────────────────────
+
+// Resolve a share token to its invoice (and owner). Mongo path is one indexed
+// query; the FS fallback scans per-user invoice files for local dev.
+async function findInvoiceByPublicToken(token) {
+  if (!token) return null;
+  if (_isConnected) {
+    try {
+      const inv = await InvoiceModel.findOne({ publicToken: token }).lean();
+      return inv ? { userEmail: inv.userEmail, invoice: inv } : null;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    if (!fs.existsSync(dataDir)) return null;
+    for (const dir of fs.readdirSync(dataDir)) {
+      const filePath = path.join(dataDir, dir, 'invoices.json');
+      if (!fs.existsSync(filePath)) continue;
+      let invoices = [];
+      try {
+        invoices = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      } catch {
+        continue;
+      }
+      const invoice = invoices.find((inv) => inv.publicToken === token);
+      if (invoice) return { userEmail: invoice.userEmail || dir, invoice };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+async function recordInvoiceView(userEmail, id) {
+  if (_isConnected) {
+    try {
+      await InvoiceModel.updateOne(
+        { userEmail, id },
+        { $inc: { viewCount: 1 }, $set: { viewedAt: new Date() } },
+      );
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+  const invoices = await getUserInvoices(userEmail);
+  const invoice = invoices.find((inv) => inv.id === id);
+  if (!invoice) return;
+  await saveInvoice(userEmail, {
+    ...invoice,
+    viewCount: (invoice.viewCount || 0) + 1,
+    viewedAt: new Date().toISOString(),
+  });
+}
+
+// ── Public API keys ─────────────────────────────────────────────────────────
+
+function hashApiKey(rawKey) {
+  return crypto.createHash('sha256').update(String(rawKey || '')).digest('hex');
+}
+
+async function getApiKeys(userEmail) {
+  if (_isConnected) {
+    try {
+      return await ApiKeyModel.find({ userEmail })
+        .sort({ createdAt: -1 })
+        .lean();
+    } catch {
+      return [];
+    }
+  }
+  const filePath = getUserPath(userEmail, 'apikeys.json');
+  if (!filePath || !fs.existsSync(filePath)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+async function saveApiKey(userEmail, record) {
+  if (_isConnected) {
+    try {
+      await ApiKeyModel.findOneAndUpdate(
+        { userEmail, id: record.id },
+        { ...record, userEmail },
+        { upsert: true },
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const filePath = getUserPath(userEmail, 'apikeys.json');
+  if (!filePath) return false;
+  try {
+    const keys = await getApiKeys(userEmail);
+    const stored = { ...record, userEmail };
+    const idx = keys.findIndex((k) => k.id === record.id);
+    if (idx >= 0) keys[idx] = { ...keys[idx], ...stored };
+    else keys.push(stored);
+    fs.writeFileSync(filePath, JSON.stringify(keys, null, 2), 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function revokeApiKey(userEmail, id) {
+  if (_isConnected) {
+    try {
+      await ApiKeyModel.updateOne({ userEmail, id }, { $set: { revoked: true } });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const keys = await getApiKeys(userEmail);
+  const key = keys.find((k) => k.id === id);
+  if (!key) return false;
+  return saveApiKey(userEmail, { ...key, revoked: true });
+}
+
+// Resolve a raw API key to its owner. Mongo path is a single indexed lookup;
+// the FS fallback scans per-user key files so local dev can authenticate too.
+async function findUserByApiKey(rawKey) {
+  const keyHash = hashApiKey(rawKey);
+  if (_isConnected) {
+    try {
+      const doc = await ApiKeyModel.findOne({ keyHash, revoked: false }).lean();
+      if (!doc) return null;
+      ApiKeyModel.updateOne({ id: doc.id }, { $set: { lastUsedAt: new Date() } }).catch(
+        () => {},
+      );
+      return doc.userEmail;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    if (!fs.existsSync(dataDir)) return null;
+    for (const dir of fs.readdirSync(dataDir)) {
+      const filePath = path.join(dataDir, dir, 'apikeys.json');
+      if (!fs.existsSync(filePath)) continue;
+      let keys = [];
+      try {
+        keys = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      } catch {
+        continue;
+      }
+      const match = keys.find((k) => k.keyHash === keyHash && !k.revoked);
+      if (match) return match.userEmail;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+// ── Outgoing webhook endpoints ──────────────────────────────────────────────
+
+async function getWebhookEndpoints(userEmail) {
+  if (_isConnected) {
+    try {
+      return await WebhookEndpointModel.find({ userEmail }).lean();
+    } catch {
+      return [];
+    }
+  }
+  const filePath = getUserPath(userEmail, 'webhooks.json');
+  if (!filePath || !fs.existsSync(filePath)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+async function saveWebhookEndpoint(userEmail, record) {
+  if (_isConnected) {
+    try {
+      await WebhookEndpointModel.findOneAndUpdate(
+        { userEmail, id: record.id },
+        { ...record, userEmail },
+        { upsert: true },
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const filePath = getUserPath(userEmail, 'webhooks.json');
+  if (!filePath) return false;
+  try {
+    const hooks = await getWebhookEndpoints(userEmail);
+    const idx = hooks.findIndex((h) => h.id === record.id);
+    if (idx >= 0) hooks[idx] = { ...hooks[idx], ...record };
+    else hooks.push(record);
+    fs.writeFileSync(filePath, JSON.stringify(hooks, null, 2), 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function deleteWebhookEndpoint(userEmail, id) {
+  if (_isConnected) {
+    try {
+      await WebhookEndpointModel.deleteOne({ userEmail, id });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const filePath = getUserPath(userEmail, 'webhooks.json');
+  if (!filePath) return false;
+  try {
+    const hooks = await getWebhookEndpoints(userEmail);
+    fs.writeFileSync(
+      filePath,
+      JSON.stringify(
+        hooks.filter((h) => h.id !== id),
+        null,
+        2,
+      ),
+      'utf8',
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ── Access grants (accountant sharing) ──────────────────────────────────────
+
+function _normEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function _grantsFilePath() {
+  return path.join(dataDir, '_access_grants.json');
+}
+
+function _readGrantsFS() {
+  const filePath = _grantsFilePath();
+  if (!fs.existsSync(filePath)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function _writeGrantsFS(grants) {
+  try {
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(_grantsFilePath(), JSON.stringify(grants, null, 2), 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function grantAccess(ownerEmail, granteeEmail, role = 'accountant') {
+  const owner = _normEmail(ownerEmail);
+  const grantee = _normEmail(granteeEmail);
+  if (!owner || !grantee || owner === grantee) return false;
+  if (_isConnected) {
+    try {
+      await AccessGrantModel.findOneAndUpdate(
+        { ownerEmail: owner, granteeEmail: grantee },
+        { ownerEmail: owner, granteeEmail: grantee, role },
+        { upsert: true },
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const grants = _readGrantsFS();
+  if (!grants.find((g) => g.ownerEmail === owner && g.granteeEmail === grantee)) {
+    grants.push({ ownerEmail: owner, granteeEmail: grantee, role, createdAt: new Date().toISOString() });
+  }
+  return _writeGrantsFS(grants);
+}
+
+async function revokeAccess(ownerEmail, granteeEmail) {
+  const owner = _normEmail(ownerEmail);
+  const grantee = _normEmail(granteeEmail);
+  if (_isConnected) {
+    try {
+      await AccessGrantModel.deleteOne({ ownerEmail: owner, granteeEmail: grantee });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const grants = _readGrantsFS().filter(
+    (g) => !(g.ownerEmail === owner && g.granteeEmail === grantee),
+  );
+  return _writeGrantsFS(grants);
+}
+
+async function getGrantsByOwner(ownerEmail) {
+  const owner = _normEmail(ownerEmail);
+  if (_isConnected) {
+    try {
+      return await AccessGrantModel.find({ ownerEmail: owner }).lean();
+    } catch {
+      return [];
+    }
+  }
+  return _readGrantsFS().filter((g) => g.ownerEmail === owner);
+}
+
+async function getGrantsByGrantee(granteeEmail) {
+  const grantee = _normEmail(granteeEmail);
+  if (_isConnected) {
+    try {
+      return await AccessGrantModel.find({ granteeEmail: grantee }).lean();
+    } catch {
+      return [];
+    }
+  }
+  return _readGrantsFS().filter((g) => g.granteeEmail === grantee);
+}
+
+async function hasAccessGrant(ownerEmail, granteeEmail) {
+  const owner = _normEmail(ownerEmail);
+  const grantee = _normEmail(granteeEmail);
+  if (!owner || !grantee) return false;
+  if (_isConnected) {
+    try {
+      return !!(await AccessGrantModel.findOne({ ownerEmail: owner, granteeEmail: grantee }).lean());
+    } catch {
+      return false;
+    }
+  }
+  return _readGrantsFS().some(
+    (g) => g.ownerEmail === owner && g.granteeEmail === grantee,
+  );
+}
+
 // ── Webhook event log ───────────────────────────────────────────────────────
 
 async function logWebhookEvent(data) {
@@ -1580,5 +2136,31 @@ module.exports = {
   getReceivedInvoice,
   saveReceivedInvoice,
   deleteReceivedInvoice,
+  RecurringTemplateModel,
+  getRecurringTemplates,
+  saveRecurringTemplate,
+  deleteRecurringTemplate,
+  getDueRecurringTemplates,
+  updateRecurringAfterRun,
+  getInvoicesPastDue,
+  recordInvoiceReminder,
+  findInvoiceByPublicToken,
+  recordInvoiceView,
+  ApiKeyModel,
+  WebhookEndpointModel,
+  hashApiKey,
+  getApiKeys,
+  saveApiKey,
+  revokeApiKey,
+  findUserByApiKey,
+  getWebhookEndpoints,
+  saveWebhookEndpoint,
+  deleteWebhookEndpoint,
+  AccessGrantModel,
+  grantAccess,
+  revokeAccess,
+  getGrantsByOwner,
+  getGrantsByGrantee,
+  hasAccessGrant,
   isConnected: () => _isConnected,
 };

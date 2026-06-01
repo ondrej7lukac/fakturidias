@@ -1,0 +1,55 @@
+.company-profiles__hint {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 14px;
+}
+
+.company-profiles__create {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.company-profiles__create .ap-input {
+  flex: 1;
+}
+
+.company-profiles__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.company-profiles__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.company-profiles__name {
+  flex: 1;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.company-profiles__active {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.company-profiles__del {
+  flex: none;
+  color: var(--danger);
+  padding: 6px 8px;
+}

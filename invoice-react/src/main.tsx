@@ -10,9 +10,20 @@ import './analytics';
 import './globals.css';
 import './index.css';
 import App from './App';
+import PublicInvoiceView from './components/PublicInvoiceView';
+
+// Public, no-auth read-only invoice page served at /i/<token>.
+const publicMatch = window.location.pathname.match(/^\/i\/([A-Za-z0-9_-]+)\/?$/);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {publicMatch ? <PublicInvoiceView token={publicMatch[1]} /> : <App />}
   </StrictMode>,
 );
+
+// Register the PWA service worker (production builds only; skipped in dev).
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

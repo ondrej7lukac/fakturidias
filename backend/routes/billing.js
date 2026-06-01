@@ -7,6 +7,7 @@ const {
 } = require('../lib/storage');
 const { isPro, isMax } = require('../lib/plan');
 const { stripe, processStripeEvent } = require('../lib/stripe');
+const { processInvoicePaymentEvent } = require('../lib/payments');
 
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 // Standard tier — reuses the original STRIPE_PRICE_MONTHLY/ANNUAL keys
@@ -52,6 +53,7 @@ async function handleWebhook(req, res) {
 
     try {
         await processStripeEvent(event);
+        await processInvoicePaymentEvent(event);
         if (logged?._id) await markWebhookEvent(logged._id, 'processed', null);
     } catch (err) {
         console.error('[billing] Webhook handler error:', err.message);

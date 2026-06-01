@@ -172,4 +172,30 @@ async function sendSegmentBroadcast(segment, subject, message) {
     return { ...result, total: recipients.length };
 }
 
-module.exports = { sendEmail, sendBroadcastEmail, sendSegmentBroadcast, broadcastHtml };
+// Server-initiated transactional email (recurring invoices, payment reminders).
+// Unlike sendEmail(), it carries no PDF attachment — PDFs are generated
+// client-side only, so server-side mails link to the app instead.
+async function sendNotificationEmail(to, subject, html, cc) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+        const err = new Error('Email service not configured');
+        err.statusCode = 503;
+        throw err;
+    }
+    if (!to) {
+        const err = new Error('Recipient email is missing');
+        err.statusCode = 400;
+        throw err;
+    }
+    const payload = {
+        from: 'Fakturidias <noreply@fakturidias.app>',
+        to: [to],
+        subject,
+        html,
+    };
+    if (cc && cc !== to) payload.cc = [cc];
+    const result = await callResend(apiKey, payload);
+    return { id: result.id };
+}
+
+module.exports = { sendEmail, sendBroadcastEmail, sendSegmentBroadcast, broadcastHtml, sendNotificationEmail };

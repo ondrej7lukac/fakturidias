@@ -1,0 +1,148 @@
+.recurring-view {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.recurring-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.recurring-header svg {
+  color: var(--accent);
+  margin-top: 4px;
+  flex: none;
+}
+
+.recurring-header h2 {
+  margin: 0;
+  font-size: 22px;
+  color: var(--text);
+}
+
+.recurring-sub {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.recurring-banner {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.recurring-form__actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.recurring-checkbox > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.recurring-checkbox svg {
+  color: var(--muted);
+  flex: none;
+}
+
+.recurring-error {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+.recurring-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recurring-empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 32px 0;
+}
+
+.recurring-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.recurring-item__main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.recurring-item__main strong {
+  color: var(--text);
+}
+
+.recurring-item__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.recurring-item__meta svg {
+  color: var(--muted);
+  flex: none;
+}
+
+.recurring-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.recurring-pill.is-active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.recurring-pill.is-paused {
+  color: var(--muted);
+}
+
+.recurring-item__delete {
+  flex: none;
+  color: var(--danger);
+  padding: 8px;
+}
+
+.recurring-item__delete:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+@media (max-width: 700px) {
+  .recurring-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

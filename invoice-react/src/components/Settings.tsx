@@ -4,6 +4,10 @@ import { safeStripeRedirect } from '@/lib/security'
 import { parseIban, calculateIban } from '../utils/bank'
 import { previewInvoiceNumber, InvoiceNumberFormat } from '../utils/storage'
 import AresSearch from './AresSearch'
+import ApiSettings from './ApiSettings'
+import CompanyProfiles from './CompanyProfiles'
+import BankAccounts from './BankAccounts'
+import AccountantAccess from './AccountantAccess'
 import {
   Contact, Wallet, Plug, Save, Mail, Cloud, Search, Check, RefreshCw, CreditCard, TrendingUp,
   Upload, FileText,
@@ -95,8 +99,38 @@ export default function Settings({
   const [importResult, setImportResult] = useState<{ parsed: number; matched: number; updated: { invoiceNumber: string }[] } | null>(null)
   const [importError, setImportError] = useState('')
   const [importFileName, setImportFileName] = useState('')
+  const [remindersEnabled, setRemindersEnabled] = useState(false)
 
   const isCz = lang === 'cs'
+
+  useEffect(() => {
+    let active = true
+    fetch('/api/settings')
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (active && data?.settings?.reminders) {
+          setRemindersEnabled(!!data.settings.reminders.enabled)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [])
+
+  async function handleToggleReminders() {
+    const next = !remindersEnabled
+    setRemindersEnabled(next)
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: { reminders: { enabled: next } } }),
+      })
+    } catch {
+      setRemindersEnabled(!next) // revert on failure
+    }
+  }
 
   useEffect(() => {
     if (defaultSupplier?.iban && !defaultSupplier.accountNumber) {
@@ -535,6 +569,13 @@ export default function Settings({
               <Save size={ICON_SM} strokeWidth={STROKE} /> {saveLabel}
             </button>
           </div>
+
+          <CompanyProfiles
+            lang={lang}
+            defaultSupplier={defaultSupplier}
+            // Supplier carries an index signature, so the record is structurally a Supplier.
+            onApplyProfile={(s) => setDefaultSupplier(() => s as Supplier)}
+          />
         </div>
       )}
 
@@ -746,6 +787,8 @@ export default function Settings({
               <Save size={ICON_SM} strokeWidth={STROKE} /> {saveLabel}
             </button>
           </div>
+
+          <BankAccounts lang={lang} />
         </div>
       )}
 
@@ -757,6 +800,33 @@ export default function Settings({
               <Plug size={ICON_MD} strokeWidth={STROKE} />
               {isCz ? 'Integrace' : 'Integrations'}
             </h3>
+
+            {/* Payment reminders */}
+            <div className="ap-integration">
+              <div className="ap-integration__icon">
+                <Mail size={ICON_MD} strokeWidth={STROKE} />
+              </div>
+              <div className="ap-integration__body">
+                <div className="ap-integration__title">
+                  {isCz ? 'Upomínky po splatnosti' : 'Overdue reminders'}
+                </div>
+                <div className="ap-integration__desc">
+                  {isCz
+                    ? 'Automaticky e-mailem upozorní klienty na neuhrazené faktury po splatnosti (max. 3×, jednou týdně).'
+                    : 'Automatically email clients about unpaid overdue invoices (up to 3 times, weekly).'}
+                </div>
+              </div>
+              <div className="ap-integration__action">
+                <button
+                  className="ap-toggle"
+                  data-on={String(remindersEnabled)}
+                  aria-label={
+                    isCz ? 'Přepnout upomínky' : 'Toggle overdue reminders'
+                  }
+                  onClick={handleToggleReminders}
+                />
+              </div>
+            </div>
 
             {/* ARES */}
             <div className="ap-integration">
@@ -1006,6 +1076,10 @@ export default function Settings({
               <Save size={ICON_SM} strokeWidth={STROKE} /> {saveLabel}
             </button>
           </div>
+
+          <ApiSettings lang={lang} />
+
+          <AccountantAccess lang={lang} />
         </div>
       )}
 

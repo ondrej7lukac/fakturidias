@@ -1,0 +1,19 @@
+{
+  "name": "Fakturidias",
+  "short_name": "Fakturidias",
+  "description": "Czech/Slovak invoicing — issue invoices by voice or text in seconds.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1230",
+  "theme_color": "#2dd7a6",
+  "lang": "cs",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

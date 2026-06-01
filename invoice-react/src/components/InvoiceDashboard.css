@@ -492,3 +492,47 @@ html.theme-dark .invoice-export-modal-overlay {
     justify-content: center;
   }
 }
+
+/* ─── Receivables aging chart ─────────────────────────────────────────────── */
+.ap-aging {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.ap-aging__row {
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.ap-aging__label {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: right;
+}
+
+.ap-aging__track {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.ap-aging__bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.ap-aging__value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}

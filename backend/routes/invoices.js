@@ -9,6 +9,7 @@ const {
     getGlobalSettings
 } = require('../lib/storage');
 const { isPro } = require('../lib/plan');
+const { fireWebhooks } = require('../lib/webhooks');
 
 function attach(router) {
     router.add('GET', '/api/invoices', async ({ res, userEmail }) => {
@@ -41,6 +42,13 @@ function attach(router) {
         }
 
         const success = await saveInvoice(userEmail, invoice);
+        if (success) {
+            fireWebhooks(
+                userEmail,
+                isNew ? 'invoice.created' : 'invoice.updated',
+                invoice,
+            ).catch(() => {});
+        }
         return success
             ? sendJson(res, 200, { success: true, invoice })
             : sendJson(res, 500, { error: 'Failed to save' });

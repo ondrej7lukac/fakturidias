@@ -262,6 +262,306 @@ export async function deleteInvoice(id) {
   return deleteApiInvoice(id);
 }
 
+export type DocumentType = 'invoice' | 'proforma' | 'advance' | 'creditNote';
+
+// ASCII prefixes keep each document series visually distinct while leaving the
+// numeric variable symbol (derived via .replace(/\D/g, '')) intact.
+export const DOC_TYPE_PREFIX: Record<DocumentType, string> = {
+  invoice: '',
+  proforma: 'PF',
+  advance: 'DD',
+  creditNote: 'OD',
+};
+
+const DOC_TYPE_PREFIX_RE = /^(PF|DD|OD)-/;
+
+export function stripDocumentTypePrefix(invoiceNumber: string): string {
+  return (invoiceNumber || '').replace(DOC_TYPE_PREFIX_RE, '');
+}
+
+export function applyDocumentTypeToNumber(
+  baseNumber: string,
+  documentType: DocumentType,
+): string {
+  const prefix = DOC_TYPE_PREFIX[documentType] || '';
+  const base = stripDocumentTypePrefix(baseNumber);
+  return prefix ? `${prefix}-${base}` : base;
+}
+
+// Maps a document type to the i18n key used for the document heading.
+// Regular invoices fall back to the existing `invoice` title key.
+export function documentTypeTitleKey(documentType?: string): string {
+  switch (documentType) {
+    case 'proforma':
+      return 'docTypeProforma';
+    case 'advance':
+      return 'docTypeAdvance';
+    case 'creditNote':
+      return 'docTypeCreditNote';
+    default:
+      return 'invoice';
+  }
+}
+
+// ── Recurring invoice templates (API client) ────────────────────────────────
+
+export type RecurringCadence =
+  | 'weekly'
+  | 'monthly'
+  | 'quarterly'
+  | 'yearly';
+
+export interface RecurringTemplate {
+  id: string;
+  name: string;
+  active: boolean;
+  cadence: RecurringCadence;
+  intervalCount: number;
+  dueDays: number;
+  autoSend: boolean;
+  nextRunAt: string;
+  lastRunAt?: string | null;
+  endDate?: string | null;
+  occurrencesLeft?: number | null;
+  template: Record<string, unknown>;
+}
+
+export async function getRecurringTemplates(): Promise<RecurringTemplate[]> {
+  const res = await fetch('/api/recurring');
+  if (!res.ok) throw new Error('Failed to load recurring templates');
+  const data = await res.json();
+  return data.templates || [];
+}
+
+export async function saveRecurringTemplate(
+  template: Partial<RecurringTemplate>,
+): Promise<RecurringTemplate> {
+  const res = await fetch('/api/recurring', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(template),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err: Error & { upgradeRequired?: boolean } = new Error(
+      data.error || 'Failed to save recurring template',
+    );
+    err.upgradeRequired = data.upgradeRequired === true;
+    throw err;
+  }
+  return data.template;
+}
+
+export async function deleteRecurringTemplate(id: string): Promise<boolean> {
+  const res = await fetch(`/api/recurring/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete recurring template');
+  return true;
+}
+
+// ── Online payments (Stripe Checkout per invoice) ───────────────────────────
+
+export async function createPaymentLink(invoiceId: string): Promise<string> {
+  const res = await fetch(`/api/pay-link/${invoiceId}`, { method: 'POST' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Failed to create payment link');
+  return data.url;
+}
+
+// ── Pohoda accounting export (batch XML) ────────────────────────────────────
+
+export async function downloadPohodaExportFromApi(
+  year: number,
+  dateBasis: AccountantDateBasis,
+): Promise<void> {
+  const query = new URLSearchParams({ year: String(year), dateBasis });
+  const response = await fetch(`/api/export/pohoda?${query.toString()}`);
+  if (!response.ok) throw new Error('Failed to export Pohoda XML');
+  downloadBlob(`pohoda-${year}.xml`, await response.blob());
+}
+
+export async function downloadMoneyS3ExportFromApi(
+  year: number,
+  dateBasis: AccountantDateBasis,
+): Promise<void> {
+  const query = new URLSearchParams({ year: String(year), dateBasis });
+  const response = await fetch(`/api/export/money-s3?${query.toString()}`);
+  if (!response.ok) throw new Error('Failed to export Money S3 XML');
+  downloadBlob(`money-s3-${year}.xml`, await response.blob());
+}
+
+// ── Kontrolní hlášení (CZ VAT control statement) ─────────────────────────────
+
+export async function downloadControlStatementFromApi(
+  year: number,
+  month: number,
+): Promise<void> {
+  const query = new URLSearchParams({
+    year: String(year),
+    month: String(month),
+  });
+  const response = await fetch(`/api/export/control-statement?${query}`);
+  if (!response.ok) throw new Error('Failed to export control statement');
+  const filename = `kontrolni-hlaseni-${year}-${String(month).padStart(2, '0')}.xml`;
+  downloadBlob(filename, await response.blob());
+}
+
+// ── Developer: API keys & outgoing webhooks ─────────────────────────────────
+
+export interface ApiKeyInfo {
+  id: string;
+  name: string;
+  prefix: string;
+  revoked: boolean;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+export interface WebhookEndpointInfo {
+  id: string;
+  url: string;
+  events: string[];
+  active: boolean;
+}
+
+export async function getApiKeys(): Promise<ApiKeyInfo[]> {
+  const res = await fetch('/api/dev/keys');
+  if (!res.ok) throw new Error('Failed to load API keys');
+  return (await res.json()).keys || [];
+}
+
+export async function createApiKey(
+  name: string,
+): Promise<{ key: ApiKeyInfo; secret: string }> {
+  const res = await fetch('/api/dev/keys', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error('Failed to create API key');
+  return res.json();
+}
+
+export async function revokeApiKey(id: string): Promise<void> {
+  const res = await fetch(`/api/dev/keys/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to revoke API key');
+}
+
+export async function getWebhookEndpoints(): Promise<WebhookEndpointInfo[]> {
+  const res = await fetch('/api/dev/webhooks');
+  if (!res.ok) throw new Error('Failed to load webhooks');
+  return (await res.json()).webhooks || [];
+}
+
+export async function createWebhookEndpoint(
+  url: string,
+  events: string[],
+): Promise<{ webhook: WebhookEndpointInfo; secret: string }> {
+  const res = await fetch('/api/dev/webhooks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, events }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Failed to create webhook');
+  return data;
+}
+
+export async function deleteWebhookEndpoint(id: string): Promise<void> {
+  const res = await fetch(`/api/dev/webhooks/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete webhook');
+}
+
+// ── Accountant access / sharing ─────────────────────────────────────────────
+
+export interface AccessGrant {
+  email: string;
+  role: string;
+}
+
+export interface AccessibleAccount {
+  ownerEmail: string;
+  role: string;
+}
+
+export async function getGrantedAccountants(): Promise<AccessGrant[]> {
+  const res = await fetch('/api/access/granted');
+  if (!res.ok) throw new Error('Failed to load access grants');
+  return (await res.json()).grants || [];
+}
+
+export async function grantAccountantAccess(email: string): Promise<void> {
+  const res = await fetch('/api/access/grant', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Failed to grant access');
+}
+
+export async function revokeAccountantAccess(email: string): Promise<void> {
+  const res = await fetch(`/api/access/grant/${encodeURIComponent(email)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error('Failed to revoke access');
+}
+
+export async function getAccessibleAccounts(): Promise<{
+  accounts: AccessibleAccount[];
+  viewingAs: string | null;
+}> {
+  const res = await fetch('/api/access/accessible');
+  if (!res.ok) throw new Error('Failed to load accessible accounts');
+  return res.json();
+}
+
+export async function viewAsAccount(ownerEmail: string): Promise<void> {
+  const res = await fetch('/api/access/view', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ownerEmail }),
+  });
+  if (!res.ok) throw new Error('Failed to switch account');
+}
+
+export async function stopViewingAs(): Promise<void> {
+  await fetch('/api/access/view/stop', { method: 'POST' });
+}
+
+// ── Public invoice share links ──────────────────────────────────────────────
+
+export async function createShareLink(
+  invoiceId: string,
+): Promise<{ url: string; viewCount: number; viewedAt: string | null }> {
+  const res = await fetch(`/api/share-link/${invoiceId}`, { method: 'POST' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Failed to create share link');
+  return data;
+}
+
+export async function getPublicInvoice(
+  token: string,
+): Promise<Record<string, unknown>> {
+  const res = await fetch(`/api/public/invoice/${encodeURIComponent(token)}`);
+  if (!res.ok) throw new Error('Invoice not found');
+  return (await res.json()).invoice;
+}
+
+// ── ISDOC export (Czech e-invoice XML) ──────────────────────────────────────
+
+export async function downloadInvoiceIsdoc(
+  invoice: { invoiceNumber?: string } & Record<string, unknown>,
+): Promise<void> {
+  const res = await fetch('/api/export/isdoc', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ invoice }),
+  });
+  if (!res.ok) throw new Error('Failed to generate ISDOC');
+  const blob = await res.blob();
+  downloadBlob(`${invoice.invoiceNumber || 'invoice'}.isdoc`, blob);
+}
+
 export interface InvoiceNumberFormat {
   prefix?: string;
   separator?: string;

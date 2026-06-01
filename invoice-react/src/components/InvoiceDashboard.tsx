@@ -10,6 +10,9 @@ import {
   type AccountantPaymentFilter,
   money,
   downloadAnnualAccountantExportZipFromApi,
+  downloadPohodaExportFromApi,
+  downloadMoneyS3ExportFromApi,
+  downloadControlStatementFromApi,
 } from '../utils/storage';
 import StatusBadge from './StatusBadge';
 import InvoiceForm from './InvoiceForm';
@@ -383,6 +386,69 @@ function DashDonut({ invoices, lang }: { invoices: Invoice[]; lang: string }) {
   );
 }
 
+// ─── Receivables Aging Chart ──────────────────────────────────────────────────
+function DashAging({ invoices, lang }: { invoices: Invoice[]; lang: string }) {
+  const isCz = lang === 'cs';
+  const buckets = [
+    { key: 'current', label: isCz ? 'Do splatnosti' : 'Not due', color: 'var(--accent)', total: 0 },
+    { key: 'd30', label: '1–30', color: 'var(--accent-2)', total: 0 },
+    { key: 'd60', label: '31–60', color: 'var(--accent-2)', total: 0 },
+    { key: 'd90', label: '61–90', color: 'var(--danger)', total: 0 },
+    { key: 'd90p', label: '90+', color: 'var(--danger)', total: 0 },
+  ];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (const inv of invoices) {
+    const status = inv.status || 'draft';
+    if (status === 'paid' || status === 'draft') continue; // outstanding only
+    const amount = Number(inv.amount) || 0;
+    if (!amount) continue;
+    const due = inv.dueDate ? new Date(inv.dueDate) : null;
+    if (!due || Number.isNaN(due.getTime())) {
+      buckets[0].total += amount;
+      continue;
+    }
+    const days = Math.floor((today.getTime() - due.getTime()) / 86400000);
+    if (days <= 0) buckets[0].total += amount;
+    else if (days <= 30) buckets[1].total += amount;
+    else if (days <= 60) buckets[2].total += amount;
+    else if (days <= 90) buckets[3].total += amount;
+    else buckets[4].total += amount;
+  }
+
+  const max = Math.max(...buckets.map((b) => b.total), 1);
+  const grandTotal = buckets.reduce((sum, b) => sum + b.total, 0);
+
+  if (grandTotal === 0) {
+    return (
+      <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '24px 0' }}>
+        {isCz ? 'Žádné nezaplacené pohledávky.' : 'No outstanding receivables.'}
+      </p>
+    );
+  }
+
+  return (
+    <div className='ap-aging'>
+      {buckets.map((b) => (
+        <div key={b.key} className='ap-aging__row'>
+          <span className='ap-aging__label'>{b.label}</span>
+          <span className='ap-aging__track'>
+            <span
+              className='ap-aging__bar'
+              style={{
+                width: `${(b.total / max) * 100}%`,
+                background: b.color,
+              }}
+            />
+          </span>
+          <span className='ap-aging__value'>{money(b.total)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 interface InvoiceDashboardProps {
   invoices: Invoice[];
@@ -433,6 +499,9 @@ export default function InvoiceDashboard({
   const [exportYear, setExportYear] = useState(
     String(new Date().getFullYear()),
   );
+  const [exportMonth, setExportMonth] = useState(
+    String(new Date().getMonth() + 1),
+  );
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportPaymentFilter, setExportPaymentFilter] =
     useState<AccountantPaymentFilter>('all');
@@ -477,6 +546,7 @@ export default function InvoiceDashboard({
     colStatus: isCz ? 'Stav' : 'Status',
     revenue: isCz ? 'Příjmy (12 měsíců)' : 'Revenue (12 months)',
     statusOverview: isCz ? 'Přehled stavů' : 'Status overview',
+    aging: isCz ? 'Pohledávky po splatnosti' : 'Receivables aging',
     recent: isCz ? 'Faktury' : 'Invoices',
     metricRevenue: isCz ? 'Příjmy (tento měsíc)' : 'Revenue (this month)',
     metricInvoices: isCz ? 'Faktury celkem' : 'Total invoices',
@@ -644,6 +714,51 @@ export default function InvoiceDashboard({
       await downloadAnnualAccountantExportZipFromApi(
         Number(exportYear),
         exportOptions,
+      );
+      setIsExportModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      window.alert(L.exportError);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPohoda = async () => {
+    if (!isAuthenticated) return;
+    setIsExporting(true);
+    try {
+      await downloadPohodaExportFromApi(Number(exportYear), exportDateBasis);
+      setIsExportModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      window.alert(L.exportError);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportMoneyS3 = async () => {
+    if (!isAuthenticated) return;
+    setIsExporting(true);
+    try {
+      await downloadMoneyS3ExportFromApi(Number(exportYear), exportDateBasis);
+      setIsExportModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      window.alert(L.exportError);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportControlStatement = async () => {
+    if (!isAuthenticated) return;
+    setIsExporting(true);
+    try {
+      await downloadControlStatementFromApi(
+        Number(exportYear),
+        Number(exportMonth),
       );
       setIsExportModalOpen(false);
     } catch (error) {
@@ -900,6 +1015,26 @@ export default function InvoiceDashboard({
               </label>
 
               <label className='invoice-export-modal__field'>
+                <span>{isCz ? 'Měsíc (KH)' : 'Month (control stmt.)'}</span>
+                <Select value={exportMonth} onValueChange={setExportMonth}>
+                  <SelectTrigger className='invoice-export-modal__select'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent
+                    align='start'
+                    className='invoice-export-modal__select-content'
+                    positionerClassName='z-[100002]'
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <SelectItem key={m} value={String(m)}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+
+              <label className='invoice-export-modal__field'>
                 <span>{L.exportPaymentFilter}</span>
                 <Select
                   value={exportPaymentFilter}
@@ -1078,6 +1213,36 @@ export default function InvoiceDashboard({
                 {L.exportCancel}
               </button>
               <button
+                className='ap-btn ap-btn--ghost'
+                type='button'
+                onClick={handleExportPohoda}
+                disabled={exportableInvoiceCount === 0 || isExporting}
+              >
+                <Download size={ICON_SM} strokeWidth={STROKE} /> Pohoda XML
+              </button>
+              <button
+                className='ap-btn ap-btn--ghost'
+                type='button'
+                onClick={handleExportMoneyS3}
+                disabled={exportableInvoiceCount === 0 || isExporting}
+              >
+                <Download size={ICON_SM} strokeWidth={STROKE} /> Money S3
+              </button>
+              <button
+                className='ap-btn ap-btn--ghost'
+                type='button'
+                onClick={handleExportControlStatement}
+                disabled={isExporting}
+                title={
+                  isCz
+                    ? 'Kontrolní hlášení DPH (koncept – ověřte v EPO)'
+                    : 'VAT control statement (draft – validate in EPO)'
+                }
+              >
+                <Download size={ICON_SM} strokeWidth={STROKE} />{' '}
+                {isCz ? 'Kontrolní hlášení' : 'Control statement'}
+              </button>
+              <button
                 className='ap-btn ap-btn--primary'
                 type='button'
                 onClick={handleExportAnnualTax}
@@ -1248,6 +1413,14 @@ export default function InvoiceDashboard({
           </h3>
           <DashDonut invoices={invoices} lang={lang} />
         </div>
+      </div>
+
+      {/* Receivables aging */}
+      <div className='ap-card'>
+        <h3 className='ap-card__title'>
+          <BarChart2 size={ICON_MD} strokeWidth={STROKE} /> {L.aging}
+        </h3>
+        <DashAging invoices={invoices} lang={lang} />
       </div>
 
       {/* Invoice list */}
