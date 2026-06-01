@@ -1,16 +1,19 @@
 import './WelcomeScreen.css'
 import { useState, useEffect } from 'react'
 import PolicyPage from './PolicyPage'
+import GuidePage from './GuidePage'
 import CookieBanner from './CookieBanner'
 import {
     Sparkles, Mic, Pencil, CheckCircle2, Search, Send, Cloud,
     ArrowLeftRight, FileText, BarChart2, Check, ChevronDown,
+    RefreshCw, Copy, CreditCard, Clock, Download, TrendingUp,
+    UserCheck, Wallet, Webhook,
     ICON_SM, ICON_MD, ICON_LG, STROKE,
 } from '@/lib/icons'
 
 const I18N = {
     cs: {
-        navFeatures: 'Funkce', navProduct: 'Produkt', navPricing: 'Cena', navFaq: 'Časté otázky',
+        navFeatures: 'Funkce', navProduct: 'Produkt', navPricing: 'Cena', navFaq: 'Časté otázky', navGuide: 'Návod',
         signIn: 'Přihlásit se', getStarted: 'Vyzkoušet zdarma',
         heroBadge: 'Postaveno v Praze · pro české firmy',
         heroHeadline1: 'Vystavte fakturu', heroHeadline2: 'hlasem za 12 sekund.',
@@ -33,13 +36,22 @@ const I18N = {
         feature4Title: 'Bezpečné v cloudu', feature4Body: 'Faktury jsou zálohované na serverech v EU, synchronizované v reálném čase a dostupné z mobilu i webu. Šifrovaný přenos (TLS).',
         feature5Title: 'Dvojjazyčné prostředí', feature5Body: 'Aplikace v češtině i angličtině. Faktury vystavujete v obou jazycích — ideální pro OSVČ fakturující zahraničním klientům v EU.',
         feature6Title: 'Tmavý režim', feature6Body: 'Světlý i tmavý motiv reaguje na nastavení systému. Komfortní práce ráno i pozdě v noci.',
+        feature7Title: 'Opakované faktury', feature7Body: 'Nastavte šablonu jednou a Fakturidias vystaví fakturu sám — týdně, měsíčně nebo ročně. Klient ji dostane e-mailem bez vašeho zásahu.',
+        feature8Title: 'Zálohové a opravné doklady', feature8Body: 'Vystavujte proformy, zálohové faktury i opravné daňové doklady (dobropisy) jedním přepínačem — se správným názvem a náležitostmi dle zákona.',
+        feature9Title: 'Online platby a QR', feature9Body: 'Přidejte na fakturu platební QR kód i odkaz „Zaplatit online". Po zaplacení se faktura sama označí jako uhrazená.',
+        feature10Title: 'Automatické upomínky', feature10Body: 'Po splatnosti pošle Fakturidias klientovi zdvořilou upomínku — až třikrát, automaticky. Zapnete jedním přepínačem v nastavení.',
+        feature11Title: 'Export pro účetní', feature11Body: 'Export do ISDOC, Pohoda XML a Money S3 i kontrolní hlášení (KH) jedním klikem. Vaše účetní dostane přesně to, co potřebuje.',
+        feature12Title: 'Přehledy a stárnutí pohledávek', feature12Body: 'Sledujte obrat, zaplacené i čekající částky a stárnutí pohledávek (do 30, 60 i 90+ dnů) v přehledných grafech.',
+        feature13Title: 'Přístup pro účetní a profily', feature13Body: 'Pozvěte svou účetní k náhledu na faktury a přepínejte mezi více firemními profily i bankovními účty na jednom místě.',
+        feature14Title: 'Evidence výdajů', feature14Body: 'Přijaté faktury a náklady na jednom místě. AI z dokladu vytáhne částky a vy máte přehled o výdajích i zisku.',
+        feature15Title: 'API, sdílení a aplikace', feature15Body: 'Veřejný odkaz na fakturu pro klienty, REST API s webhooky pro vývojáře a instalace jako aplikace (PWA) do mobilu i počítače.',
         showcaseEyebrow: 'Náhled', showcaseTitle: 'Faktura, kterou opravdu chcete vidět.',
         showcaseLead: 'Čistý PDF výstup, přehledný seznam, smysluplné metriky. Žádná tabulková nuda 90. let.',
         showcaseTab1: 'Faktura', showcaseTab2: 'Přehled',
         howEyebrow: 'Jak to funguje', howTitle: 'Tři kroky k odeslané faktuře.',
         howStep1Title: 'Diktujte nebo napište', howStep1Body: 'Stiskněte mikrofon a řekněte, komu fakturujete, co a za kolik — česky nebo anglicky. Nebo napište jednu větu. Celý krok trvá průměrně 8 sekund.',
         howStep2Title: 'AI vyplní pole automaticky', howStep2Body: 'Klient, položky, sazby DPH (21 %, 15 %, 12 %, 0 %) a IČO se vyplní samy. ARES doplní firemní profil z rejstříku za méně než 1 sekundu. Cokoliv jedním klikem upravíte.',
-        howStep3Title: 'Odešlete PDF', howStep3Body: 'Stáhněte PDF nebo pošlete klientovi e-mailem. Faktura se uloží do přehledu, sleduje stav platby a automaticky se zálohuje do Google Drive.',
+        howStep3Title: 'Odešlete PDF', howStep3Body: 'Stáhněte PDF, pošlete klientovi e-mailem nebo veřejným odkazem — s tlačítkem „Zaplatit online" a QR kódem. Faktura se uloží do přehledu, sleduje stav platby a automaticky se zálohuje do Google Drive.',
         pricingEyebrow: 'Cena', pricingTitle: 'Jednoduchý plán, žádné překvapení.',
         pricingLead: 'Začněte zdarma. Když budete chtít víc, zaplatíte měsíčně nebo ročně.',
         pricingFreeName: 'Zdarma', pricingFreeTagline: 'Vyzkoušejte bez kreditní karty', pricingFreePrice: '0 Kč',
@@ -53,24 +65,27 @@ const I18N = {
         pricingMaxNote: '/ měsíc', pricingMaxF1: 'Neomezené faktury', pricingMaxF2: 'Neomezené AI faktury',
         pricingMaxF3: 'Prioritní podpora', pricingMaxF4: 'Vlastní šablony', pricingMaxF5: 'Vlastní doména PDF',
         pricingMaxCta: 'Začít s Max',
-        faqEyebrow: 'Časté otázky', faqTitle: 'Vše, co byste mohli chtít vědět.',
+        faqEyebrow: 'Časté otázky', faqTitle: 'Vše, co byste mohli chtít vědět.', faqGuideCta: 'Přečíst celý návod k aplikaci',
         faq1Q: 'Jak přesný je AI vstup česky?', faq1A: 'Fakturidias AI je trénovaná na českou byznys terminologii — IČO, DIČ, sazby DPH (21 %, 15 %, 12 %, 0 %) a položkové popisky. AI správně rozpozná více než 95 % vstupních polí při prvním pokusu. Cokoliv lze opravit jedním klikem před uložením.',
         faq2Q: 'Funguje to bez připojení k internetu?', faq2A: 'Faktury lze vystavovat offline. Hlasové rozpoznání (Gemini Vertex AI) a ARES vyhledávání potřebují připojení. Faktury se synchronizují automaticky do 30 sekund po obnovení spojení.',
         faq3Q: 'Splňuje to české účetní předpisy?', faq3A: 'Ano. Faktury splňují všechny povinné náležitosti dle § 29 zákona o DPH č. 235/2004 Sb. Podporujeme sazby 21 %, 15 %, 12 % i 0 %, včetně přenesené daňové povinnosti (reverse charge) pro přeshraniční B2B plnění.',
         faq4Q: 'Mohu importovat faktury z jiné aplikace?', faq4A: 'Ano. Podporujeme import z CSV a ze standardizovaných formátů ISDOC (český standard e-faktur) a UBL 2.1. Z velkých systémů jako Pohoda nebo Fakturoid vám pomůžeme s migrací osobně.',
         faq5Q: 'Co se stane s mými daty, když přestanu platit?', faq5A: 'Plán se vrátí na Zdarma a vy si zachováte plný přístup k posledním 5 fakturám. Všechny ostatní si můžete kdykoliv exportovat jako PDF nebo CSV. Data se nemazají — uchováváme je 7 let dle české legislativy.',
         faq6Q: 'Mohu nastavit vlastní šablonu faktury?', faq6A: 'V plánu Max (120 Kč/měsíc) ano — změníte logo, barvy, písmo i rozložení. Plán Standard používá výchozí profesionální šablonu Fakturidias.',
+        faq7Q: 'Umí to vystavovat opakované faktury?', faq7A: 'Ano. Nastavíte šablonu a interval (týdně, měsíčně, ročně) a Fakturidias fakturu vystaví i odešle klientovi sám. Po splatnosti navíc umí poslat automatické upomínky — až třikrát.',
+        faq8Q: 'Jak klienti fakturu zaplatí?', faq8A: 'Na každou fakturu přidáme platební QR kód i odkaz „Zaplatit online". Jakmile klient zaplatí, faktura se sama označí jako uhrazená a vy to hned vidíte v přehledu.',
+        faq9Q: 'Může s tím pracovat moje účetní?', faq9A: 'Ano. Účetní můžete dát náhledový přístup k fakturám a data exportovat do ISDOC, Pohoda XML, Money S3 i jako kontrolní hlášení (KH) — vše jedním klikem.',
         finalTitle: 'Začněte fakturovat hlasem.', finalSub: 'Zdarma navždy pro prvních 5 faktur. Bez kreditní karty.',
         finalCta1: 'Začít zdarma', finalCta2: 'Pokračovat jako host',
         footerTagline: 'Fakturace nové generace · postaveno v Praze',
         footerProduct: 'Produkt', footerCompany: 'Společnost', footerLegal: 'Právní',
-        footerFeat1: 'Funkce', footerFeat2: 'Cena',
+        footerFeat1: 'Funkce', footerFeat2: 'Cena', footerFeat3: 'Návod a FAQ',
         footerComp1: 'O nás', footerComp2: 'Blog', footerComp3: 'Kontakt',
         footerLegal1: 'Podmínky a ochrana soukromí', footerLegal3: 'Cookies', footerLegal4: 'GDPR',
         footerRights: '© 2026 Fakturidias s.r.o. · Václavské náměstí 1, Praha',
     },
     en: {
-        navFeatures: 'Features', navProduct: 'Product', navPricing: 'Pricing', navFaq: 'FAQ',
+        navFeatures: 'Features', navProduct: 'Product', navPricing: 'Pricing', navFaq: 'FAQ', navGuide: 'Guide',
         signIn: 'Sign in', getStarted: 'Try it free',
         heroBadge: 'Built in Prague · for Czech businesses',
         heroHeadline1: 'Issue an invoice', heroHeadline2: 'by voice in 12 seconds.',
@@ -93,13 +108,22 @@ const I18N = {
         feature4Title: 'Secure cloud sync', feature4Body: 'All invoices are backed up on EU servers, synced in real time, and accessible from mobile or web. Encrypted transit (TLS).',
         feature5Title: 'Bilingual UI', feature5Body: 'Full Czech and English interface. Issue invoices in either language — ideal for freelancers billing international clients across the EU.',
         feature6Title: 'Dark mode', feature6Body: 'Light and dark themes follow the system preference. Comfortable to use morning or late at night.',
+        feature7Title: 'Recurring invoices', feature7Body: 'Set a template once and Fakturidias issues the invoice automatically — weekly, monthly or yearly. Your client gets it by email without you lifting a finger.',
+        feature8Title: 'Proforma & credit notes', feature8Body: 'Issue proforma, advance and credit-note documents with one switch — each with the correct legal title and mandatory fields.',
+        feature9Title: 'Online payments & QR', feature9Body: 'Add a payment QR code and a "Pay online" link to every invoice. Once paid, the invoice marks itself as settled automatically.',
+        feature10Title: 'Automatic reminders', feature10Body: 'When an invoice goes overdue, Fakturidias emails the client a polite reminder — up to three times, automatically. Toggle it on in settings.',
+        feature11Title: 'Accounting exports', feature11Body: 'One-click export to ISDOC, Pohoda XML and Money S3, plus the VAT control statement (kontrolní hlášení). Your accountant gets exactly what they need.',
+        feature12Title: 'Reports & receivables aging', feature12Body: 'Track revenue, paid and pending amounts, and receivables aging (0–30, 31–60 and 90+ days) in clear dashboards.',
+        feature13Title: 'Accountant access & profiles', feature13Body: 'Invite your accountant to view your invoices, and switch between multiple company profiles and bank accounts from one place.',
+        feature14Title: 'Expense ledger', feature14Body: 'Keep received invoices and costs in one place. The AI reads amounts from each bill so you always see spending and profit.',
+        feature15Title: 'API, share links & app', feature15Body: 'Public invoice links for clients, a REST API with webhooks for developers, and install-as-an-app (PWA) on mobile and desktop.',
         showcaseEyebrow: 'Preview', showcaseTitle: 'An invoice you actually want to look at.',
         showcaseLead: 'Clean PDF output, a list that scans in three seconds, dashboards that mean something.',
         showcaseTab1: 'Invoice', showcaseTab2: 'Dashboard',
         howEyebrow: 'How it works', howTitle: 'Three steps to a sent invoice.',
         howStep1Title: 'Dictate or type', howStep1Body: 'Hit the mic, say who you\'re billing, what for and how much — in Czech or English. Or write a single sentence. The whole step takes about 8 seconds.',
         howStep2Title: 'AI fills the fields', howStep2Body: 'Client, line items, VAT rates (21%, 15%, 12%, 0%) and business IDs populate themselves. ARES fills the company profile in under 1 second. Edit anything with one click.',
-        howStep3Title: 'Send the PDF', howStep3Body: 'Download the PDF or email the client directly. The invoice lands in your dashboard with live payment status and auto-backs up to Google Drive.',
+        howStep3Title: 'Send the PDF', howStep3Body: 'Download the PDF, email the client, or send a public link — with a "Pay online" button and QR code. The invoice lands in your dashboard with live payment status and auto-backs up to Google Drive.',
         pricingEyebrow: 'Pricing', pricingTitle: 'Simple plans, no surprises.',
         pricingLead: 'Start free. Upgrade monthly or annually when you need more.',
         pricingFreeName: 'Free', pricingFreeTagline: 'Try without a credit card', pricingFreePrice: '0 CZK',
@@ -113,18 +137,21 @@ const I18N = {
         pricingMaxNote: '/ month', pricingMaxF1: 'Unlimited invoices', pricingMaxF2: 'Unlimited AI invoices',
         pricingMaxF3: 'Priority support', pricingMaxF4: 'Custom templates', pricingMaxF5: 'Custom PDF domain',
         pricingMaxCta: 'Go Max',
-        faqEyebrow: 'FAQ', faqTitle: 'Everything you might want to know.',
+        faqEyebrow: 'FAQ', faqTitle: 'Everything you might want to know.', faqGuideCta: 'Read the full app guide',
         faq1Q: 'How accurate is the Czech AI input?', faq1A: 'Fakturidias AI is trained on Czech business terminology — IČO, DIČ, VAT rates (21%, 15%, 12%, 0%), and line-item phrasing. The AI correctly identifies over 95% of input fields on the first attempt. Anything misread can be fixed in one click before saving.',
         faq2Q: 'Does it work offline?', faq2A: 'You can draft invoices offline; voice recognition (Gemini Vertex AI) and ARES lookup need an internet connection. Drafts sync automatically within 30 seconds of reconnection.',
         faq3Q: 'Is it compliant with Czech tax rules?', faq3A: 'Yes. Invoices include all mandatory fields under Section 29 of Czech VAT Act No. 235/2004 Coll. We support rates 21%, 15%, 12% and 0%, including reverse charge for cross-border EU B2B transactions.',
         faq4Q: 'Can I import invoices from another app?', faq4A: 'Yes — CSV, ISDOC (Czech e-invoice standard) and UBL 2.1 formats. For large systems like Pohoda or Fakturoid we\'ll assist with the migration personally.',
         faq5Q: 'What happens to my data if I stop paying?', faq5A: 'Your plan reverts to Free and you keep full access to your last 5 invoices. You can export anything else at any time as PDF or CSV. Data is never deleted — we retain it for 7 years per Czech law.',
         faq6Q: 'Can I customize the invoice template?', faq6A: 'On the Max plan (120 CZK/month) — change logo, colors, font and layout. The Standard plan uses the default Fakturidias professional template.',
+        faq7Q: 'Can it send recurring invoices automatically?', faq7A: 'Yes. Set a template and an interval (weekly, monthly, yearly) and Fakturidias issues and emails the invoice to your client on its own. It also sends automatic payment reminders — up to three times — once an invoice is overdue.',
+        faq8Q: 'How do my clients pay?', faq8A: 'Every invoice can carry a payment QR code and a "Pay online" link. The moment the client pays, the invoice marks itself as settled and you see it in your dashboard.',
+        faq9Q: 'Can my accountant use it too?', faq9A: 'Yes. Grant your accountant read access to your invoices and export data to ISDOC, Pohoda XML, Money S3 and the VAT control statement (kontrolní hlášení) — all in one click.',
         finalTitle: 'Start invoicing by voice.', finalSub: 'Free forever for the first 5 invoices. No credit card.',
         finalCta1: 'Start free', finalCta2: 'Continue as guest',
         footerTagline: 'Next-generation invoicing · built in Prague',
         footerProduct: 'Product', footerCompany: 'Company', footerLegal: 'Legal',
-        footerFeat1: 'Features', footerFeat2: 'Pricing',
+        footerFeat1: 'Features', footerFeat2: 'Pricing', footerFeat3: 'Guide & FAQ',
         footerComp1: 'About', footerComp2: 'Blog', footerComp3: 'Contact',
         footerLegal1: 'Terms & Privacy', footerLegal3: 'Cookies', footerLegal4: 'GDPR',
         footerRights: '© 2026 Fakturidias s.r.o. · Václavské náměstí 1, Prague',
@@ -247,6 +274,9 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheck
     const [faqOpen, setFaqOpen] = useState(-1)
     const [showcaseTab, setShowcaseTab] = useState<'invoice' | 'dashboard'>('invoice')
     const [policyPage, setPolicyPage] = useState<'terms-privacy' | 'cookies' | 'gdpr' | null>(null)
+    const [showGuide, setShowGuide] = useState(false)
+
+    const openGuide = () => { setShowGuide(true); window.scrollTo(0, 0) }
 
     const t = I18N[lang as keyof typeof I18N] ?? I18N.cs
 
@@ -261,12 +291,21 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheck
     const isCz = lang === 'cs'
 
     const features = [
-        { Icon: Mic,            title: t.feature1Title, body: t.feature1Body, alt: false },
-        { Icon: Search,         title: t.feature2Title, body: t.feature2Body, alt: true  },
-        { Icon: Send,           title: t.feature3Title, body: t.feature3Body, alt: false },
-        { Icon: Cloud,          title: t.feature4Title, body: t.feature4Body, alt: true  },
-        { Icon: ArrowLeftRight, title: t.feature5Title, body: t.feature5Body, alt: false },
-        { Icon: Sparkles,       title: t.feature6Title, body: t.feature6Body, alt: true  },
+        { Icon: Mic,            title: t.feature1Title,  body: t.feature1Body,  alt: false },
+        { Icon: Search,         title: t.feature2Title,  body: t.feature2Body,  alt: true  },
+        { Icon: Send,           title: t.feature3Title,  body: t.feature3Body,  alt: false },
+        { Icon: RefreshCw,      title: t.feature7Title,  body: t.feature7Body,  alt: true  },
+        { Icon: Copy,           title: t.feature8Title,  body: t.feature8Body,  alt: false },
+        { Icon: CreditCard,     title: t.feature9Title,  body: t.feature9Body,  alt: true  },
+        { Icon: Clock,          title: t.feature10Title, body: t.feature10Body, alt: false },
+        { Icon: Download,       title: t.feature11Title, body: t.feature11Body, alt: true  },
+        { Icon: TrendingUp,     title: t.feature12Title, body: t.feature12Body, alt: false },
+        { Icon: UserCheck,      title: t.feature13Title, body: t.feature13Body, alt: true  },
+        { Icon: Wallet,         title: t.feature14Title, body: t.feature14Body, alt: false },
+        { Icon: Webhook,        title: t.feature15Title, body: t.feature15Body, alt: true  },
+        { Icon: Cloud,          title: t.feature4Title,  body: t.feature4Body,  alt: false },
+        { Icon: ArrowLeftRight, title: t.feature5Title,  body: t.feature5Body,  alt: true  },
+        { Icon: Sparkles,       title: t.feature6Title,  body: t.feature6Body,  alt: false },
     ]
 
     const pricingTiers: Array<{
@@ -298,6 +337,9 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheck
         { q: t.faq4Q, a: t.faq4A },
         { q: t.faq5Q, a: t.faq5A },
         { q: t.faq6Q, a: t.faq6A },
+        { q: t.faq7Q, a: t.faq7A },
+        { q: t.faq8Q, a: t.faq8A },
+        { q: t.faq9Q, a: t.faq9A },
     ]
 
     const toggleFaq = (i: number) => setFaqOpen(prev => prev === i ? -1 : i)
@@ -307,6 +349,19 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheck
             <>
                 <CookieBanner lang={lang} />
                 <PolicyPage page={policyPage} lang={lang} onBack={() => { setPolicyPage(null); window.scrollTo(0, 0) }} />
+            </>
+        )
+    }
+
+    if (showGuide) {
+        return (
+            <>
+                <CookieBanner lang={lang} />
+                <GuidePage
+                    lang={lang}
+                    onBack={() => { setShowGuide(false); window.scrollTo(0, 0) }}
+                    onGetStarted={onContinueAsGuest}
+                />
             </>
         )
     }
@@ -327,6 +382,7 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheck
                         <a className="lp-nav__link" href="#showcase">{t.navProduct}</a>
                         <a className="lp-nav__link" href="#pricing">{t.navPricing}</a>
                         <a className="lp-nav__link" href="#faq">{t.navFaq}</a>
+                        <button className="lp-nav__link" onClick={openGuide}>{t.navGuide}</button>
                     </nav>
                     <div className="lp-header__actions">
                         <div className="lp-lang">
@@ -588,6 +644,12 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheck
                             </div>
                         ))}
                     </div>
+                    <div className="lp-faq__more">
+                        <button className="lp-btn lp-btn--secondary" onClick={openGuide}>
+                            <FileText size={ICON_SM} strokeWidth={STROKE} />
+                            {t.faqGuideCta}
+                        </button>
+                    </div>
                 </div>
             </section>
 
@@ -623,6 +685,7 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheck
                             <ul className="lp-footer__links">
                                 <li><a href="#features">{t.footerFeat1}</a></li>
                                 <li><a href="#pricing">{t.footerFeat2}</a></li>
+                                <li><button className="lp-footer__link-btn" onClick={openGuide}>{t.footerFeat3}</button></li>
                             </ul>
                         </div>
                         <div>

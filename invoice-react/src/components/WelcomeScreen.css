@@ -47,6 +47,15 @@ body:has(.welcome-screen) {
 .welcome-screen .lp-feature:nth-child(4) { animation-delay: 0.18s; }
 .welcome-screen .lp-feature:nth-child(5) { animation-delay: 0.24s; }
 .welcome-screen .lp-feature:nth-child(6) { animation-delay: 0.30s; }
+.welcome-screen .lp-feature:nth-child(7) { animation-delay: 0.36s; }
+.welcome-screen .lp-feature:nth-child(8) { animation-delay: 0.42s; }
+.welcome-screen .lp-feature:nth-child(9) { animation-delay: 0.48s; }
+.welcome-screen .lp-feature:nth-child(10) { animation-delay: 0.54s; }
+.welcome-screen .lp-feature:nth-child(11) { animation-delay: 0.60s; }
+.welcome-screen .lp-feature:nth-child(12) { animation-delay: 0.66s; }
+.welcome-screen .lp-feature:nth-child(13) { animation-delay: 0.72s; }
+.welcome-screen .lp-feature:nth-child(14) { animation-delay: 0.78s; }
+.welcome-screen .lp-feature:nth-child(15) { animation-delay: 0.84s; }
 
 /* ── How-it-works steps stagger ────────────────────────────── */
 .welcome-screen .lp-step {
@@ -71,6 +80,16 @@ body:has(.welcome-screen) {
 .welcome-screen .lp-faq__item:nth-child(4) { animation-delay: 0.15s; }
 .welcome-screen .lp-faq__item:nth-child(5) { animation-delay: 0.20s; }
 .welcome-screen .lp-faq__item:nth-child(6) { animation-delay: 0.25s; }
+.welcome-screen .lp-faq__item:nth-child(7) { animation-delay: 0.30s; }
+.welcome-screen .lp-faq__item:nth-child(8) { animation-delay: 0.35s; }
+.welcome-screen .lp-faq__item:nth-child(9) { animation-delay: 0.40s; }
+
+/* ── FAQ → full guide CTA ──────────────────────────────────── */
+.welcome-screen .lp-faq__more {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+}
 
 /* ── Final CTA block ───────────────────────────────────────── */
 .welcome-screen .lp-final {
