@@ -13,7 +13,7 @@ const {
   sendNotFound,
   SECURITY_HEADERS,
 } = require("./lib/utils");
-const { connectDB, isUserSuspended } = require("./lib/storage");
+const { connectDB, isUserSuspended, hasAccessGrant } = require("./lib/storage");
 const { getCurrentUserEmail } = require("./lib/auth");
 const { createRouter } = require("./routes/router");
 const { startScheduler } = require("./lib/scheduler");
@@ -75,6 +75,8 @@ require("./routes/auth").attach(publicRouter);
 billing.attachPublic(publicRouter);
 admin.attachPublic(publicRouter);
 require("./routes/inbound").attach(publicRouter);
+require("./routes/apiV1").attach(publicRouter);
+require("./routes/share").attachPublic(publicRouter);
 
 const protectedRouter = createRouter();
 require("./routes/invoices").attach(protectedRouter);
@@ -87,6 +89,11 @@ require("./routes/email").attach(protectedRouter);
 require("./routes/ai").attach(protectedRouter);
 require("./routes/bank").attach(protectedRouter);
 require("./routes/mailbox").attach(protectedRouter);
+require("./routes/recurring").attach(protectedRouter);
+require("./routes/payments").attach(protectedRouter);
+require("./routes/developer").attach(protectedRouter);
+require("./routes/share").attachProtected(protectedRouter);
+require("./routes/access").attach(protectedRouter);
 admin.attach(protectedRouter);
 billing.attachProtected(protectedRouter);
 
@@ -165,7 +172,38 @@ const handleRequest = async (req, res) => {
     if (realIsAdmin && req.session && req.session.impersonate) {
       effective = req.session.impersonate;
     }
+
+    // Accountant view-as: re-validated against a live grant on every request,
+    // so revoking access takes effect immediately. Read-only (writes blocked).
+    let accountantViewAs = false;
+    if (
+      effective === realEmail &&
+      req.session &&
+      req.session.viewAs &&
+      req.session.viewAs !== realEmail
+    ) {
+      if (await hasAccessGrant(req.session.viewAs, realEmail)) {
+        effective = req.session.viewAs;
+        accountantViewAs = true;
+      } else {
+        req.session.viewAs = null; // grant gone — drop the stale view
+      }
+    }
     ctx.userEmail = effective;
+    ctx.accountantViewAs = accountantViewAs;
+
+    // Enforce read-only while viewing another account as an accountant.
+    // Access-management endpoints stay reachable so they can switch back.
+    if (
+      accountantViewAs &&
+      req.method !== "GET" &&
+      !requestPath.startsWith("/api/access/")
+    ) {
+      return sendJson(res, 403, {
+        error: "Read-only accountant access",
+        readOnly: true,
+      });
+    }
 
     // Suspended users are locked out of the API. Admins are never blocked
     // (so impersonation can still debug a suspended account). Fails open.

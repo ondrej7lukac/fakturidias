@@ -1,6 +1,7 @@
 import './InvoicePreview.css'
 import { QRCodeCanvas } from 'qrcode.react'
 import { getCzechQrPayload } from '../utils/bank'
+import { documentTypeTitleKey } from '../utils/storage'
 
 export default function InvoicePreview({ invoice, t, lang }) {
     return (
@@ -15,7 +16,7 @@ export default function InvoicePreview({ invoice, t, lang }) {
                         fontWeight: 800,
                         textTransform: 'uppercase',
                         letterSpacing: '-0.025em'
-                    }}>{t.invoice}</h1>
+                    }}>{t[documentTypeTitleKey(invoice.documentType)]}</h1>
                     <p style={{
                         margin: '5px 0',
                         color: '#64748b',

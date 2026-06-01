@@ -1,3 +1,4 @@
+import './App.css';
 import { useState, useEffect } from 'react';
 import { safeStripeRedirect, safeGoogleOAuthPopup } from './lib/security';
 import Header from './components/Header';
@@ -5,6 +6,8 @@ import InvoiceForm from './components/InvoiceForm';
 import InvoiceList from './components/InvoiceList';
 import Settings from './components/Settings';
 import Mailbox from './components/Mailbox';
+import Recurring from './components/Recurring';
+import Expenses from './components/Expenses';
 import WelcomeScreen from './components/WelcomeScreen';
 import CookieBanner from './components/CookieBanner';
 import AdminDashboard from './components/AdminDashboard';
@@ -16,6 +19,8 @@ import {
   saveLocalInvoice,
   deleteApiInvoice,
   deleteLocalInvoice,
+  getAccessibleAccounts,
+  stopViewingAs,
 } from './utils/storage';
 import { languages } from './utils/i18n';
 
@@ -29,6 +34,7 @@ function App() {
   const [lang, setLang] = useState('cs');
   const [defaultSupplier, setDefaultSupplier] = useState(null);
   const [currentView, setCurrentView] = useState('invoices');
+  const [viewingAs, setViewingAs] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [invoicesLoaded, setInvoicesLoaded] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
@@ -61,6 +67,17 @@ function App() {
       setShowWelcome(true);
       setSubscription(null);
     }
+  }, [user]);
+
+  // Reflect accountant "view-as" state in a persistent banner.
+  useEffect(() => {
+    if (!user) {
+      setViewingAs(null);
+      return;
+    }
+    getAccessibleAccounts()
+      .then((data) => setViewingAs(data.viewingAs))
+      .catch(() => {});
   }, [user]);
 
   // Fetch subscription + admin status when user logs in; trigger pending checkout if set
@@ -499,6 +516,23 @@ function App() {
 
   return (
     <>
+      {viewingAs && (
+        <div className="viewing-as-banner">
+          <span>
+            {lang === 'cs' ? 'Prohlížíte účet ' : 'Viewing account '}
+            <strong>{viewingAs}</strong>{' '}
+            {lang === 'cs' ? '(jen pro čtení)' : '(read-only)'}
+          </span>
+          <button
+            onClick={async () => {
+              await stopViewingAs();
+              window.location.reload();
+            }}
+          >
+            {lang === 'cs' ? 'Ukončit' : 'Stop'}
+          </button>
+        </div>
+      )}
       <CookieBanner lang={lang} />
       <Header
         onNewInvoice={handleNewInvoice}
@@ -518,12 +552,28 @@ function App() {
         isAdmin={isAdmin}
       />
       <main
-        className={`${dashboardOpen ? 'dashboard-mode' : ''} ${currentView === 'settings' || currentView === 'mailbox' ? 'settings-view' : ''}`}
+        className={`${dashboardOpen ? 'dashboard-mode' : ''} ${currentView === 'settings' || currentView === 'mailbox' || currentView === 'recurring' || currentView === 'expenses' ? 'settings-view' : ''}`}
       >
         {currentView === 'admin' ? (
           <AdminDashboard />
         ) : currentView === 'mailbox' ? (
           <Mailbox lang={lang} t={t} user={user} />
+        ) : currentView === 'expenses' ? (
+          <Expenses lang={lang} />
+        ) : currentView === 'recurring' ? (
+          <Recurring
+            lang={lang}
+            t={t}
+            invoices={invoices}
+            isPro={
+              !!subscription &&
+              (subscription.status === 'active' ||
+                subscription.status === 'trialing') &&
+              (!subscription.currentPeriodEnd ||
+                subscription.currentPeriodEnd * 1000 >= Date.now()) &&
+              ['standard', 'max', 'pro'].includes(subscription.plan)
+            }
+          />
         ) : currentView === 'settings' ? (
           <Settings
             lang={lang}

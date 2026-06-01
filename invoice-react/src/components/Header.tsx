@@ -22,6 +22,8 @@ import {
   Check,
   Shield,
   Mail,
+  RefreshCw,
+  Wallet,
   ICON_SM,
   STROKE,
 } from '@/lib/icons';
@@ -262,6 +264,34 @@ export default function Header({
                     <span>{isCz ? 'Schránka faktur' : 'Invoice mailbox'}</span>
                   </DropdownMenuItem>
                 )}
+                {user && (
+                  <DropdownMenuItem
+                    onClick={() => onViewChange('recurring')}
+                    className='user-dropdown__item'
+                  >
+                    <RefreshCw
+                      size={15}
+                      strokeWidth={2}
+                      className='user-dropdown__item-icon'
+                    />
+                    <span>
+                      {isCz ? 'Opakované faktury' : 'Recurring invoices'}
+                    </span>
+                  </DropdownMenuItem>
+                )}
+                {user && (
+                  <DropdownMenuItem
+                    onClick={() => onViewChange('expenses')}
+                    className='user-dropdown__item'
+                  >
+                    <Wallet
+                      size={15}
+                      strokeWidth={2}
+                      className='user-dropdown__item-icon'
+                    />
+                    <span>{isCz ? 'Výdaje' : 'Expenses'}</span>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={() => onViewChange('settings')}
                   className='user-dropdown__item'
@@ -384,6 +414,32 @@ export default function Header({
               >
                 <Mail size={ICON_SM} strokeWidth={STROKE} />
                 {isCz ? 'Schránka faktur' : 'Invoice mailbox'}
+              </button>
+            )}
+            {user && (
+              <button
+                className='lp-btn lp-btn--secondary'
+                style={{ justifyContent: 'flex-start', width: '100%' }}
+                onClick={() => {
+                  onViewChange('recurring');
+                  setMobileMenuOpen(false);
+                }}
+              >
+                <RefreshCw size={ICON_SM} strokeWidth={STROKE} />
+                {isCz ? 'Opakované faktury' : 'Recurring invoices'}
+              </button>
+            )}
+            {user && (
+              <button
+                className='lp-btn lp-btn--secondary'
+                style={{ justifyContent: 'flex-start', width: '100%' }}
+                onClick={() => {
+                  onViewChange('expenses');
+                  setMobileMenuOpen(false);
+                }}
+              >
+                <Wallet size={ICON_SM} strokeWidth={STROKE} />
+                {isCz ? 'Výdaje' : 'Expenses'}
               </button>
             )}
           </div>

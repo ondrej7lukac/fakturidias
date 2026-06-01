@@ -1,0 +1,128 @@
+.expenses-view {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.expenses-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.expenses-header svg {
+  color: var(--accent);
+  margin-top: 4px;
+  flex: none;
+}
+
+.expenses-header h2 {
+  margin: 0;
+  font-size: 22px;
+  color: var(--text);
+}
+
+.expenses-sub {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.expenses-refresh {
+  margin-left: auto;
+  flex: none;
+}
+
+.expenses-summary {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.expenses-summary__label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.expenses-summary__value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.expenses-summary__count {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.expenses-empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 32px 0;
+}
+
+.expenses-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.expenses-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.expenses-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.expenses-table tr:last-child td {
+  border-bottom: none;
+}
+
+.expenses-table__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.expenses-table__subject {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.expenses-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.expenses-pill--approved {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.expenses-pill--pending {
+  color: var(--muted);
+}

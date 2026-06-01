@@ -5,8 +5,14 @@ import {
   addDays,
   formatDate,
   money,
+  applyDocumentTypeToNumber,
+  createPaymentLink,
+  createShareLink,
+  downloadInvoiceIsdoc,
+  type DocumentType,
 } from '../utils/storage';
 import { searchAres, parseAresItem, lookupAresByIco } from '../utils/ares';
+import type { BankAccount } from './BankAccounts';
 import {
   BarChart2,
   Pencil,
@@ -24,6 +30,7 @@ import {
   X,
   Send,
   Save,
+  CreditCard,
   ICON_MD,
   ICON_SM,
   STROKE,
@@ -78,6 +85,7 @@ export default function InvoiceForm({
   const qrCanvasRef = useRef(null);
   const [formData, setFormData] = useState({
     invoiceNumber: '',
+    documentType: 'invoice',
     issueDate: formatDate(new Date()),
     dueDate: formatDate(addDays(new Date(), 7)),
     taxableSupplyDate: '',
@@ -159,6 +167,8 @@ export default function InvoiceForm({
   const [categoryInput, setCategoryInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [emailStatus, setEmailStatus] = useState('');
+  const [payStatus, setPayStatus] = useState('');
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [previewMode, setPreviewMode] = useState(false);
   const [viesStatus, setViesStatus] = useState(null); // null | 'loading' | 'valid' | 'invalid'
   const [savedItems, setSavedItems] = useState([]);
@@ -188,6 +198,7 @@ export default function InvoiceForm({
       const ibanData = parseIban(invoice.payment.iban || '');
       setFormData({
         invoiceNumber: invoice.invoiceNumber,
+        documentType: invoice.documentType || 'invoice',
         issueDate: invoice.issueDate,
         dueDate: invoice.dueDate || '',
         taxableSupplyDate: invoice.taxableSupplyDate || '',
@@ -236,6 +247,7 @@ export default function InvoiceForm({
       setFormData((prev) => ({
         // Keep only layout/supplier defaults, reset client/invoice-specific fields
         invoiceNumber: prev.invoiceNumber || '...',
+        documentType: 'invoice',
         issueDate: formatDate(today),
         dueDate: formatDate(addDays(today, 7)),
         taxableSupplyDate: '',
@@ -531,6 +543,7 @@ export default function InvoiceForm({
     return {
       id: invoice?.id || newInvoiceIdRef.current,
       invoiceNumber: currentFormData.invoiceNumber.trim(),
+      documentType: currentFormData.documentType || 'invoice',
       issueDate: currentFormData.issueDate,
       dueDate: currentFormData.dueDate,
       taxableSupplyDate:
@@ -581,6 +594,50 @@ export default function InvoiceForm({
       taxRate: currentFormData.taxRate,
       taxAmount: currentFormData.taxAmount,
     };
+  };
+
+  const handleDocTypeChange = (e) => {
+    const documentType = e.target.value as DocumentType;
+    setFormData((prev) => {
+      // Existing invoices keep their issued number; only re-prefix drafts.
+      if (invoice) return { ...prev, documentType };
+      const invoiceNumber = applyDocumentTypeToNumber(
+        prev.invoiceNumber,
+        documentType,
+      );
+      return {
+        ...prev,
+        documentType,
+        invoiceNumber,
+        variableSymbol: invoiceNumber.replace(/\D/g, ''),
+      };
+    });
+  };
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const list = data?.settings?.bankAccounts;
+        if (active && Array.isArray(list)) setBankAccounts(list);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleSelectBankAccount = (e) => {
+    const account = bankAccounts.find((a) => a.id === e.target.value);
+    if (!account) return;
+    setFormData((prev) => ({
+      ...prev,
+      iban: account.iban || '',
+      accountNumber: account.accountNumber || '',
+      bankCode: account.bankCode || '',
+      prefix: account.prefix || '',
+    }));
   };
 
   const handlePasteBank = (e) => {
@@ -1009,6 +1066,66 @@ export default function InvoiceForm({
       alert(t.alertError);
     }
     setIsGenerating(false);
+  };
+
+  const handlePaymentLink = async () => {
+    if (!isAuthenticated) {
+      return alert(
+        lang === 'cs'
+          ? 'Pro vytvoření platebního odkazu se musíte přihlásit.'
+          : 'You must be logged in to create a payment link.',
+      );
+    }
+    const { id } = getCurrentInvoiceData();
+    if (!id) return;
+    setPayStatus(lang === 'cs' ? 'Generuji…' : 'Generating…');
+    try {
+      const url = await createPaymentLink(id);
+      await navigator.clipboard?.writeText(url).catch(() => {});
+      window.open(url, '_blank', 'noopener');
+      setPayStatus(lang === 'cs' ? 'Odkaz zkopírován' : 'Link copied');
+      setTimeout(() => setPayStatus(''), 3000);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Error';
+      setPayStatus(message);
+      setTimeout(() => setPayStatus(''), 4000);
+    }
+  };
+
+  const handleShareLink = async () => {
+    if (!isAuthenticated) {
+      return alert(
+        lang === 'cs'
+          ? 'Pro sdílení faktury se musíte přihlásit.'
+          : 'You must be logged in to share an invoice.',
+      );
+    }
+    const { id } = getCurrentInvoiceData();
+    if (!id) return;
+    setPayStatus(lang === 'cs' ? 'Generuji…' : 'Generating…');
+    try {
+      const { url } = await createShareLink(id);
+      await navigator.clipboard?.writeText(url).catch(() => {});
+      window.open(url, '_blank', 'noopener');
+      setPayStatus(lang === 'cs' ? 'Odkaz zkopírován' : 'Link copied');
+      setTimeout(() => setPayStatus(''), 3000);
+    } catch {
+      setPayStatus(lang === 'cs' ? 'Chyba' : 'Error');
+      setTimeout(() => setPayStatus(''), 3000);
+    }
+  };
+
+  const handleExportIsdoc = async () => {
+    try {
+      await downloadInvoiceIsdoc(getCurrentInvoiceData());
+    } catch {
+      alert(
+        lang === 'cs'
+          ? 'Export ISDOC se nezdařil.'
+          : 'ISDOC export failed.',
+      );
+    }
   };
 
   const handleBackupToDrive = async () => {
@@ -1460,6 +1577,34 @@ export default function InvoiceForm({
                 <Send size={ICON_MD} strokeWidth={STROKE} />{' '}
                 {emailStatus || t.emailPdf}
               </button>
+              {isAuthenticated && formData.status !== 'paid' && (
+                <button
+                  type='button'
+                  onClick={handlePaymentLink}
+                  className='ap-btn ap-btn--secondary'
+                >
+                  <CreditCard size={ICON_MD} strokeWidth={STROKE} />{' '}
+                  {payStatus ||
+                    (lang === 'cs' ? 'Platební odkaz' : 'Payment link')}
+                </button>
+              )}
+              <button
+                type='button'
+                onClick={handleExportIsdoc}
+                className='ap-btn ap-btn--ghost'
+              >
+                <FileText size={ICON_MD} strokeWidth={STROKE} /> ISDOC
+              </button>
+              {isAuthenticated && (
+                <button
+                  type='button'
+                  onClick={handleShareLink}
+                  className='ap-btn ap-btn--ghost'
+                >
+                  <Eye size={ICON_MD} strokeWidth={STROKE} />{' '}
+                  {lang === 'cs' ? 'Sdílet odkaz' : 'Share link'}
+                </button>
+              )}
               <button
                 type='button'
                 onClick={handleBackupToDrive}
@@ -1515,6 +1660,20 @@ export default function InvoiceForm({
                     {lang === 'cs' ? 'Základní údaje' : 'Basic info'}
                   </h3>
                   <div className='ap-grid ap-grid--3'>
+                    <div className='ap-field'>
+                      <label>{t.docType}</label>
+                      <select
+                        className='ap-select'
+                        name='documentType'
+                        value={formData.documentType}
+                        onChange={handleDocTypeChange}
+                      >
+                        <option value='invoice'>{t.docTypeInvoice}</option>
+                        <option value='proforma'>{t.docTypeProforma}</option>
+                        <option value='advance'>{t.docTypeAdvance}</option>
+                        <option value='creditNote'>{t.docTypeCreditNote}</option>
+                      </select>
+                    </div>
                     <div className='ap-field'>
                       <label>{t.invoiceNumber}</label>
                       <input
@@ -2003,6 +2162,29 @@ export default function InvoiceForm({
                     <Wallet size={ICON_MD} strokeWidth={STROKE} />
                     {lang === 'cs' ? 'Platba' : 'Payment'}
                   </h3>
+                  {bankAccounts.length > 0 && (
+                    <div className='ap-field' style={{ marginBottom: 12 }}>
+                      <label>
+                        {lang === 'cs' ? 'Bankovní účet' : 'Bank account'}
+                      </label>
+                      <select
+                        className='ap-select'
+                        value=''
+                        onChange={handleSelectBankAccount}
+                      >
+                        <option value=''>
+                          {lang === 'cs'
+                            ? '— vybrat uložený účet —'
+                            : '— pick a saved account —'}
+                        </option>
+                        {bankAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className='ap-grid ap-grid--2'>
                     <div className='ap-field'>
                       <label>IBAN</label>

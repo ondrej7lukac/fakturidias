@@ -1,5 +1,6 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet, Image, pdf as renderPdf, Font } from '@react-pdf/renderer'
+import { documentTypeTitleKey } from './storage'
 
 Font.register({
     family: 'Roboto',
@@ -102,7 +103,7 @@ function InvoicePDF({ invoice, t, qrDataUrl }: { invoice: any; t: any; qrDataUrl
                 {/* Header */}
                 <View style={S.header}>
                     <View>
-                        <Text style={S.headerTitle}>{t.invoice}</Text>
+                        <Text style={S.headerTitle}>{t[documentTypeTitleKey(invoice.documentType)]}</Text>
                         <Text style={S.headerNum}># {invoice.invoiceNumber}</Text>
                     </View>
                     <View>
