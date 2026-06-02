@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react'
-import { Sparkles, Mic, MicOff, X, Camera, Upload, ScanLine, Loader2, ICON_MD, ICON_LG, ICON_SM, STROKE } from '@/lib/icons'
+import { Sparkles, Mic, MicOff, X, Camera, Upload, ScanLine, Loader2, Pencil, CheckCircle2, ICON_MD, ICON_LG, ICON_SM, STROKE } from '@/lib/icons'
+import { money } from '@/utils/storage'
+import type { LiveActivity } from '@/types/activity'
 
 const PREFERRED_AUDIO_TYPES = [
     'audio/webm;codecs=opus',
@@ -43,26 +45,47 @@ async function resizeImage(file: File): Promise<{ base64: string; mimeType: stri
     return { base64, mimeType: 'image/jpeg', dataUrl: outUrl }
 }
 
-const SAMPLES = {
-    cs: [
-        'Faktura pro Novák s.r.o. za 3 hodiny konzultace po 2000 Kč, 21% DPH, splatnost 14 dní',
-        'Webdesign pro e-shop, paušál 25 000 Kč, klient Jan Dvořák, splatnost konec měsíce',
-        '5 hodin programování, 1500 Kč/h, bez DPH',
-    ],
-    en: [
-        'Invoice Acme Studio for 3h UX consulting at 2000 CZK, 21% VAT, due in 14 days',
-        'Monthly retainer for social media management, 15000 CZK, client John Smith',
-        '5 hours of development work at 1500 CZK/h, no VAT',
-    ],
+type PreviewSource = 'text' | 'voice' | 'image'
+
+interface PreviewState {
+    data: any
+    source: PreviewSource
+    text?: string
+    imageUrl?: string
+}
+
+interface PreviewLine {
+    name: string
+    qty: number
+    price: number
+    taxRate: number
+}
+
+function summarizeItems(data: any, vatPayer: boolean): { rows: PreviewLine[]; subtotal: number; tax: number; total: number } {
+    const items = Array.isArray(data?.items) ? data.items : []
+    let subtotal = 0
+    let tax = 0
+    const rows: PreviewLine[] = items.map((item: any) => {
+        const qty = Number(item.qty) || 1
+        const price = Number(item.price) || 0
+        const taxRate = item.taxRate != null ? Number(item.taxRate) : vatPayer ? 21 : 0
+        const lineSubtotal = qty * price
+        subtotal += lineSubtotal
+        tax += lineSubtotal * (taxRate / 100)
+        return { name: String(item.name || ''), qty, price, taxRate }
+    })
+    return { rows, subtotal, tax, total: subtotal + tax }
 }
 
 interface AIPromptProps {
     lang: string
     onFillForm: (data: any) => void
     isGuest?: boolean
+    isVatPayer?: boolean
+    onActivity?: (activity: LiveActivity | null) => void
 }
 
-export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
+export default function AIPrompt({ lang, onFillForm, isGuest, isVatPayer = true, onActivity }: AIPromptProps) {
     const [prompt, setPrompt] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [isListening, setIsListening] = useState(false)
@@ -73,9 +96,9 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isScanning, setIsScanning] = useState(false)
     const [scanPreview, setScanPreview] = useState<{ dataUrl: string; name: string } | null>(null)
+    const [preview, setPreview] = useState<PreviewState | null>(null)
 
     const isCz = lang === 'cs'
-    const samples = SAMPLES[lang as keyof typeof SAMPLES] || SAMPLES.en
 
     const handleVoice = async () => {
         if (isListening) {
@@ -99,7 +122,7 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
                 streamRef.current?.getTracks().forEach(t => t.stop())
                 streamRef.current = null
 
-                if (chunks.length === 0) return
+                if (chunks.length === 0) { onActivity?.(null); return }
 
                 const blob = new Blob(chunks, { type: recorder.mimeType })
                 const baseMime = recorder.mimeType.split(';')[0]
@@ -114,10 +137,12 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
                     })
                 } catch {
                     setError(isCz ? 'Chyba při čtení nahrávky.' : 'Failed to read recording.')
+                    onActivity?.({ kind: 'error', label: isCz ? 'Nepovedlo se' : 'Couldn’t read it' })
                     return
                 }
 
                 setIsLoading(true)
+                onActivity?.({ kind: 'processing', label: isCz ? 'Zpracovávám hlas…' : 'Processing your voice…' })
                 try {
                     const res = await fetch('/api/ai/invoice-audio', {
                         method: 'POST',
@@ -126,9 +151,11 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
                     })
                     const result = await res.json()
                     if (!res.ok) throw new Error(result.message || result.error)
-                    onFillForm(result.data)
+                    setPreview({ data: result.data, source: 'voice', text: result.transcript })
+                    onActivity?.({ kind: 'done', label: isCz ? 'Náhled připraven' : 'Preview ready' })
                 } catch (err: any) {
                     setError(err?.message || (isCz ? 'Nepodařilo se zpracovat nahrávku.' : 'Failed to process recording.'))
+                    onActivity?.({ kind: 'error', label: isCz ? 'Nepovedlo se' : 'Couldn’t read it' })
                 } finally {
                     setIsLoading(false)
                 }
@@ -137,11 +164,13 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
             recorder.start()
             mediaRecorderRef.current = recorder
             setIsListening(true)
+            onActivity?.({ kind: 'listening', label: isCz ? 'Posloucháme…' : 'Listening…' })
         } catch (err: any) {
             const denied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError'
             setError(denied
                 ? (isCz ? 'Přístup k mikrofonu byl zamítnut.' : 'Microphone access was denied.')
                 : (isCz ? 'Nelze získat přístup k mikrofonu.' : 'Cannot access microphone.'))
+            onActivity?.(null)
         }
     }
 
@@ -158,6 +187,7 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
         }
 
         setIsScanning(true)
+        onActivity?.({ kind: 'scanning', label: isCz ? 'Skenuji fakturu…' : 'Scanning your invoice…' })
         try {
             const { base64, mimeType, dataUrl } = await resizeImage(file)
             setScanPreview({ dataUrl, name: file.name || (isCz ? 'fotografie' : 'photo') })
@@ -169,9 +199,11 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
             })
             const result = await res.json()
             if (!res.ok) throw new Error(result.message || result.error)
-            onFillForm(result.data)
+            setPreview({ data: result.data, source: 'image', imageUrl: dataUrl })
+            onActivity?.({ kind: 'done', label: isCz ? 'Náhled připraven' : 'Preview ready' })
         } catch (err: any) {
             setError(err?.message || (isCz ? 'Nepodařilo se přečíst fakturu z obrázku.' : 'Failed to read invoice from image.'))
+            onActivity?.({ kind: 'error', label: isCz ? 'Nepovedlo se' : 'Couldn’t read it' })
         } finally {
             setIsScanning(false)
         }
@@ -194,6 +226,7 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
         if (!text) return
         setIsLoading(true)
         setError('')
+        onActivity?.({ kind: 'processing', label: isCz ? 'Čtu vaše zadání…' : 'Reading your prompt…' })
         try {
             const res = await fetch('/api/ai/invoice', {
                 method: 'POST',
@@ -202,12 +235,31 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
             })
             const result = await res.json()
             if (!res.ok) throw new Error(result.message || result.error)
-            onFillForm(result.data)
+            setPreview({ data: result.data, source: 'text', text })
+            onActivity?.({ kind: 'done', label: isCz ? 'Náhled připraven' : 'Preview ready' })
         } catch (err: any) {
             setError(err.message || (isCz ? 'Chyba při zpracování.' : 'Processing failed.'))
+            onActivity?.({ kind: 'error', label: isCz ? 'Nepovedlo se' : 'Couldn’t read it' })
         } finally {
             setIsLoading(false)
         }
+    }
+
+    const confirmPreview = () => {
+        if (!preview) return
+        onFillForm(preview.data)
+        setPreview(null)
+        setPrompt('')
+        setScanPreview(null)
+        setError('')
+    }
+
+    const editPreview = () => {
+        if (preview?.source === 'text' && preview.text) {
+            setPrompt(preview.text)
+        }
+        setPreview(null)
+        setScanPreview(null)
     }
 
     if (isGuest) {
@@ -228,6 +280,81 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
         )
     }
 
+    if (preview) {
+        const summary = summarizeItems(preview.data, isVatPayer)
+        const currency = preview.data?.currency || 'CZK'
+        const itemCount = summary.rows.length
+        const itemsValue = `${itemCount} ${itemCount === 1
+            ? (isCz ? 'položka' : 'item')
+            : (isCz ? 'položek' : 'items')}`
+        const FieldIcon = preview.source === 'image' ? ScanLine : preview.source === 'text' ? Pencil : Mic
+
+        return (
+            <div className="lp-demo ap-ai-preview">
+                <div className="lp-demo__halo" aria-hidden />
+                <div className="lp-demo__card">
+                    <div className="lp-demo__head">
+                        <Sparkles size={ICON_MD} strokeWidth={STROKE} style={{ color: 'var(--accent)' }} />
+                        <span style={{ fontWeight: 600, color: 'var(--text)' }}>
+                            {isCz ? 'AI vstup' : 'AI input'}
+                        </span>
+                        <span className="badge">{isCz ? 'Náhled' : 'Preview'}</span>
+                    </div>
+
+                    <div className="lp-demo__field">
+                        {preview.imageUrl ? (
+                            <img className="lp-demo__thumb" src={preview.imageUrl} alt="" />
+                        ) : (
+                            <div className="lp-demo__mic">
+                                <FieldIcon size={ICON_LG} strokeWidth={STROKE} />
+                            </div>
+                        )}
+                        <div className="lp-demo__text">
+                            {preview.text
+                                ? <em>{preview.text}</em>
+                                : (isCz ? 'Naskenovaná faktura' : 'Scanned invoice')}
+                        </div>
+                        {!preview.imageUrl && (
+                            <div className="lp-demo__wave" aria-hidden>
+                                <span /><span /><span /><span /><span /><span />
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="lp-demo__chips">
+                        <div className="lp-demo__chip">
+                            <div className="lp-demo__chip-label">{isCz ? 'Klient' : 'Client'}</div>
+                            <div className="lp-demo__chip-value">{preview.data?.clientName || '—'}</div>
+                        </div>
+                        <div className="lp-demo__chip">
+                            <div className="lp-demo__chip-label">{isCz ? 'Položky' : 'Items'}</div>
+                            <div className="lp-demo__chip-value">{itemsValue}</div>
+                        </div>
+                        <div className="lp-demo__chip">
+                            <div className="lp-demo__chip-label">{isCz ? 'Bez DPH' : 'Subtotal'}</div>
+                            <div className="lp-demo__chip-value">{money(summary.subtotal)} {currency}</div>
+                        </div>
+                        <div className="lp-demo__chip lp-demo__chip--accent">
+                            <div className="lp-demo__chip-label">{isCz ? 'Celkem' : 'Total'}</div>
+                            <div className="lp-demo__chip-value">{money(summary.total)} {currency}</div>
+                        </div>
+                    </div>
+
+                    {error && <p style={{ fontSize: 12, color: 'var(--danger)', margin: '14px 0 0' }}>{error}</p>}
+
+                    <div className="lp-demo__action">
+                        <button type="button" className="lp-btn lp-btn--secondary" onClick={editPreview}>
+                            <Pencil size={ICON_SM} strokeWidth={STROKE} /> {isCz ? 'Upravit' : 'Edit'}
+                        </button>
+                        <button type="button" className="lp-btn lp-btn--primary" onClick={confirmPreview}>
+                            <CheckCircle2 size={ICON_SM} strokeWidth={STROKE} /> {isCz ? 'Vytvořit fakturu' : 'Create invoice'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="ap-ai">
             <div className="ap-ai__head">
@@ -237,8 +364,8 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
                 </h3>
                 <div className="ap-ai__sub">
                     {isCz
-                        ? 'AI rozpozná klienta, položky a DPH. Co AI nepochopí, opravíte jedním klikem.'
-                        : 'The AI extracts the client, line items and VAT. Whatever it misreads, fix in one click.'}
+                        ? 'AI rozpozná klienta, položky a DPH. Před vytvořením faktury vše zkontrolujete.'
+                        : 'The AI extracts the client, line items and VAT. You review everything before the invoice is created.'}
                 </div>
             </div>
 
@@ -283,7 +410,7 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
                         disabled={isLoading || !prompt.trim()}
                     >
                         <Sparkles size={ICON_SM} strokeWidth={STROKE} />
-                        {isLoading ? (isCz ? 'Zpracovávám…' : 'Processing…') : (isCz ? 'Vyplnit formulář' : 'Fill form')}
+                        {isLoading ? (isCz ? 'Zpracovávám…' : 'Processing…') : (isCz ? 'Náhled faktury' : 'Preview invoice')}
                     </button>
                     <button
                         type="button"
@@ -342,8 +469,8 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
             <p className="ap-ai__scan-hint">
                 <ScanLine size={ICON_SM} strokeWidth={STROKE} style={{ verticalAlign: '-2px', marginRight: 6 }} />
                 {isCz
-                    ? 'AI vyplní formulář z fotografie. Fakturu si zkontrolujte před uložením.'
-                    : 'AI fills the form from your photo. Review the fields before saving.'}
+                    ? 'AI přečte fakturu z fotografie a zobrazí náhled ke kontrole.'
+                    : 'AI reads the invoice from your photo and shows a preview to review.'}
             </p>
 
             {scanPreview && (
@@ -354,7 +481,7 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
                         <span className="ap-ai__scan-meta-sub">
                             {isScanning
                                 ? (isCz ? 'Zpracovávám obrázek…' : 'Processing image…')
-                                : (isCz ? 'Pole byla vyplněna – zkontrolujte je.' : 'Fields filled — please review.')}
+                                : (isCz ? 'Připraveno k náhledu.' : 'Ready for preview.')}
                         </span>
                     </div>
                     <button
@@ -367,15 +494,6 @@ export default function AIPrompt({ lang, onFillForm, isGuest }: AIPromptProps) {
                     </button>
                 </div>
             )}
-
-            <div className="ap-ai__hints">
-                <div className="ap-ai__hints-title">{isCz ? 'Příklady:' : 'Examples:'}</div>
-                {samples.map((s, i) => (
-                    <button key={i} type="button" className="ap-ai__hint" onClick={() => setPrompt(s)}>
-                        {s}
-                    </button>
-                ))}
-            </div>
         </div>
     )
 }

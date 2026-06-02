@@ -23,6 +23,8 @@ import {
   stopViewingAs,
 } from './utils/storage';
 import { languages } from './utils/i18n';
+import { useScreenNarration } from './hooks/useScreenNarration';
+import type { LiveActivity } from './types/activity';
 
 function App() {
   const [user, setUser] = useState(null); // Auth state lifted to App
@@ -41,6 +43,16 @@ function App() {
   const [mobileView, setMobileView] = useState('form'); // 'form' or 'list'
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
+  const [liveActivity, setLiveActivity] = useState<LiveActivity | null>(null);
+  const [recentInvoices, setRecentInvoices] = useState<
+    { id: string; invoiceNumber: string; clientName: string }[]
+  >(() => {
+    try {
+      return JSON.parse(localStorage.getItem('recent_invoices') || '[]');
+    } catch {
+      return [];
+    }
+  });
   const [subscription, setSubscription] = useState<{
     plan: string;
     status: string;
@@ -58,6 +70,18 @@ function App() {
   const [impersonating, setImpersonating] = useState<string | null>(null);
 
   const t = languages[lang];
+
+  const screenNarration = useScreenNarration(
+    `${showWelcome}:${currentView}:${dashboardOpen}`,
+  );
+
+  // Auto-clear terminal live-activity states (done/error) after a short beat
+  useEffect(() => {
+    if (liveActivity?.kind === 'done' || liveActivity?.kind === 'error') {
+      const id = setTimeout(() => setLiveActivity(null), 1800);
+      return () => clearTimeout(id);
+    }
+  }, [liveActivity]);
 
   // Show welcome screen only when not logged in
   useEffect(() => {
@@ -328,6 +352,30 @@ function App() {
     }
   }, [lang, defaultSupplier, categories, user]);
 
+  // Track recently opened invoices (localStorage cache) for quick access in the header menu
+  useEffect(() => {
+    if (!selectedId) return;
+    const inv = invoices.find((i) => i.id === selectedId);
+    if (!inv) return;
+    setRecentInvoices((prev) => {
+      const entry = {
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber || '',
+        clientName: inv.client?.name || '',
+      };
+      const next = [entry, ...prev.filter((r) => r.id !== inv.id)].slice(0, 6);
+      localStorage.setItem('recent_invoices', JSON.stringify(next));
+      return next;
+    });
+  }, [selectedId, invoices]);
+
+  const handleOpenInvoice = (id) => {
+    setSelectedId(id);
+    setCurrentView('invoices');
+    setDashboardOpen(false);
+    setMobileView('form');
+  };
+
   const selectedInvoice = invoices.find((inv) => inv.id === selectedId);
 
   const handleSaveInvoice = async (invoice, { autoSave = false } = {}) => {
@@ -550,6 +598,12 @@ function App() {
         onOpenInvoicesList={handleOpenInvoicesList}
         onLogout={handleLogout}
         isAdmin={isAdmin}
+        defaultSupplier={defaultSupplier}
+        setDefaultSupplier={setDefaultSupplier}
+        recentInvoices={recentInvoices}
+        onOpenInvoice={handleOpenInvoice}
+        liveActivity={liveActivity}
+        narration={screenNarration}
       />
       <main
         className={`${dashboardOpen ? 'dashboard-mode' : ''} ${currentView === 'settings' || currentView === 'mailbox' || currentView === 'recurring' || currentView === 'expenses' ? 'settings-view' : ''}`}
@@ -611,6 +665,7 @@ function App() {
                 isAuthenticated={!!user}
                 onShowInvoiceForm={handleNewInvoice}
                 onOpenDashboard={handleOpenDashboard}
+                onActivity={setLiveActivity}
               />
             </div>
             <div

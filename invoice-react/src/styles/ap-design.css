@@ -527,29 +527,6 @@ html.theme-dark .ap-select option,
   .ap-ai__actions { flex-direction: row; }
   .ap-ai__actions .ap-btn { flex: 1; justify-content: center; }
 }
-.ap-ai__hints { margin-top: 14px; display: grid; gap: 8px; }
-.ap-ai__hints-title {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted2);
-}
-.ap-ai__hint {
-  appearance: none;
-  background: var(--card2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 9px 12px;
-  font: inherit;
-  font-size: 13px;
-  color: var(--muted);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
-}
-.ap-ai__hint:hover { border-color: var(--border); color: var(--text); background: var(--card); }
-
 /* ── SCAN INVOICE (photo upload) ──────────────────────────────── */
 .ap-ai__divider {
   display: flex;
@@ -640,6 +617,17 @@ html.theme-dark .ap-select option,
 .ap-ai__scan-meta-sub { font-size: 12px; color: var(--muted2); }
 .ap-ai__scan-spin { animation: ap-spin 0.9s linear infinite; }
 @keyframes ap-spin { to { transform: rotate(360deg); } }
+
+/* ── AI PREVIEW — reuses homepage .lp-demo card; thumbnail for scans ── */
+.ap-ai-preview { margin: 4px 0; }
+.lp-demo__thumb {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--r-sharp);
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
 
 /* ── LINE ITEMS TABLE ────────────────────────────────────────── */
 .ap-items {
@@ -1085,4 +1073,29 @@ html.theme-dark .ap-select option,
   letter-spacing: -0.03em;
   font-feature-settings: "tnum";
   color: var(--accent-ink);
+}
+
+/* ── AI assistant — homepage hero styling (item 7) ─────────────
+   Lifts the in-app AIPrompt card to match the WelcomeScreen hero:
+   accent top strip, soft glow and a larger gradient heading. */
+.ap-ai {
+  box-shadow:
+    0 0 0 1px var(--accent-soft),
+    0 24px 60px -32px color-mix(in oklab, var(--accent) 70%, transparent);
+}
+.ap-ai::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  z-index: 1;
+}
+.ap-ai__head h3 {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+@media (max-width: 700px) {
+  .ap-ai__head h3 { font-size: 17px; }
 }
