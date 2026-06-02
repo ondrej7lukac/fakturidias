@@ -3,7 +3,8 @@ export type LiveActivityKind =
   | 'processing'
   | 'scanning'
   | 'done'
-  | 'error';
+  | 'error'
+  | 'info'; // transient announcement of a navigation / selection change
 
 export interface LiveActivity {
   kind: LiveActivityKind;

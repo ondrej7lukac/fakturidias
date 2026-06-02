@@ -1,5 +1,5 @@
 import './App.css';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { safeStripeRedirect, safeGoogleOAuthPopup } from './lib/security';
 import Header from './components/Header';
 import InvoiceForm from './components/InvoiceForm';
@@ -75,13 +75,58 @@ function App() {
     `${showWelcome}:${currentView}:${dashboardOpen}`,
   );
 
-  // Auto-clear terminal live-activity states (done/error) after a short beat
+  // Auto-clear transient live-activity states (done/error/info) after a short beat
   useEffect(() => {
-    if (liveActivity?.kind === 'done' || liveActivity?.kind === 'error') {
+    if (
+      liveActivity?.kind === 'done' ||
+      liveActivity?.kind === 'error' ||
+      liveActivity?.kind === 'info'
+    ) {
       const id = setTimeout(() => setLiveActivity(null), 1800);
       return () => clearTimeout(id);
     }
   }, [liveActivity]);
+
+  // Announce navigation / selection changes in the island (skip first render)
+  const navAnnouncedRef = useRef(false);
+  useEffect(() => {
+    if (!navAnnouncedRef.current) {
+      navAnnouncedRef.current = true;
+      return;
+    }
+    const cz = lang === 'cs';
+    const label = dashboardOpen
+      ? cz
+        ? 'Otevřeno: Přehled faktur'
+        : 'Opened: Invoice overview'
+      : currentView === 'settings'
+        ? cz
+          ? 'Otevřeno: Nastavení'
+          : 'Opened: Settings'
+        : currentView === 'mailbox'
+          ? cz
+            ? 'Otevřeno: Schránka faktur'
+            : 'Opened: Invoice mailbox'
+          : currentView === 'recurring'
+            ? cz
+              ? 'Otevřeno: Opakované faktury'
+              : 'Opened: Recurring invoices'
+            : currentView === 'expenses'
+              ? cz
+                ? 'Otevřeno: Výdaje'
+                : 'Opened: Expenses'
+              : currentView === 'admin'
+                ? 'Opened: Admin'
+                : selectedId
+                  ? cz
+                    ? 'Úprava faktury'
+                    : 'Editing invoice'
+                  : cz
+                    ? 'Nová faktura'
+                    : 'New invoice';
+    setLiveActivity({ kind: 'info', label });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentView, dashboardOpen, selectedId]);
 
   // Show welcome screen only when not logged in
   useEffect(() => {

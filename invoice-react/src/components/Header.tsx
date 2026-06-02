@@ -225,9 +225,17 @@ export default function Header({
     }
   })();
 
-  // Priority: a transient live interaction (AI / saving) → the on-screen
-  // narration (focused field / section in view) → the static section name.
-  const island = liveFace
+  // Priority: a navigation/selection announcement → a transient live AI
+  // interaction → the on-screen narration (focused field / section in view) →
+  // the static section name.
+  const island = liveActivity?.kind === 'info'
+    ? {
+        Icon: sectionFace.icon,
+        label: liveActivity.label,
+        tone: 'idle' as const,
+        spin: false,
+      }
+    : liveFace
     ? {
         Icon: liveFace.icon,
         label: liveActivity?.label ?? '',
