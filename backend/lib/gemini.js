@@ -37,6 +37,7 @@ Rules:
 - qty is a plain number
 - taxRate per item: 0 if VAT not mentioned, otherwise 21 (CZ standard rate)
 - dueDate: calculate from today (${today}); default to 14 days if not mentioned
+- transcript: include a faithful, verbatim transcription of what was said, in the original spoken language
 - Text field values (item names, paymentNote) must be in ${outputLang}`;
 }
 
@@ -96,6 +97,17 @@ function buildResponseSchema() {
             }
         },
         required: ['clientName', 'clientCountry', 'currency', 'issueDate', 'dueDate', 'items']
+    };
+}
+
+function buildAudioResponseSchema() {
+    const schema = buildResponseSchema();
+    return {
+        ...schema,
+        properties: {
+            ...schema.properties,
+            transcript: { type: 'string', description: 'Verbatim transcription of what was said, in the original spoken language' }
+        }
     };
 }
 
@@ -282,7 +294,7 @@ function callGeminiAudioApi(audioBase64, mimeType, lang = 'en') {
             temperature: 0.1,
             maxOutputTokens: 1024,
             responseMimeType: 'application/json',
-            responseSchema: buildResponseSchema()
+            responseSchema: buildAudioResponseSchema()
         }
     });
 
