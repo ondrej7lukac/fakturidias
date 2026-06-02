@@ -70,8 +70,7 @@
     border-color 0.25s ease,
     box-shadow 0.25s ease,
     background 0.25s ease;
-  pointer-events: none; /* purely informational (tooltip enabled on desktop below) */
-  cursor: default; /* never clickable — status only */
+  pointer-events: none; /* never intercepts clicks — purely informational */
   user-select: none;
 }
 .header-island__face {
@@ -196,59 +195,6 @@
   }
   .header-island__label {
     font-size: 12.5px;
-  }
-}
-
-/* Desktop-only hover tooltip with the detailed narration */
-@media (min-width: 701px) {
-  .header-island[data-tooltip] {
-    pointer-events: auto;
-  }
-  .header-island[data-tooltip]:hover::before {
-    content: '';
-    position: absolute;
-    top: calc(100% + 5px);
-    left: 50%;
-    transform: translateX(-50%) rotate(45deg);
-    width: 9px;
-    height: 9px;
-    background: var(--paper);
-    border-left: 1px solid var(--border-strong);
-    border-top: 1px solid var(--border-strong);
-    z-index: 61;
-  }
-  .header-island[data-tooltip]:hover::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    top: calc(100% + 9px);
-    left: 50%;
-    transform: translateX(-50%);
-    width: max-content;
-    max-width: 340px;
-    padding: 10px 14px;
-    background: var(--paper);
-    color: var(--text);
-    border: 1px solid var(--border-strong);
-    border-radius: 12px;
-    box-shadow: var(--shadow);
-    font-size: 12.5px;
-    font-weight: 500;
-    line-height: 1.45;
-    white-space: normal;
-    text-align: center;
-    z-index: 60;
-    pointer-events: none;
-    animation: island-tip 0.16s ease-out;
-  }
-}
-@keyframes island-tip {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
   }
 }
 

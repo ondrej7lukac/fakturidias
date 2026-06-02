@@ -200,7 +200,7 @@ main:not(.dashboard-mode) .invoice-list-container {
 
   html,
   body {
-    overflow-x: hidden !important;
+    overflow-x: clip !important; /* clip (not hidden) so the header stays sticky on mobile */
     width: 100%;
     margin: 0;
     padding: 0;
