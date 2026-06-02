@@ -44,6 +44,7 @@ interface HeaderProps {
   mobileMenuOpen: boolean;
   setMobileMenuOpen: (open: boolean) => void;
   isAdmin?: boolean;
+  dashboardOpen?: boolean;
 }
 
 export default function Header({
@@ -60,6 +61,7 @@ export default function Header({
   mobileMenuOpen,
   setMobileMenuOpen,
   isAdmin = false,
+  dashboardOpen = false,
 }: HeaderProps) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -122,17 +124,22 @@ export default function Header({
           />
         </button>
 
-        {/* Desktop segment: Invoice overview + New invoice */}
-        <div className='ap-seg header-seg-desktop'>
-          <button className='ap-seg__btn' onClick={onOpenDashboard}>
+        {/* Desktop switch: Invoice overview ⇄ New invoice */}
+        <div className='ap-seg header-seg-desktop' role='tablist' aria-label={isCz ? 'Zobrazení' : 'View'}>
+          <button
+            className={`ap-seg__btn${dashboardOpen ? ' ap-seg__btn--active' : ''}`}
+            onClick={onOpenDashboard}
+            role='tab'
+            aria-selected={dashboardOpen}
+          >
             <BarChart2 size={ICON_SM} strokeWidth={STROKE} />
-            <span className='seg-label-long'>
-              {isCz ? 'Přehled faktur' : 'Invoice overview'}
-            </span>
+            {isCz ? 'Přehled faktur' : 'Invoice overview'}
           </button>
           <button
-            className='ap-seg__btn ap-seg__btn--primary'
+            className={`ap-seg__btn${!dashboardOpen ? ' ap-seg__btn--active' : ''}`}
             onClick={onNewInvoice}
+            role='tab'
+            aria-selected={!dashboardOpen}
           >
             <Plus size={ICON_SM} strokeWidth={STROKE} />
             {isCz ? 'Nová faktura' : 'New invoice'}
