@@ -3,6 +3,8 @@ table {
   border-collapse: separate;
   border-spacing: 0;
   margin-top: 1rem;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 th, td {
@@ -13,11 +15,12 @@ th, td {
 }
 
 th {
-  color: var(--muted);
-  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--muted2);
+  font-weight: 500;
   text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
+  font-size: 0.7rem;
+  letter-spacing: 0.07em;
 }
 
 /* Status pills */
@@ -35,27 +38,27 @@ th {
 }
 
 .pill.draft {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
+  background: color-mix(in oklab, var(--text) 7%, transparent);
+  color: var(--muted);
   border-color: var(--border);
 }
 
 .pill.sent {
-  background: rgba(138, 164, 255, 0.15);
+  background: color-mix(in oklab, var(--accent-2) 16%, transparent);
   color: var(--accent-2);
-  border-color: rgba(138, 164, 255, 0.3);
+  border-color: color-mix(in oklab, var(--accent-2) 32%, transparent);
 }
 
 .pill.paid {
   background: var(--success-bg);
-  color: var(--success-border);
-  border-color: rgba(45, 215, 166, 0.3);
+  color: var(--accent-ink);
+  border-color: color-mix(in oklab, var(--accent) 32%, transparent);
 }
 
 .pill.overdue {
-  background: rgba(255, 91, 122, 0.15);
+  background: color-mix(in oklab, var(--danger) 15%, transparent);
   color: var(--danger);
-  border-color: rgba(255, 91, 122, 0.3);
+  border-color: color-mix(in oklab, var(--danger) 32%, transparent);
 }
 
 /* Suggestion items (ARES etc.) */

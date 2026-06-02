@@ -33,31 +33,30 @@ button:active, .btn:active {
   transform: translateY(0) scale(0.99);
 }
 
-/* Primary variant */
+/* Primary variant — ink fill (contrast-safe in both themes, matches landing) */
 button.primary,
 button[type="submit"]:not(.secondary),
 .btn--primary {
-  --btn-bg: radial-gradient(14px 14px at 18% 18%, rgba(255, 255, 255, 0.35), transparent 60%),
-            linear-gradient(135deg, rgba(124, 247, 212, 0.92), rgba(138, 164, 255, 0.92));
-  --btn-color: #061022;
-  --btn-border: rgba(255, 255, 255, 0.14);
-  --btn-hover-filter: saturate(1.08) brightness(1.05);
-  --btn-hover-bg: var(--btn-bg);
+  --btn-bg: var(--text);
+  --btn-color: var(--bg);
+  --btn-border: var(--text);
+  --btn-hover-filter: none;
+  --btn-hover-bg: color-mix(in oklab, var(--text) 88%, var(--accent));
   box-shadow: var(--shadow-lg);
 }
 
 /* Soft/secondary variant */
 button.secondary, .btn--soft {
-  --btn-bg: rgba(255, 255, 255, 0.06);
-  --btn-border: var(--border);
-  --btn-hover-bg: rgba(255, 255, 255, 0.10);
+  --btn-bg: color-mix(in oklab, var(--text) 5%, transparent);
+  --btn-border: var(--border-strong);
+  --btn-hover-bg: color-mix(in oklab, var(--text) 9%, transparent);
 }
 
 /* Success variant */
 button.success {
-  --btn-bg: linear-gradient(135deg, var(--accent-2), #2dd7a6);
-  --btn-color: #061022;
-  --btn-hover-filter: saturate(1.1) brightness(1.05);
+  --btn-bg: var(--accent);
+  --btn-color: #06140e;
+  --btn-hover-filter: brightness(1.05);
   --btn-hover-bg: var(--btn-bg);
   box-shadow: var(--shadow-lg);
 }
