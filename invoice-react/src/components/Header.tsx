@@ -34,8 +34,8 @@ import {
   ICON_SM,
   STROKE,
 } from '@/lib/icons';
-import type { LiveActivity } from '@/types/activity';
 import type { ScreenNarration } from '@/hooks/useScreenNarration';
+import { useLiveActivity } from '@/contexts/activity';
 
 interface CompanyProfile {
   id: string;
@@ -70,7 +70,6 @@ interface HeaderProps {
   setDefaultSupplier?: (supplier: Record<string, unknown>) => void;
   recentInvoices?: RecentInvoice[];
   onOpenInvoice?: (id: string) => void;
-  liveActivity?: LiveActivity | null;
   narration?: ScreenNarration | null;
 }
 
@@ -93,9 +92,9 @@ export default function Header({
   setDefaultSupplier,
   recentInvoices = [],
   onOpenInvoice,
-  liveActivity = null,
   narration = null,
 }: HeaderProps) {
+  const { liveActivity, settingsTab, announce } = useLiveActivity();
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     window.matchMedia('(prefers-color-scheme: dark)').matches
       ? 'dark'
@@ -128,6 +127,10 @@ export default function Header({
 
   const handleSwitchCompany = (profile: CompanyProfile) => {
     setDefaultSupplier?.({ ...profile.supplier });
+    announce({
+      kind: 'info',
+      label: isCz ? `Firma: ${profile.name}` : `Company: ${profile.name}`,
+    });
   };
 
   const handleSaveCompany = (supplier: Record<string, unknown>) => {
@@ -153,6 +156,17 @@ export default function Header({
     document.documentElement.classList.remove('theme-light', 'theme-dark');
     document.documentElement.classList.add(`theme-${next}`);
     setTheme(next);
+    announce({
+      kind: 'info',
+      label:
+        next === 'dark'
+          ? isCz
+            ? 'Tmavý vzhled'
+            : 'Dark theme'
+          : isCz
+            ? 'Světlý vzhled'
+            : 'Light theme',
+    });
   };
 
   const handleLogin = async () => {
@@ -208,14 +222,52 @@ export default function Header({
 
   const sectionFace = (() => {
     if (dashboardOpen)
-      return { icon: BarChart2, label: isCz ? 'Přehled faktur' : 'Invoice overview' };
+      return {
+        icon: BarChart2,
+        label: isCz ? 'Přehled faktur' : 'Invoice overview',
+      };
     switch (currentView) {
-      case 'settings':
-        return { icon: Settings2, label: isCz ? 'Nastavení' : 'Settings' };
+      case 'settings': {
+        const settingsHints: Record<number, { cs: string; en: string }> = {
+          1: {
+            cs: 'Identita — jméno, IČO, adresa',
+            en: 'Identity — name, business ID, address',
+          },
+          2: {
+            cs: 'Daně a banka — DPH, účet, číslování',
+            en: 'Tax & Bank — VAT, account, numbering',
+          },
+          3: {
+            cs: 'Integrace — Google Drive, Fio, API',
+            en: 'Integrations — Google Drive, Fio, API',
+          },
+          4: {
+            cs: 'Plán — správa předplatného',
+            en: 'Plan — subscription management',
+          },
+        };
+        const hint = settingsHints[settingsTab];
+        return {
+          icon: Settings2,
+          label: hint
+            ? isCz
+              ? hint.cs
+              : hint.en
+            : isCz
+              ? 'Nastavení'
+              : 'Settings',
+        };
+      }
       case 'mailbox':
-        return { icon: Mail, label: isCz ? 'Schránka faktur' : 'Invoice mailbox' };
+        return {
+          icon: Mail,
+          label: isCz ? 'Schránka faktur' : 'Invoice mailbox',
+        };
       case 'recurring':
-        return { icon: RefreshCw, label: isCz ? 'Opakované faktury' : 'Recurring invoices' };
+        return {
+          icon: RefreshCw,
+          label: isCz ? 'Opakované faktury' : 'Recurring invoices',
+        };
       case 'expenses':
         return { icon: Wallet, label: isCz ? 'Výdaje' : 'Expenses' };
       case 'admin':
@@ -228,36 +280,37 @@ export default function Header({
   // Priority: a navigation/selection announcement → a transient live AI
   // interaction → the on-screen narration (focused field / section in view) →
   // the static section name.
-  const island = liveActivity?.kind === 'info'
-    ? {
-        Icon: sectionFace.icon,
-        label: liveActivity.label,
-        tone: 'idle' as const,
-        spin: false,
-      }
-    : liveFace
-    ? {
-        Icon: liveFace.icon,
-        label: liveActivity?.label ?? '',
-        tone: liveFace.tone,
-        spin: liveFace.spin,
-      }
-    : narration
+  const island =
+    liveActivity?.kind === 'info'
       ? {
-          Icon: narration.mode === 'field' ? Pencil : FileText,
-          label:
-            narration.mode === 'field'
-              ? `${isCz ? 'Vyplňujete' : 'Editing'}: ${narration.text}`
-              : narration.text,
+          Icon: sectionFace.icon,
+          label: liveActivity.label,
           tone: 'idle' as const,
           spin: false,
         }
-      : {
-          Icon: sectionFace.icon,
-          label: sectionFace.label,
-          tone: 'idle' as const,
-          spin: false,
-        };
+      : liveFace
+        ? {
+            Icon: liveFace.icon,
+            label: liveActivity?.label ?? '',
+            tone: liveFace.tone,
+            spin: liveFace.spin,
+          }
+        : narration
+          ? {
+              Icon: narration.mode === 'field' ? Pencil : FileText,
+              label:
+                narration.mode === 'field'
+                  ? `${isCz ? 'Vyplňujete' : 'Editing'}: ${narration.text}`
+                  : narration.text,
+              tone: 'idle' as const,
+              spin: false,
+            }
+          : {
+              Icon: sectionFace.icon,
+              label: sectionFace.label,
+              tone: 'idle' as const,
+              spin: false,
+            };
   const IslandIcon = island.Icon;
   const islandLabel = island.label;
   const islandTone = island.tone;
@@ -284,7 +337,10 @@ export default function Header({
           role='status'
           aria-live='polite'
         >
-          <span key={`${islandTone}-${islandLabel}`} className='header-island__face'>
+          <span
+            key={`${islandTone}-${islandLabel}`}
+            className='header-island__face'
+          >
             <span className='header-island__dot' aria-hidden />
             <IslandIcon
               size={ICON_SM}
@@ -310,13 +366,19 @@ export default function Header({
           <div className='lp-lang header-lang-desktop'>
             <button
               className={`lp-lang__btn${lang === 'cs' ? ' lp-lang__btn--active' : ''}`}
-              onClick={() => setLang('cs')}
+              onClick={() => {
+                setLang('cs');
+                announce({ kind: 'info', label: 'Čeština' });
+              }}
             >
               CS
             </button>
             <button
               className={`lp-lang__btn${lang === 'en' ? ' lp-lang__btn--active' : ''}`}
-              onClick={() => setLang('en')}
+              onClick={() => {
+                setLang('en');
+                announce({ kind: 'info', label: 'English' });
+              }}
             >
               EN
             </button>
@@ -371,204 +433,235 @@ export default function Header({
 
           {/* User avatar with dropdown (desktop only) */}
           <div className='header-user-desktop'>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className={`ap-avatar${user ? ' ap-avatar--active' : ''}`}
-              aria-label='User menu'
-            >
-              {user ? user.email[0].toUpperCase() : 'G'}
-            </DropdownMenuTrigger>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={`ap-avatar${user ? ' ap-avatar--active' : ''}`}
+                aria-label='User menu'
+              >
+                {user ? user.email[0].toUpperCase() : 'G'}
+              </DropdownMenuTrigger>
 
-            <DropdownMenuContent
-              align='end'
-              sideOffset={8}
-              className='user-dropdown'
-            >
-              {user ? (
-                <div className='user-dropdown__card'>
-                  <div className='user-dropdown__avatar'>
-                    {user.email[0].toUpperCase()}
-                  </div>
-                  <div className='user-dropdown__info'>
-                    <div className='user-dropdown__name'>
-                      {user.email.split('@')[0]}
+              <DropdownMenuContent
+                align='end'
+                sideOffset={8}
+                className='user-dropdown'
+              >
+                {user ? (
+                  <div className='user-dropdown__card'>
+                    <div className='user-dropdown__avatar'>
+                      {user.email[0].toUpperCase()}
                     </div>
-                    <div className='user-dropdown__email'>{user.email}</div>
-                    <div className='user-dropdown__badge'>
-                      <Check size={10} strokeWidth={3} />
-                      {isCz ? 'Přihlášen' : 'Signed in'}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className='user-dropdown__signin-prompt'>
-                  <div className='user-dropdown__google-icon'>G</div>
-                  <div>
-                    <div className='user-dropdown__prompt-title'>
-                      {isCz ? 'Nejste přihlášeni' : 'Not signed in'}
-                    </div>
-                    <div className='user-dropdown__prompt-sub'>
-                      {isCz
-                        ? 'Přihlaste se pro ukládání faktur'
-                        : 'Sign in to save invoices'}
+                    <div className='user-dropdown__info'>
+                      <div className='user-dropdown__name'>
+                        {user.email.split('@')[0]}
+                      </div>
+                      <div className='user-dropdown__email'>{user.email}</div>
+                      <div className='user-dropdown__badge'>
+                        <Check size={10} strokeWidth={3} />
+                        {isCz ? 'Přihlášen' : 'Signed in'}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-              <DropdownMenuSeparator className='user-dropdown__separator' />
-              {user && (
-                <div className='user-dropdown__section'>
-                  <div className='user-dropdown__section-label'>
-                    <Contact size={12} strokeWidth={2} />
-                    {isCz ? 'Firma' : 'Company'}
-                  </div>
-                  {activeCompanyName && (
-                    <div className='user-dropdown__company-active'>
-                      {activeCompanyName}
+                ) : (
+                  <div className='user-dropdown__signin-prompt'>
+                    <div className='user-dropdown__google-icon'>G</div>
+                    <div>
+                      <div className='user-dropdown__prompt-title'>
+                        {isCz ? 'Nejste přihlášeni' : 'Not signed in'}
+                      </div>
+                      <div className='user-dropdown__prompt-sub'>
+                        {isCz
+                          ? 'Přihlaste se pro ukládání faktur'
+                          : 'Sign in to save invoices'}
+                      </div>
                     </div>
-                  )}
-                  {profiles
-                    .filter((p) => p.name !== activeCompanyName)
-                    .slice(0, 4)
-                    .map((p) => (
-                      <DropdownMenuItem
-                        key={p.id}
-                        onClick={() => handleSwitchCompany(p)}
-                        className='user-dropdown__item user-dropdown__item--compact'
-                      >
-                        <RefreshCw size={14} strokeWidth={2} className='user-dropdown__item-icon' />
-                        <span>{p.name}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  <DropdownMenuItem
-                    onClick={() => setCompanyModalOpen(true)}
-                    className='user-dropdown__item user-dropdown__item--compact'
-                  >
-                    <Plus size={14} strokeWidth={2} className='user-dropdown__item-icon' />
-                    <span>{isCz ? 'Přidat / upravit firmu' : 'Add / edit company'}</span>
-                  </DropdownMenuItem>
-                </div>
-              )}
-              {user && recentInvoices.length > 0 && (
-                <div className='user-dropdown__section'>
-                  <div className='user-dropdown__section-label'>
-                    <Clock size={12} strokeWidth={2} />
-                    {isCz ? 'Naposledy otevřené' : 'Recent'}
                   </div>
-                  {recentInvoices.slice(0, 4).map((r) => (
+                )}
+                <DropdownMenuSeparator className='user-dropdown__separator' />
+                {user && (
+                  <div className='user-dropdown__section'>
+                    <div className='user-dropdown__section-label'>
+                      <Contact size={12} strokeWidth={2} />
+                      {isCz ? 'Firma' : 'Company'}
+                    </div>
+                    {activeCompanyName && (
+                      <div className='user-dropdown__company-active'>
+                        {activeCompanyName}
+                      </div>
+                    )}
+                    {profiles
+                      .filter((p) => p.name !== activeCompanyName)
+                      .slice(0, 4)
+                      .map((p) => (
+                        <DropdownMenuItem
+                          key={p.id}
+                          onClick={() => handleSwitchCompany(p)}
+                          className='user-dropdown__item user-dropdown__item--compact'
+                        >
+                          <RefreshCw
+                            size={14}
+                            strokeWidth={2}
+                            className='user-dropdown__item-icon'
+                          />
+                          <span>{p.name}</span>
+                        </DropdownMenuItem>
+                      ))}
                     <DropdownMenuItem
-                      key={r.id}
-                      onClick={() => onOpenInvoice?.(r.id)}
+                      onClick={() => setCompanyModalOpen(true)}
                       className='user-dropdown__item user-dropdown__item--compact'
                     >
-                      <FileText size={14} strokeWidth={2} className='user-dropdown__item-icon' />
-                      <span className='user-dropdown__recent-text'>
-                        {r.invoiceNumber || (isCz ? 'Faktura' : 'Invoice')}
-                        {r.clientName ? ` · ${r.clientName}` : ''}
+                      <Plus
+                        size={14}
+                        strokeWidth={2}
+                        className='user-dropdown__item-icon'
+                      />
+                      <span>
+                        {isCz ? 'Přidat / upravit firmu' : 'Add / edit company'}
                       </span>
                     </DropdownMenuItem>
-                  ))}
+                  </div>
+                )}
+                {user && recentInvoices.length > 0 && (
+                  <div className='user-dropdown__section'>
+                    <div className='user-dropdown__section-label'>
+                      <Clock size={12} strokeWidth={2} />
+                      {isCz ? 'Naposledy otevřené' : 'Recent'}
+                    </div>
+                    {recentInvoices.slice(0, 4).map((r) => (
+                      <DropdownMenuItem
+                        key={r.id}
+                        onClick={() => onOpenInvoice?.(r.id)}
+                        className='user-dropdown__item user-dropdown__item--compact'
+                      >
+                        <FileText
+                          size={14}
+                          strokeWidth={2}
+                          className='user-dropdown__item-icon'
+                        />
+                        <span className='user-dropdown__recent-text'>
+                          {r.invoiceNumber || (isCz ? 'Faktura' : 'Invoice')}
+                          {r.clientName ? ` · ${r.clientName}` : ''}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </div>
+                )}
+                <DropdownMenuSeparator className='user-dropdown__separator' />
+                <div className='user-dropdown__actions'>
+                  {user && (
+                    <DropdownMenuItem
+                      onClick={() => onViewChange('mailbox')}
+                      className='user-dropdown__item'
+                    >
+                      <Mail
+                        size={15}
+                        strokeWidth={2}
+                        className='user-dropdown__item-icon'
+                      />
+                      <span>
+                        {isCz ? 'Schránka faktur' : 'Invoice mailbox'}
+                      </span>
+                    </DropdownMenuItem>
+                  )}
+                  {user && (
+                    <DropdownMenuItem
+                      onClick={() => onViewChange('recurring')}
+                      className='user-dropdown__item'
+                    >
+                      <RefreshCw
+                        size={15}
+                        strokeWidth={2}
+                        className='user-dropdown__item-icon'
+                      />
+                      <span>
+                        {isCz ? 'Opakované faktury' : 'Recurring invoices'}
+                      </span>
+                    </DropdownMenuItem>
+                  )}
+                  {user && (
+                    <DropdownMenuItem
+                      onClick={() => onViewChange('expenses')}
+                      className='user-dropdown__item'
+                    >
+                      <Wallet
+                        size={15}
+                        strokeWidth={2}
+                        className='user-dropdown__item-icon'
+                      />
+                      <span>{isCz ? 'Výdaje' : 'Expenses'}</span>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onClick={() => onViewChange('settings')}
+                    className='user-dropdown__item'
+                  >
+                    <Settings2
+                      size={15}
+                      strokeWidth={2}
+                      className='user-dropdown__item-icon'
+                    />
+                    <span>{isCz ? 'Nastavení' : 'Settings'}</span>
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem
+                      onClick={() => onViewChange('admin')}
+                      className='user-dropdown__item'
+                    >
+                      <Shield
+                        size={15}
+                        strokeWidth={2}
+                        className='user-dropdown__item-icon'
+                        style={{ color: 'var(--accent)' }}
+                      />
+                      <span style={{ color: 'var(--accent)' }}>Admin</span>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator className='user-dropdown__separator--inner' />
+                  {user ? (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        announce({
+                          kind: 'info',
+                          label: isCz ? 'Odhlášení…' : 'Signing out…',
+                        });
+                        onLogout();
+                      }}
+                      className='user-dropdown__item user-dropdown__item--danger'
+                    >
+                      <X size={15} strokeWidth={2} style={{ flexShrink: 0 }} />
+                      <span>{isCz ? 'Odhlásit se' : 'Sign out'}</span>
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        announce({
+                          kind: 'processing',
+                          label: isCz ? 'Přihlašování…' : 'Signing in…',
+                        });
+                        handleLogin();
+                      }}
+                      className='user-dropdown__item user-dropdown__item--signin'
+                    >
+                      <span className='user-dropdown__signin-letter'>G</span>
+                      <span>
+                        {isCz
+                          ? 'Přihlásit se přes Google'
+                          : 'Sign in with Google'}
+                      </span>
+                    </DropdownMenuItem>
+                  )}
                 </div>
-              )}
-              <DropdownMenuSeparator className='user-dropdown__separator' />
-              <div className='user-dropdown__actions'>
-                {user && (
-                  <DropdownMenuItem
-                    onClick={() => onViewChange('mailbox')}
-                    className='user-dropdown__item'
-                  >
-                    <Mail
-                      size={15}
-                      strokeWidth={2}
-                      className='user-dropdown__item-icon'
-                    />
-                    <span>{isCz ? 'Schránka faktur' : 'Invoice mailbox'}</span>
-                  </DropdownMenuItem>
-                )}
-                {user && (
-                  <DropdownMenuItem
-                    onClick={() => onViewChange('recurring')}
-                    className='user-dropdown__item'
-                  >
-                    <RefreshCw
-                      size={15}
-                      strokeWidth={2}
-                      className='user-dropdown__item-icon'
-                    />
-                    <span>
-                      {isCz ? 'Opakované faktury' : 'Recurring invoices'}
-                    </span>
-                  </DropdownMenuItem>
-                )}
-                {user && (
-                  <DropdownMenuItem
-                    onClick={() => onViewChange('expenses')}
-                    className='user-dropdown__item'
-                  >
-                    <Wallet
-                      size={15}
-                      strokeWidth={2}
-                      className='user-dropdown__item-icon'
-                    />
-                    <span>{isCz ? 'Výdaje' : 'Expenses'}</span>
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem
-                  onClick={() => onViewChange('settings')}
-                  className='user-dropdown__item'
-                >
-                  <Settings2
-                    size={15}
-                    strokeWidth={2}
-                    className='user-dropdown__item-icon'
-                  />
-                  <span>{isCz ? 'Nastavení' : 'Settings'}</span>
-                </DropdownMenuItem>
-                {isAdmin && (
-                  <DropdownMenuItem
-                    onClick={() => onViewChange('admin')}
-                    className='user-dropdown__item'
-                  >
-                    <Shield
-                      size={15}
-                      strokeWidth={2}
-                      className='user-dropdown__item-icon'
-                      style={{ color: 'var(--accent)' }}
-                    />
-                    <span style={{ color: 'var(--accent)' }}>Admin</span>
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator className='user-dropdown__separator--inner' />
-                {user ? (
-                  <DropdownMenuItem
-                    onClick={onLogout}
-                    className='user-dropdown__item user-dropdown__item--danger'
-                  >
-                    <X size={15} strokeWidth={2} style={{ flexShrink: 0 }} />
-                    <span>{isCz ? 'Odhlásit se' : 'Sign out'}</span>
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem
-                    onClick={handleLogin}
-                    className='user-dropdown__item user-dropdown__item--signin'
-                  >
-                    <span className='user-dropdown__signin-letter'>G</span>
-                    <span>
-                      {isCz
-                        ? 'Přihlásit se přes Google'
-                        : 'Sign in with Google'}
-                    </span>
-                  </DropdownMenuItem>
-                )}
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Mobile hamburger */}
           <button
             className='lp-icon-toggle header-mobile-menu'
-            onClick={() => setMobileMenuOpen(true)}
+            onClick={() => {
+              setMobileMenuOpen(true);
+              announce({ kind: 'info', label: isCz ? 'Nabídka' : 'Menu' });
+            }}
             aria-label='Menu'
           >
             <Menu size={18} strokeWidth={2} />
@@ -634,7 +727,11 @@ export default function Header({
                   setMobileMenuOpen(false);
                 }}
               >
-                <BarChart2 size={15} strokeWidth={2} className='user-dropdown__item-icon' />
+                <BarChart2
+                  size={15}
+                  strokeWidth={2}
+                  className='user-dropdown__item-icon'
+                />
                 <span>{isCz ? 'Přehled faktur' : 'Invoice overview'}</span>
               </button>
               <button
@@ -644,7 +741,11 @@ export default function Header({
                   setMobileMenuOpen(false);
                 }}
               >
-                <FileText size={15} strokeWidth={2} className='user-dropdown__item-icon' />
+                <FileText
+                  size={15}
+                  strokeWidth={2}
+                  className='user-dropdown__item-icon'
+                />
                 <span>{isCz ? 'Faktury' : 'Invoices'}</span>
               </button>
               <button
@@ -654,7 +755,11 @@ export default function Header({
                   setMobileMenuOpen(false);
                 }}
               >
-                <Plus size={15} strokeWidth={2} className='user-dropdown__item-icon' />
+                <Plus
+                  size={15}
+                  strokeWidth={2}
+                  className='user-dropdown__item-icon'
+                />
                 <span>{isCz ? 'Nová faktura' : 'New invoice'}</span>
               </button>
             </div>
@@ -683,7 +788,11 @@ export default function Header({
                         setMobileMenuOpen(false);
                       }}
                     >
-                      <RefreshCw size={14} strokeWidth={2} className='user-dropdown__item-icon' />
+                      <RefreshCw
+                        size={14}
+                        strokeWidth={2}
+                        className='user-dropdown__item-icon'
+                      />
                       <span>{p.name}</span>
                     </button>
                   ))}
@@ -694,8 +803,14 @@ export default function Header({
                     setCompanyModalOpen(true);
                   }}
                 >
-                  <Plus size={14} strokeWidth={2} className='user-dropdown__item-icon' />
-                  <span>{isCz ? 'Přidat / upravit firmu' : 'Add / edit company'}</span>
+                  <Plus
+                    size={14}
+                    strokeWidth={2}
+                    className='user-dropdown__item-icon'
+                  />
+                  <span>
+                    {isCz ? 'Přidat / upravit firmu' : 'Add / edit company'}
+                  </span>
                 </button>
               </div>
             )}
@@ -716,7 +831,11 @@ export default function Header({
                       setMobileMenuOpen(false);
                     }}
                   >
-                    <FileText size={14} strokeWidth={2} className='user-dropdown__item-icon' />
+                    <FileText
+                      size={14}
+                      strokeWidth={2}
+                      className='user-dropdown__item-icon'
+                    />
                     <span className='user-dropdown__recent-text'>
                       {r.invoiceNumber || (isCz ? 'Faktura' : 'Invoice')}
                       {r.clientName ? ` · ${r.clientName}` : ''}
@@ -736,7 +855,11 @@ export default function Header({
                     setMobileMenuOpen(false);
                   }}
                 >
-                  <Mail size={15} strokeWidth={2} className='user-dropdown__item-icon' />
+                  <Mail
+                    size={15}
+                    strokeWidth={2}
+                    className='user-dropdown__item-icon'
+                  />
                   <span>{isCz ? 'Schránka faktur' : 'Invoice mailbox'}</span>
                 </button>
               )}
@@ -748,8 +871,14 @@ export default function Header({
                     setMobileMenuOpen(false);
                   }}
                 >
-                  <RefreshCw size={15} strokeWidth={2} className='user-dropdown__item-icon' />
-                  <span>{isCz ? 'Opakované faktury' : 'Recurring invoices'}</span>
+                  <RefreshCw
+                    size={15}
+                    strokeWidth={2}
+                    className='user-dropdown__item-icon'
+                  />
+                  <span>
+                    {isCz ? 'Opakované faktury' : 'Recurring invoices'}
+                  </span>
                 </button>
               )}
               {user && (
@@ -760,7 +889,11 @@ export default function Header({
                     setMobileMenuOpen(false);
                   }}
                 >
-                  <Wallet size={15} strokeWidth={2} className='user-dropdown__item-icon' />
+                  <Wallet
+                    size={15}
+                    strokeWidth={2}
+                    className='user-dropdown__item-icon'
+                  />
                   <span>{isCz ? 'Výdaje' : 'Expenses'}</span>
                 </button>
               )}
@@ -771,7 +904,11 @@ export default function Header({
                   setMobileMenuOpen(false);
                 }}
               >
-                <Settings2 size={15} strokeWidth={2} className='user-dropdown__item-icon' />
+                <Settings2
+                  size={15}
+                  strokeWidth={2}
+                  className='user-dropdown__item-icon'
+                />
                 <span>{isCz ? 'Nastavení' : 'Settings'}</span>
               </button>
               {isAdmin && (
@@ -782,7 +919,12 @@ export default function Header({
                     setMobileMenuOpen(false);
                   }}
                 >
-                  <Shield size={15} strokeWidth={2} className='user-dropdown__item-icon' style={{ color: 'var(--accent)' }} />
+                  <Shield
+                    size={15}
+                    strokeWidth={2}
+                    className='user-dropdown__item-icon'
+                    style={{ color: 'var(--accent)' }}
+                  />
                   <span style={{ color: 'var(--accent)' }}>Admin</span>
                 </button>
               )}
@@ -806,6 +948,7 @@ export default function Header({
                   style={{ flex: 1, textAlign: 'center', padding: '8px 0' }}
                   onClick={() => {
                     setLang('cs');
+                    announce({ kind: 'info', label: 'Čeština' });
                     setMobileMenuOpen(false);
                   }}
                 >
@@ -816,6 +959,7 @@ export default function Header({
                   style={{ flex: 1, textAlign: 'center', padding: '8px 0' }}
                   onClick={() => {
                     setLang('en');
+                    announce({ kind: 'info', label: 'English' });
                     setMobileMenuOpen(false);
                   }}
                 >
@@ -835,7 +979,19 @@ export default function Header({
               className={`lp-btn lp-btn--lg ${user ? 'header__mobile-auth--logout' : 'lp-btn--primary'}`}
               style={{ justifyContent: 'center', width: '100%' }}
               onClick={() => {
-                user ? onLogout() : handleLogin();
+                if (user) {
+                  announce({
+                    kind: 'info',
+                    label: isCz ? 'Odhlášení…' : 'Signing out…',
+                  });
+                  onLogout();
+                } else {
+                  announce({
+                    kind: 'processing',
+                    label: isCz ? 'Přihlašování…' : 'Signing in…',
+                  });
+                  handleLogin();
+                }
                 setMobileMenuOpen(false);
               }}
             >

@@ -11,6 +11,7 @@ import {
   ICON_MD,
   STROKE,
 } from '@/lib/icons';
+import { useLiveActivity } from '@/contexts/activity';
 import {
   getRecurringTemplates,
   saveRecurringTemplate,
@@ -60,6 +61,7 @@ function formatRunDate(value?: string | null): string {
 
 export default function Recurring({ lang, invoices, isPro }: RecurringProps) {
   const isCz = lang === 'cs';
+  const { announce } = useLiveActivity();
   const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -97,6 +99,10 @@ export default function Recurring({ lang, invoices, isPro }: RecurringProps) {
       return;
     }
     setSaving(true);
+    announce({
+      kind: 'processing',
+      label: isCz ? 'Vytvářím šablonu…' : 'Creating template…',
+    });
     try {
       await saveRecurringTemplate({
         name: source.client?.name || source.invoiceNumber,
@@ -111,9 +117,19 @@ export default function Recurring({ lang, invoices, isPro }: RecurringProps) {
       setAutoSend(false);
       await loadTemplates();
       setError('');
+      announce({
+        kind: 'done',
+        label: isCz
+          ? 'Opakovaná faktura vytvořena'
+          : 'Recurring template created',
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save';
       setError(message);
+      announce({
+        kind: 'error',
+        label: isCz ? 'Chyba při ukládání' : 'Failed to save',
+      });
     } finally {
       setSaving(false);
     }
@@ -121,6 +137,10 @@ export default function Recurring({ lang, invoices, isPro }: RecurringProps) {
 
   async function handleDelete(id: string) {
     try {
+      announce({
+        kind: 'info',
+        label: isCz ? 'Šablona smazána' : 'Template deleted',
+      });
       await deleteRecurringTemplate(id);
       setTemplates((prev) => prev.filter((tpl) => tpl.id !== id));
     } catch {
@@ -129,12 +149,12 @@ export default function Recurring({ lang, invoices, isPro }: RecurringProps) {
   }
 
   return (
-    <div className="recurring-view">
-      <header className="recurring-header">
+    <div className='recurring-view'>
+      <header className='recurring-header'>
         <RefreshCw size={ICON_MD} strokeWidth={STROKE} />
         <div>
           <h2>{isCz ? 'Opakované faktury' : 'Recurring invoices'}</h2>
-          <p className="recurring-sub">
+          <p className='recurring-sub'>
             {isCz
               ? 'Automaticky vystavujte faktury podle plánu.'
               : 'Automatically issue invoices on a schedule.'}
@@ -143,27 +163,27 @@ export default function Recurring({ lang, invoices, isPro }: RecurringProps) {
       </header>
 
       {!isPro && (
-        <div className="recurring-banner">
+        <div className='recurring-banner'>
           {isCz
             ? 'Opakované faktury jsou součástí plánu Pro. Šablonu si můžete připravit, ale automatické vystavování vyžaduje Pro.'
             : 'Recurring invoices are a Pro feature. You can prepare a template, but automatic issuing requires Pro.'}
         </div>
       )}
 
-      <section className="ap-card recurring-form">
-        <h3 className="ap-card__title">
+      <section className='ap-card recurring-form'>
+        <h3 className='ap-card__title'>
           <Plus size={ICON_MD} strokeWidth={STROKE} />
           {isCz ? 'Nová šablona' : 'New template'}
         </h3>
-        <div className="ap-grid ap-grid--3">
-          <div className="ap-field">
+        <div className='ap-grid ap-grid--3'>
+          <div className='ap-field'>
             <label>{isCz ? 'Zdrojová faktura' : 'Source invoice'}</label>
             <select
-              className="ap-select"
+              className='ap-select'
               value={sourceId}
               onChange={(e) => setSourceId(e.target.value)}
             >
-              <option value="">{isCz ? '— vyberte —' : '— select —'}</option>
+              <option value=''>{isCz ? '— vyberte —' : '— select —'}</option>
               {invoices.map((inv) => (
                 <option key={inv.id} value={inv.id}>
                   {inv.invoiceNumber} · {inv.client?.name || '—'} ·{' '}
@@ -172,10 +192,10 @@ export default function Recurring({ lang, invoices, isPro }: RecurringProps) {
               ))}
             </select>
           </div>
-          <div className="ap-field">
+          <div className='ap-field'>
             <label>{isCz ? 'Frekvence' : 'Frequency'}</label>
             <select
-              className="ap-select"
+              className='ap-select'
               value={cadence}
               onChange={(e) => setCadence(e.target.value as RecurringCadence)}
             >
@@ -186,11 +206,11 @@ export default function Recurring({ lang, invoices, isPro }: RecurringProps) {
               ))}
             </select>
           </div>
-          <div className="ap-field">
+          <div className='ap-field'>
             <label>{isCz ? 'Interval (každých)' : 'Every (interval)'}</label>
             <input
-              className="ap-input"
-              type="number"
+              className='ap-input'
+              type='number'
               min={1}
               value={intervalCount}
               onChange={(e) =>
@@ -198,29 +218,31 @@ export default function Recurring({ lang, invoices, isPro }: RecurringProps) {
               }
             />
           </div>
-          <div className="ap-field">
+          <div className='ap-field'>
             <label>{isCz ? 'První vystavení' : 'First run'}</label>
             <input
-              className="ap-input"
-              type="date"
+              className='ap-input'
+              type='date'
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
           </div>
-          <div className="ap-field">
+          <div className='ap-field'>
             <label>{isCz ? 'Splatnost (dní)' : 'Due in (days)'}</label>
             <input
-              className="ap-input"
-              type="number"
+              className='ap-input'
+              type='number'
               min={0}
               value={dueDays}
-              onChange={(e) => setDueDays(Math.max(0, Number(e.target.value) || 0))}
+              onChange={(e) =>
+                setDueDays(Math.max(0, Number(e.target.value) || 0))
+              }
             />
           </div>
-          <div className="ap-field recurring-checkbox">
+          <div className='ap-field recurring-checkbox'>
             <label>
               <input
-                type="checkbox"
+                type='checkbox'
                 checked={autoSend}
                 onChange={(e) => setAutoSend(e.target.checked)}
               />
@@ -229,9 +251,9 @@ export default function Recurring({ lang, invoices, isPro }: RecurringProps) {
             </label>
           </div>
         </div>
-        <div className="recurring-form__actions">
+        <div className='recurring-form__actions'>
           <button
-            className="btn btn--primary"
+            className='btn btn--primary'
             onClick={handleCreate}
             disabled={saving || !sourceId}
           >
@@ -246,21 +268,21 @@ export default function Recurring({ lang, invoices, isPro }: RecurringProps) {
         </div>
       </section>
 
-      {error && <div className="recurring-error">{error}</div>}
+      {error && <div className='recurring-error'>{error}</div>}
 
-      <section className="recurring-list">
+      <section className='recurring-list'>
         {loading ? (
-          <p className="recurring-empty">{isCz ? 'Načítám…' : 'Loading…'}</p>
+          <p className='recurring-empty'>{isCz ? 'Načítám…' : 'Loading…'}</p>
         ) : templates.length === 0 ? (
-          <p className="recurring-empty">
+          <p className='recurring-empty'>
             {isCz
               ? 'Zatím žádné opakované faktury.'
               : 'No recurring invoices yet.'}
           </p>
         ) : (
           templates.map((tpl) => (
-            <article key={tpl.id} className="ap-card recurring-item">
-              <div className="recurring-item__main">
+            <article key={tpl.id} className='ap-card recurring-item'>
+              <div className='recurring-item__main'>
                 <span
                   className={`recurring-pill ${tpl.active ? 'is-active' : 'is-paused'}`}
                 >
@@ -273,30 +295,31 @@ export default function Recurring({ lang, invoices, isPro }: RecurringProps) {
                       : 'Paused'}
                 </span>
                 <strong>{tpl.name}</strong>
-                <span className="recurring-item__meta">
+                <span className='recurring-item__meta'>
                   <RefreshCw size={ICON_SM} strokeWidth={STROKE} />
                   {cadenceLabel(tpl.cadence, isCz)}
                   {tpl.intervalCount > 1 ? ` ×${tpl.intervalCount}` : ''}
                 </span>
-                <span className="recurring-item__meta">
+                <span className='recurring-item__meta'>
                   <Calendar size={ICON_SM} strokeWidth={STROKE} />
                   {isCz ? 'Příště' : 'Next'}: {formatRunDate(tpl.nextRunAt)}
                 </span>
                 {tpl.autoSend && (
-                  <span className="recurring-item__meta">
+                  <span className='recurring-item__meta'>
                     <Send size={ICON_SM} strokeWidth={STROKE} />
                     {isCz ? 'Auto-odeslání' : 'Auto-send'}
                   </span>
                 )}
                 {tpl.lastRunAt && (
-                  <span className="recurring-item__meta">
+                  <span className='recurring-item__meta'>
                     <Clock size={ICON_SM} strokeWidth={STROKE} />
-                    {isCz ? 'Naposledy' : 'Last'}: {formatRunDate(tpl.lastRunAt)}
+                    {isCz ? 'Naposledy' : 'Last'}:{' '}
+                    {formatRunDate(tpl.lastRunAt)}
                   </span>
                 )}
               </div>
               <button
-                className="btn recurring-item__delete"
+                className='btn recurring-item__delete'
                 onClick={() => handleDelete(tpl.id)}
                 aria-label={isCz ? 'Smazat' : 'Delete'}
               >

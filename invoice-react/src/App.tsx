@@ -24,7 +24,7 @@ import {
 } from './utils/storage';
 import { languages } from './utils/i18n';
 import { useScreenNarration } from './hooks/useScreenNarration';
-import type { LiveActivity } from './types/activity';
+import { useLiveActivity } from './contexts/activity';
 
 function App() {
   const [user, setUser] = useState(null); // Auth state lifted to App
@@ -43,7 +43,8 @@ function App() {
   const [mobileView, setMobileView] = useState('form'); // 'form' or 'list'
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
-  const [liveActivity, setLiveActivity] = useState<LiveActivity | null>(null);
+  const { liveActivity, settingsTab, announce, setSettingsTab } =
+    useLiveActivity();
   const [recentInvoices, setRecentInvoices] = useState<
     { id: string; invoiceNumber: string; clientName: string }[]
   >(() => {
@@ -75,17 +76,7 @@ function App() {
     `${showWelcome}:${currentView}:${dashboardOpen}`,
   );
 
-  // Auto-clear transient live-activity states (done/error/info) after a short beat
-  useEffect(() => {
-    if (
-      liveActivity?.kind === 'done' ||
-      liveActivity?.kind === 'error' ||
-      liveActivity?.kind === 'info'
-    ) {
-      const id = setTimeout(() => setLiveActivity(null), 1800);
-      return () => clearTimeout(id);
-    }
-  }, [liveActivity]);
+  // Auto-clear for transient states is handled by ActivityContext.
 
   // Announce navigation / selection changes in the island (skip first render)
   const navAnnouncedRef = useRef(false);
@@ -124,7 +115,7 @@ function App() {
                   : cz
                     ? 'Nová faktura'
                     : 'New invoice';
-    setLiveActivity({ kind: 'info', label });
+    announce({ kind: 'info', label });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentView, dashboardOpen, selectedId]);
 
@@ -610,7 +601,7 @@ function App() {
   return (
     <>
       {viewingAs && (
-        <div className="viewing-as-banner">
+        <div className='viewing-as-banner'>
           <span>
             {lang === 'cs' ? 'Prohlížíte účet ' : 'Viewing account '}
             <strong>{viewingAs}</strong>{' '}
@@ -647,7 +638,6 @@ function App() {
         setDefaultSupplier={setDefaultSupplier}
         recentInvoices={recentInvoices}
         onOpenInvoice={handleOpenInvoice}
-        liveActivity={liveActivity}
         narration={screenNarration}
       />
       <main
@@ -710,7 +700,6 @@ function App() {
                 isAuthenticated={!!user}
                 onShowInvoiceForm={handleNewInvoice}
                 onOpenDashboard={handleOpenDashboard}
-                onActivity={setLiveActivity}
               />
             </div>
             <div

@@ -1,6 +1,15 @@
 import './AccountantAccess.css';
 import { useEffect, useState } from 'react';
-import { Users, UserCheck, Plus, Trash2, ICON_SM, ICON_MD, STROKE } from '@/lib/icons';
+import {
+  Users,
+  UserCheck,
+  Plus,
+  Trash2,
+  ICON_SM,
+  ICON_MD,
+  STROKE,
+} from '@/lib/icons';
+import { useLiveActivity } from '@/contexts/activity';
 import {
   getGrantedAccountants,
   grantAccountantAccess,
@@ -18,6 +27,7 @@ interface AccountantAccessProps {
 
 export default function AccountantAccess({ lang }: AccountantAccessProps) {
   const isCz = lang === 'cs';
+  const { announce } = useLiveActivity();
   const [granted, setGranted] = useState<AccessGrant[]>([]);
   const [accessible, setAccessible] = useState<AccessibleAccount[]>([]);
   const [viewingAs, setViewingAs] = useState<string | null>(null);
@@ -45,67 +55,98 @@ export default function AccountantAccess({ lang }: AccountantAccessProps) {
   async function handleGrant() {
     setError('');
     try {
+      announce({
+        kind: 'processing',
+        label: isCz ? 'Uděluji přístup…' : 'Granting access…',
+      });
       await grantAccountantAccess(email.trim());
       setEmail('');
       await load();
+      announce({
+        kind: 'done',
+        label: isCz ? 'Přístup udělen' : 'Access granted',
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed');
+      announce({
+        kind: 'error',
+        label: isCz ? 'Chyba udělení přístupu' : 'Failed to grant access',
+      });
     }
   }
 
   async function handleRevoke(e: string) {
+    announce({
+      kind: 'info',
+      label: isCz ? 'Přístup odebrán' : 'Access revoked',
+    });
     await revokeAccountantAccess(e).catch(() => {});
     await load();
   }
 
   async function handleView(ownerEmail: string) {
     try {
+      announce({
+        kind: 'processing',
+        label: isCz
+          ? `Přepínám na: ${ownerEmail}`
+          : `Switching to: ${ownerEmail}`,
+      });
       await viewAsAccount(ownerEmail);
       window.location.reload();
     } catch {
       setError(isCz ? 'Přepnutí selhalo' : 'Switch failed');
+      announce({
+        kind: 'error',
+        label: isCz ? 'Přepnutí selhalo' : 'Switch failed',
+      });
     }
   }
 
   async function handleStop() {
+    announce({
+      kind: 'info',
+      label: isCz ? 'Ukončuji náhled…' : 'Stopping view…',
+    });
     await stopViewingAs().catch(() => {});
     window.location.reload();
   }
 
   return (
-    <div className="accountant-access">
+    <div className='accountant-access'>
       {viewingAs && (
-        <div className="accountant-access__banner">
+        <div className='accountant-access__banner'>
           <span>
             {isCz ? 'Prohlížíte účet: ' : 'Viewing account: '}
-            <strong>{viewingAs}</strong> ({isCz ? 'jen pro čtení' : 'read-only'})
+            <strong>{viewingAs}</strong> ({isCz ? 'jen pro čtení' : 'read-only'}
+            )
           </span>
-          <button className="ap-btn ap-btn--secondary" onClick={handleStop}>
+          <button className='ap-btn ap-btn--secondary' onClick={handleStop}>
             {isCz ? 'Ukončit' : 'Stop'}
           </button>
         </div>
       )}
 
-      <div className="ap-card">
-        <h3 className="ap-card__title">
+      <div className='ap-card'>
+        <h3 className='ap-card__title'>
           <Users size={ICON_MD} strokeWidth={STROKE} />
           {isCz ? 'Sdílení s účetním' : 'Share with accountant'}
         </h3>
-        <p className="accountant-access__hint">
+        <p className='accountant-access__hint'>
           {isCz
             ? 'Udělte účetnímu přístup pro čtení k vašim fakturám a exportům.'
             : 'Give an accountant read-only access to your invoices and exports.'}
         </p>
-        <div className="accountant-access__create">
+        <div className='accountant-access__create'>
           <input
-            className="ap-input"
-            type="email"
+            className='ap-input'
+            type='email'
             placeholder={isCz ? 'E-mail účetního' : 'Accountant email'}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
           <button
-            className="ap-btn ap-btn--secondary"
+            className='ap-btn ap-btn--secondary'
             onClick={handleGrant}
             disabled={!email.trim()}
           >
@@ -113,13 +154,13 @@ export default function AccountantAccess({ lang }: AccountantAccessProps) {
             {isCz ? 'Udělit přístup' : 'Grant access'}
           </button>
         </div>
-        {error && <div className="accountant-access__error">{error}</div>}
-        <ul className="accountant-access__list">
+        {error && <div className='accountant-access__error'>{error}</div>}
+        <ul className='accountant-access__list'>
           {granted.map((g) => (
-            <li key={g.email} className="accountant-access__item">
+            <li key={g.email} className='accountant-access__item'>
               <span>{g.email}</span>
               <button
-                className="ap-btn accountant-access__del"
+                className='ap-btn accountant-access__del'
                 onClick={() => handleRevoke(g.email)}
                 aria-label={isCz ? 'Odebrat' : 'Revoke'}
               >
@@ -131,22 +172,22 @@ export default function AccountantAccess({ lang }: AccountantAccessProps) {
       </div>
 
       {accessible.length > 0 && (
-        <div className="ap-card">
-          <h3 className="ap-card__title">
+        <div className='ap-card'>
+          <h3 className='ap-card__title'>
             <UserCheck size={ICON_MD} strokeWidth={STROKE} />
             {isCz ? 'Účty, ke kterým máte přístup' : 'Accounts you can access'}
           </h3>
-          <ul className="accountant-access__list">
+          <ul className='accountant-access__list'>
             {accessible.map((a) => (
-              <li key={a.ownerEmail} className="accountant-access__item">
+              <li key={a.ownerEmail} className='accountant-access__item'>
                 <span>{a.ownerEmail}</span>
                 {viewingAs === a.ownerEmail ? (
-                  <span className="accountant-access__current">
+                  <span className='accountant-access__current'>
                     {isCz ? 'Aktivní' : 'Active'}
                   </span>
                 ) : (
                   <button
-                    className="ap-btn ap-btn--ghost"
+                    className='ap-btn ap-btn--ghost'
                     onClick={() => handleView(a.ownerEmail)}
                   >
                     {isCz ? 'Zobrazit' : 'View'}

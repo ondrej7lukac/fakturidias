@@ -17,6 +17,7 @@ import {
   ICON_MD,
   STROKE,
 } from '@/lib/icons';
+import { useLiveActivity } from '@/contexts/activity';
 import {
   getMailbox,
   claimMailbox,
@@ -49,6 +50,7 @@ function calcTotal(parsed: any): number {
 
 export default function Mailbox({ lang, user }: MailboxProps) {
   const isCz = lang === 'cs';
+  const { announce } = useLiveActivity();
   const [loading, setLoading] = useState(true);
   const [mailbox, setMailbox] = useState<MailboxInfo | null>(null);
   const [domain, setDomain] = useState('fakturidias.app');
@@ -106,16 +108,28 @@ export default function Mailbox({ lang, user }: MailboxProps) {
   const handleClaim = async () => {
     setClaimError('');
     setClaiming(true);
+    announce({
+      kind: 'processing',
+      label: isCz ? 'Vytvářím schránku…' : 'Creating mailbox…',
+    });
     try {
       const res = await claimMailbox(slugInput);
       setMailbox(res.mailbox);
       setDomain(res.domain);
       setInbound(res.inbound || { ready: true, missing: [] });
       await loadAll();
+      announce({
+        kind: 'done',
+        label: isCz ? 'Schránka vytvořena' : 'Mailbox created',
+      });
     } catch (err: any) {
       setClaimError(
         err?.message || (isCz ? 'Nepodařilo se uložit' : 'Failed to save'),
       );
+      announce({
+        kind: 'error',
+        label: isCz ? 'Chyba schránky' : 'Mailbox error',
+      });
     } finally {
       setClaiming(false);
     }
@@ -125,6 +139,10 @@ export default function Mailbox({ lang, user }: MailboxProps) {
     if (!mailbox) return;
     navigator.clipboard?.writeText(mailbox.address).then(() => {
       setCopied(true);
+      announce({
+        kind: 'info',
+        label: isCz ? 'Adresa zkopírována' : 'Address copied',
+      });
       setTimeout(() => setCopied(false), 1500);
     });
   };
@@ -142,11 +160,19 @@ export default function Mailbox({ lang, user }: MailboxProps) {
   const handleApprove = async () => {
     if (!selected) return;
     setBusy(true);
+    announce({
+      kind: 'processing',
+      label: isCz ? 'Schvaluji fakturu…' : 'Approving bill…',
+    });
     try {
       const updated = await approveReceivedInvoice(selected.id, draft);
       setReceived((list) =>
         list.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)),
       );
+      announce({
+        kind: 'done',
+        label: isCz ? 'Faktura schválena' : 'Bill approved',
+      });
     } finally {
       setBusy(false);
     }
@@ -155,6 +181,10 @@ export default function Mailbox({ lang, user }: MailboxProps) {
   const handleReject = async () => {
     if (!selected) return;
     setBusy(true);
+    announce({
+      kind: 'info',
+      label: isCz ? 'Faktura zamítnuta' : 'Bill rejected',
+    });
     try {
       const updated = await rejectReceivedInvoice(selected.id);
       setReceived((list) =>
@@ -170,6 +200,10 @@ export default function Mailbox({ lang, user }: MailboxProps) {
     if (!window.confirm(isCz ? 'Smazat tuto položku?' : 'Delete this item?'))
       return;
     setBusy(true);
+    announce({
+      kind: 'info',
+      label: isCz ? 'Faktura smazána' : 'Bill deleted',
+    });
     try {
       await deleteReceivedInvoice(selected.id);
       setReceived((list) => {
@@ -297,7 +331,16 @@ export default function Mailbox({ lang, user }: MailboxProps) {
             </button>
           </div>
         </div>
-        <button className='mbx-btn mbx-btn--ghost' onClick={loadAll}>
+        <button
+          className='mbx-btn mbx-btn--ghost'
+          onClick={() => {
+            announce({
+              kind: 'scanning',
+              label: isCz ? 'Obnování…' : 'Refreshing…',
+            });
+            loadAll();
+          }}
+        >
           <RefreshCw size={ICON_SM} strokeWidth={STROKE} />
           {isCz ? 'Obnovit' : 'Refresh'}
         </button>
@@ -330,7 +373,14 @@ export default function Mailbox({ lang, user }: MailboxProps) {
               <button
                 key={r.id}
                 className={`mbx-item${r.id === selectedId ? ' mbx-item--active' : ''}`}
-                onClick={() => setSelectedId(r.id)}
+                onClick={() => {
+                  setSelectedId(r.id);
+                  announce({
+                    kind: 'info',
+                    label:
+                      r.subject || r.fromName || (isCz ? 'Faktura' : 'Bill'),
+                  });
+                }}
               >
                 <div className='mbx-item__top'>
                   <span className='mbx-item__from'>

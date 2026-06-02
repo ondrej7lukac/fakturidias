@@ -11,13 +11,18 @@ import './globals.css';
 import './index.css';
 import App from './App';
 import PublicInvoiceView from './components/PublicInvoiceView';
+import { ActivityProvider } from './contexts/activity';
 
 // Public, no-auth read-only invoice page served at /i/<token>.
-const publicMatch = window.location.pathname.match(/^\/i\/([A-Za-z0-9_-]+)\/?$/);
+const publicMatch = window.location.pathname.match(
+  /^\/i\/([A-Za-z0-9_-]+)\/?$/,
+);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {publicMatch ? <PublicInvoiceView token={publicMatch[1]} /> : <App />}
+    <ActivityProvider>
+      {publicMatch ? <PublicInvoiceView token={publicMatch[1]} /> : <App />}
+    </ActivityProvider>
   </StrictMode>,
 );
 

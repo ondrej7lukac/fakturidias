@@ -2,6 +2,7 @@ import './InvoiceList.css';
 import { useState } from 'react';
 import { money } from '../utils/storage';
 import { BarChart2 } from '@/lib/icons';
+import { useLiveActivity } from '@/contexts/activity';
 import InvoiceDashboard from './InvoiceDashboard';
 import StatusBadge from './StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -70,6 +71,8 @@ export default function InvoiceList({
   const [searchText, setSearchText] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
+  const isCz = lang === 'cs';
+  const { announce } = useLiveActivity();
 
   const sortedInvoices = [...invoices].reverse();
 
@@ -119,7 +122,13 @@ export default function InvoiceList({
         <Button
           variant='outline'
           size='sm'
-          onClick={() => setDashboardOpen(true)}
+          onClick={() => {
+            setDashboardOpen(true);
+            announce({
+              kind: 'info',
+              label: isCz ? 'Přehled faktur' : 'Invoice dashboard',
+            });
+          }}
           className='btn--list-action'
         >
           <BarChart2 size={16} strokeWidth={2} className='mr-1' />{' '}
@@ -143,7 +152,16 @@ export default function InvoiceList({
           <select
             id='filterStatus'
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={(e) => {
+              setFilterStatus(e.target.value);
+              if (e.target.value !== 'all')
+                announce({
+                  kind: 'info',
+                  label: isCz
+                    ? `Filtr: ${e.target.value}`
+                    : `Filter: ${e.target.value}`,
+                });
+            }}
           >
             <option value='all'>{t.all}</option>
             <option value='draft'>{t.draft}</option>
@@ -160,7 +178,16 @@ export default function InvoiceList({
           <select
             id='filterCategory'
             value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
+            onChange={(e) => {
+              setFilterCategory(e.target.value);
+              if (e.target.value !== 'all')
+                announce({
+                  kind: 'info',
+                  label: isCz
+                    ? `Kategorie: ${e.target.value}`
+                    : `Category: ${e.target.value}`,
+                });
+            }}
           >
             <option value='all'>
               {lang === 'cs' ? 'Všechny kategorie' : 'All categories'}
@@ -221,6 +248,12 @@ export default function InvoiceList({
                   size='sm'
                   onClick={(e) => {
                     e.stopPropagation();
+                    announce({
+                      kind: 'info',
+                      label: isCz
+                        ? `Otevírám: ${inv.invoiceNumber}`
+                        : `Opening: ${inv.invoiceNumber}`,
+                    });
                     onSelect(inv.id);
                   }}
                   className='btn--list-action'
@@ -233,6 +266,12 @@ export default function InvoiceList({
                   size='sm'
                   onClick={(e) => {
                     e.stopPropagation();
+                    announce({
+                      kind: 'info',
+                      label: isCz
+                        ? `Mazání: ${inv.invoiceNumber}`
+                        : `Deleting: ${inv.invoiceNumber}`,
+                    });
                     onDelete(inv.id);
                   }}
                   className='ml-auto text-xs'

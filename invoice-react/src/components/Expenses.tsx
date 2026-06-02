@@ -1,6 +1,7 @@
 import './Expenses.css';
 import { useEffect, useMemo, useState } from 'react';
 import { Wallet, RefreshCw, ICON_MD, ICON_SM, STROKE } from '@/lib/icons';
+import { useLiveActivity } from '@/contexts/activity';
 import {
   getReceivedInvoices,
   money,
@@ -36,11 +37,16 @@ function fmtDate(value?: string): string {
 
 export default function Expenses({ lang }: ExpensesProps) {
   const isCz = lang === 'cs';
+  const { announce } = useLiveActivity();
   const [items, setItems] = useState<ReceivedInvoice[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     setLoading(true);
+    announce({
+      kind: 'scanning',
+      label: isCz ? 'Načítám výdaje…' : 'Loading expenses…',
+    });
     try {
       setItems(await getReceivedInvoices());
     } catch {
@@ -68,51 +74,54 @@ export default function Expenses({ lang }: ExpensesProps) {
   );
 
   return (
-    <div className="expenses-view">
-      <header className="expenses-header">
+    <div className='expenses-view'>
+      <header className='expenses-header'>
         <Wallet size={ICON_MD} strokeWidth={STROKE} />
         <div>
           <h2>{isCz ? 'Výdaje' : 'Expenses'}</h2>
-          <p className="expenses-sub">
+          <p className='expenses-sub'>
             {isCz
               ? 'Přijaté faktury z e-mailové schránky jako evidence výdajů.'
               : 'Bills received in your invoice mailbox, tracked as expenses.'}
           </p>
         </div>
-        <button className="ap-btn ap-btn--ghost expenses-refresh" onClick={load}>
+        <button
+          className='ap-btn ap-btn--ghost expenses-refresh'
+          onClick={load}
+        >
           <RefreshCw size={ICON_SM} strokeWidth={STROKE} />
           {isCz ? 'Obnovit' : 'Refresh'}
         </button>
       </header>
 
-      <div className="expenses-summary">
-        <div className="expenses-summary__label">
+      <div className='expenses-summary'>
+        <div className='expenses-summary__label'>
           {isCz ? 'Celkem výdajů' : 'Total expenses'}
         </div>
-        <div className="expenses-summary__value">{money(total)}</div>
-        <div className="expenses-summary__count">
+        <div className='expenses-summary__value'>{money(total)}</div>
+        <div className='expenses-summary__count'>
           {rows.length} {isCz ? 'položek' : 'items'}
         </div>
       </div>
 
-      <div className="ap-card expenses-table-card">
+      <div className='ap-card expenses-table-card'>
         {loading ? (
-          <p className="expenses-empty">{isCz ? 'Načítám…' : 'Loading…'}</p>
+          <p className='expenses-empty'>{isCz ? 'Načítám…' : 'Loading…'}</p>
         ) : rows.length === 0 ? (
-          <p className="expenses-empty">
+          <p className='expenses-empty'>
             {isCz
               ? 'Zatím žádné přijaté faktury. Přeposílejte faktury do své schránky.'
               : 'No received bills yet. Forward invoices to your mailbox.'}
           </p>
         ) : (
-          <table className="expenses-table">
+          <table className='expenses-table'>
             <thead>
               <tr>
                 <th>{isCz ? 'Datum' : 'Date'}</th>
                 <th>{isCz ? 'Dodavatel' : 'Supplier'}</th>
                 <th>{isCz ? 'Předmět' : 'Subject'}</th>
                 <th>{isCz ? 'Stav' : 'Status'}</th>
-                <th className="expenses-table__num">
+                <th className='expenses-table__num'>
                   {isCz ? 'Částka' : 'Amount'}
                 </th>
               </tr>
@@ -122,9 +131,11 @@ export default function Expenses({ lang }: ExpensesProps) {
                 <tr key={r.id}>
                   <td>{fmtDate(r.receivedAt)}</td>
                   <td>{r.fromName || r.from}</td>
-                  <td className="expenses-table__subject">{r.subject}</td>
+                  <td className='expenses-table__subject'>{r.subject}</td>
                   <td>
-                    <span className={`expenses-pill expenses-pill--${r.status}`}>
+                    <span
+                      className={`expenses-pill expenses-pill--${r.status}`}
+                    >
                       {r.status === 'approved'
                         ? isCz
                           ? 'Schváleno'
@@ -134,7 +145,7 @@ export default function Expenses({ lang }: ExpensesProps) {
                           : 'Pending'}
                     </span>
                   </td>
-                  <td className="expenses-table__num">{money(r.amount)}</td>
+                  <td className='expenses-table__num'>{money(r.amount)}</td>
                 </tr>
               ))}
             </tbody>
