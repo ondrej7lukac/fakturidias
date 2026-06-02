@@ -30,21 +30,25 @@ const I18N = {
         trustLine: 'Firmy, které fakturují rychleji',
         featuresEyebrow: 'Funkce', featuresTitle: 'Vše, co potřebujete k fakturaci v Česku.',
         featuresLead: 'Žádné šablony, žádné výpočty DPH ručně. Diktujte, AI vyplní, ARES zkontroluje.',
-        feature1Title: 'Hlasový a textový AI vstup', feature1Body: 'Mluvte česky nebo anglicky. AI parsuje klienta, položky, hodinovou sazbu i DPH — a vrátí strukturovaný náhled průměrně za méně než 15 sekund s přesností přes 95 %.',
-        feature2Title: 'ARES integrace', feature2Body: 'Zadáte IČO a Fakturidias automaticky doplní název, adresu a DIČ z českého obchodního rejstříku (ARES) za méně než 1 sekundu.',
-        feature3Title: 'PDF a e-mail jedním klikem', feature3Body: 'Generujte profesionální PDF splňující zákon o DPH č. 235/2004 Sb., posílejte klientům přímo z aplikace a sledujte stav platby.',
-        feature4Title: 'Bezpečné v cloudu', feature4Body: 'Faktury jsou zálohované na serverech v EU, synchronizované v reálném čase a dostupné z mobilu i webu. Šifrovaný přenos (TLS).',
-        feature5Title: 'Dvojjazyčné prostředí', feature5Body: 'Aplikace v češtině i angličtině. Faktury vystavujete v obou jazycích — ideální pro OSVČ fakturující zahraničním klientům v EU.',
-        feature6Title: 'Tmavý režim', feature6Body: 'Světlý i tmavý motiv reaguje na nastavení systému. Komfortní práce ráno i pozdě v noci.',
-        feature7Title: 'Opakované faktury', feature7Body: 'Nastavte šablonu jednou a Fakturidias vystaví fakturu sám — týdně, měsíčně nebo ročně. Klient ji dostane e-mailem bez vašeho zásahu.',
-        feature8Title: 'Zálohové a opravné doklady', feature8Body: 'Vystavujte proformy, zálohové faktury i opravné daňové doklady (dobropisy) jedním přepínačem — se správným názvem a náležitostmi dle zákona.',
-        feature9Title: 'Online platby a QR', feature9Body: 'Přidejte na fakturu platební QR kód i odkaz „Zaplatit online". Po zaplacení se faktura sama označí jako uhrazená.',
-        feature10Title: 'Automatické upomínky', feature10Body: 'Po splatnosti pošle Fakturidias klientovi zdvořilou upomínku — až třikrát, automaticky. Zapnete jedním přepínačem v nastavení.',
-        feature11Title: 'Export pro účetní', feature11Body: 'Export do ISDOC, Pohoda XML a Money S3 i kontrolní hlášení (KH) jedním klikem. Vaše účetní dostane přesně to, co potřebuje.',
-        feature12Title: 'Přehledy a stárnutí pohledávek', feature12Body: 'Sledujte obrat, zaplacené i čekající částky a stárnutí pohledávek (do 30, 60 i 90+ dnů) v přehledných grafech.',
-        feature13Title: 'Přístup pro účetní a profily', feature13Body: 'Pozvěte svou účetní k náhledu na faktury a přepínejte mezi více firemními profily i bankovními účty na jednom místě.',
-        feature14Title: 'Evidence výdajů', feature14Body: 'Přijaté faktury a náklady na jednom místě. AI z dokladu vytáhne částky a vy máte přehled o výdajích i zisku.',
-        feature15Title: 'API, sdílení a aplikace', feature15Body: 'Veřejný odkaz na fakturu pro klienty, REST API s webhooky pro vývojáře a instalace jako aplikace (PWA) do mobilu i počítače.',
+        feature1Title: 'Hlasový a textový AI vstup', feature1Body: 'Diktujte nebo napište česky či anglicky — AI vyplní klienta, položky i DPH za pár sekund.',
+        feature2Title: 'ARES integrace', feature2Body: 'Zadáte IČO a doplníme název, adresu i DIČ z rejstříku ARES.',
+        feature3Title: 'PDF a e-mail jedním klikem', feature3Body: 'Profesionální PDF dle zákona o DPH, odeslání i sledování stavu jedním klikem.',
+        feature4Title: 'Bezpečné v cloudu', feature4Body: 'Šifrované zálohy na serverech v EU, synchronizace v reálném čase.',
+        feature5Title: 'Dvojjazyčné prostředí', feature5Body: 'Aplikace i faktury v češtině a angličtině pro klienty z celé EU.',
+        feature6Title: 'Tmavý režim', feature6Body: 'Světlý i tmavý motiv podle nastavení systému.',
+        feature7Title: 'Opakované faktury', feature7Body: 'Nastavte šablonu a interval — faktura se vystaví i odešle sama.',
+        feature8Title: 'Zálohové a opravné doklady', feature8Body: 'Proformy, zálohové i opravné doklady (dobropisy) jedním přepínačem.',
+        feature9Title: 'Online platby a QR', feature9Body: 'Platební QR kód a odkaz „Zaplatit online" — po platbě se faktura označí sama.',
+        feature10Title: 'Automatické upomínky', feature10Body: 'Po splatnosti pošleme klientovi zdvořilou upomínku — až třikrát.',
+        feature11Title: 'Export pro účetní', feature11Body: 'Export do ISDOC, Pohoda XML, Money S3 i kontrolní hlášení (KH).',
+        feature12Title: 'Přehledy a stárnutí pohledávek', feature12Body: 'Obrat, zaplacené i čekající částky a stárnutí pohledávek v grafech.',
+        feature13Title: 'Přístup pro účetní a profily', feature13Body: 'Pozvěte účetní k náhledu a přepínejte mezi firmami i bankovními účty.',
+        feature14Title: 'Evidence výdajů', feature14Body: 'Přijaté faktury a náklady na jednom místě — AI vytáhne částky z dokladu.',
+        feature15Title: 'API, sdílení a aplikace', feature15Body: 'Veřejné odkazy, REST API s webhooky a instalace jako aplikace (PWA).',
+        fgCreateLabel: 'Tvorba', fgCreateDesc: 'Od nápadu k hotové faktuře za pár sekund.',
+        fgPayLabel: 'Platby', fgPayDesc: 'Nechte se zaplatit rychleji a automaticky.',
+        fgBooksLabel: 'Účetnictví', fgBooksDesc: 'Přehledy, exporty a hladká spolupráce s účetní.',
+        fgPlatformLabel: 'Platforma', fgPlatformDesc: 'Bezpečná, dvojjazyčná a otevřená pro vývojáře.',
         showcaseEyebrow: 'Náhled', showcaseTitle: 'Faktura, kterou opravdu chcete vidět.',
         showcaseLead: 'Čistý PDF výstup, přehledný seznam, smysluplné metriky. Žádná tabulková nuda 90. let.',
         showcaseTab1: 'Faktura', showcaseTab2: 'Přehled',
@@ -102,21 +106,25 @@ const I18N = {
         trustLine: 'Companies billing faster with Fakturidias',
         featuresEyebrow: 'Features', featuresTitle: 'Everything you need to invoice in the Czech Republic.',
         featuresLead: 'No templates, no manual VAT math. Dictate it, the AI fills it, ARES verifies it.',
-        feature1Title: 'Voice & text AI input', feature1Body: 'Speak Czech or English. The AI parses client, line items, hourly rate and VAT — returning a structured draft in under 15 seconds with over 95% field accuracy.',
-        feature2Title: 'ARES integration', feature2Body: 'Type a business ID (IČO) and Fakturidias auto-fills name, address and VAT number from the Czech business registry (ARES) in under 1 second.',
-        feature3Title: 'PDF & email in one click', feature3Body: 'Generate compliant PDFs meeting Czech VAT Act No. 235/2004 Coll., send directly from the app, and track payment status on every invoice.',
-        feature4Title: 'Secure cloud sync', feature4Body: 'All invoices are backed up on EU servers, synced in real time, and accessible from mobile or web. Encrypted transit (TLS).',
-        feature5Title: 'Bilingual UI', feature5Body: 'Full Czech and English interface. Issue invoices in either language — ideal for freelancers billing international clients across the EU.',
-        feature6Title: 'Dark mode', feature6Body: 'Light and dark themes follow the system preference. Comfortable to use morning or late at night.',
-        feature7Title: 'Recurring invoices', feature7Body: 'Set a template once and Fakturidias issues the invoice automatically — weekly, monthly or yearly. Your client gets it by email without you lifting a finger.',
-        feature8Title: 'Proforma & credit notes', feature8Body: 'Issue proforma, advance and credit-note documents with one switch — each with the correct legal title and mandatory fields.',
-        feature9Title: 'Online payments & QR', feature9Body: 'Add a payment QR code and a "Pay online" link to every invoice. Once paid, the invoice marks itself as settled automatically.',
-        feature10Title: 'Automatic reminders', feature10Body: 'When an invoice goes overdue, Fakturidias emails the client a polite reminder — up to three times, automatically. Toggle it on in settings.',
-        feature11Title: 'Accounting exports', feature11Body: 'One-click export to ISDOC, Pohoda XML and Money S3, plus the VAT control statement (kontrolní hlášení). Your accountant gets exactly what they need.',
-        feature12Title: 'Reports & receivables aging', feature12Body: 'Track revenue, paid and pending amounts, and receivables aging (0–30, 31–60 and 90+ days) in clear dashboards.',
-        feature13Title: 'Accountant access & profiles', feature13Body: 'Invite your accountant to view your invoices, and switch between multiple company profiles and bank accounts from one place.',
-        feature14Title: 'Expense ledger', feature14Body: 'Keep received invoices and costs in one place. The AI reads amounts from each bill so you always see spending and profit.',
-        feature15Title: 'API, share links & app', feature15Body: 'Public invoice links for clients, a REST API with webhooks for developers, and install-as-an-app (PWA) on mobile and desktop.',
+        feature1Title: 'Voice & text AI input', feature1Body: 'Dictate or type in Czech or English — AI fills client, items and VAT in seconds.',
+        feature2Title: 'ARES integration', feature2Body: 'Enter an IČO and we pull name, address and VAT number from ARES.',
+        feature3Title: 'PDF & email in one click', feature3Body: 'Compliant PDF, sending and payment-status tracking in one click.',
+        feature4Title: 'Secure cloud sync', feature4Body: 'Encrypted backups on EU servers, synced in real time.',
+        feature5Title: 'Bilingual UI', feature5Body: 'App and invoices in Czech and English for clients across the EU.',
+        feature6Title: 'Dark mode', feature6Body: 'Light and dark themes that follow your system.',
+        feature7Title: 'Recurring invoices', feature7Body: 'Set a template and interval — invoices issue and send themselves.',
+        feature8Title: 'Proforma & credit notes', feature8Body: 'Proforma, advance and credit-note documents with one switch.',
+        feature9Title: 'Online payments & QR', feature9Body: 'Payment QR code and a "Pay online" link — auto-marked as paid.',
+        feature10Title: 'Automatic reminders', feature10Body: 'Polite overdue reminders, sent automatically up to three times.',
+        feature11Title: 'Accounting exports', feature11Body: 'Export to ISDOC, Pohoda XML, Money S3 and the VAT control statement.',
+        feature12Title: 'Reports & receivables aging', feature12Body: 'Revenue, paid and pending amounts, and receivables aging at a glance.',
+        feature13Title: 'Accountant access & profiles', feature13Body: 'Invite your accountant and switch between companies and bank accounts.',
+        feature14Title: 'Expense ledger', feature14Body: 'Received invoices and costs in one place — AI reads the amounts.',
+        feature15Title: 'API, share links & app', feature15Body: 'Public links, a REST API with webhooks, and install-as-an-app (PWA).',
+        fgCreateLabel: 'Create', fgCreateDesc: 'From idea to a finished invoice in seconds.',
+        fgPayLabel: 'Get paid', fgPayDesc: 'Get paid faster — and automatically.',
+        fgBooksLabel: 'Accounting', fgBooksDesc: 'Reports, exports and smooth accountant collaboration.',
+        fgPlatformLabel: 'Platform', fgPlatformDesc: 'Secure, bilingual and open for developers.',
         showcaseEyebrow: 'Preview', showcaseTitle: 'An invoice you actually want to look at.',
         showcaseLead: 'Clean PDF output, a list that scans in three seconds, dashboards that mean something.',
         showcaseTab1: 'Invoice', showcaseTab2: 'Dashboard',
@@ -290,22 +298,42 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheck
 
     const isCz = lang === 'cs'
 
-    const features = [
-        { Icon: Mic,            title: t.feature1Title,  body: t.feature1Body,  alt: false },
-        { Icon: Search,         title: t.feature2Title,  body: t.feature2Body,  alt: true  },
-        { Icon: Send,           title: t.feature3Title,  body: t.feature3Body,  alt: false },
-        { Icon: RefreshCw,      title: t.feature7Title,  body: t.feature7Body,  alt: true  },
-        { Icon: Copy,           title: t.feature8Title,  body: t.feature8Body,  alt: false },
-        { Icon: CreditCard,     title: t.feature9Title,  body: t.feature9Body,  alt: true  },
-        { Icon: Clock,          title: t.feature10Title, body: t.feature10Body, alt: false },
-        { Icon: Download,       title: t.feature11Title, body: t.feature11Body, alt: true  },
-        { Icon: TrendingUp,     title: t.feature12Title, body: t.feature12Body, alt: false },
-        { Icon: UserCheck,      title: t.feature13Title, body: t.feature13Body, alt: true  },
-        { Icon: Wallet,         title: t.feature14Title, body: t.feature14Body, alt: false },
-        { Icon: Webhook,        title: t.feature15Title, body: t.feature15Body, alt: true  },
-        { Icon: Cloud,          title: t.feature4Title,  body: t.feature4Body,  alt: false },
-        { Icon: ArrowLeftRight, title: t.feature5Title,  body: t.feature5Body,  alt: true  },
-        { Icon: Sparkles,       title: t.feature6Title,  body: t.feature6Body,  alt: false },
+    const featureGroups = [
+        {
+            index: '01', label: t.fgCreateLabel, desc: t.fgCreateDesc,
+            items: [
+                { Icon: Mic,    title: t.feature1Title, body: t.feature1Body },
+                { Icon: Search, title: t.feature2Title, body: t.feature2Body },
+                { Icon: Send,   title: t.feature3Title, body: t.feature3Body },
+            ],
+        },
+        {
+            index: '02', label: t.fgPayLabel, desc: t.fgPayDesc,
+            items: [
+                { Icon: RefreshCw,  title: t.feature7Title,  body: t.feature7Body },
+                { Icon: CreditCard, title: t.feature9Title,  body: t.feature9Body },
+                { Icon: Clock,      title: t.feature10Title, body: t.feature10Body },
+                { Icon: Copy,       title: t.feature8Title,  body: t.feature8Body },
+            ],
+        },
+        {
+            index: '03', label: t.fgBooksLabel, desc: t.fgBooksDesc,
+            items: [
+                { Icon: Download,   title: t.feature11Title, body: t.feature11Body },
+                { Icon: TrendingUp, title: t.feature12Title, body: t.feature12Body },
+                { Icon: UserCheck,  title: t.feature13Title, body: t.feature13Body },
+                { Icon: Wallet,     title: t.feature14Title, body: t.feature14Body },
+            ],
+        },
+        {
+            index: '04', label: t.fgPlatformLabel, desc: t.fgPlatformDesc,
+            items: [
+                { Icon: Cloud,          title: t.feature4Title,  body: t.feature4Body },
+                { Icon: ArrowLeftRight, title: t.feature5Title,  body: t.feature5Body },
+                { Icon: Sparkles,       title: t.feature6Title,  body: t.feature6Body },
+                { Icon: Webhook,        title: t.feature15Title, body: t.feature15Body },
+            ],
+        },
     ]
 
     const pricingTiers: Array<{
@@ -380,8 +408,8 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheck
                     <nav className="lp-nav">
                         <a className="lp-nav__link" href="#features">{t.navFeatures}</a>
                         <a className="lp-nav__link" href="#showcase">{t.navProduct}</a>
-                        <a className="lp-nav__link" href="#pricing">{t.navPricing}</a>
                         <a className="lp-nav__link" href="#faq">{t.navFaq}</a>
+                        <a className="lp-nav__link" href="#pricing">{t.navPricing}</a>
                         <button className="lp-nav__link" onClick={openGuide}>{t.navGuide}</button>
                     </nav>
                     <div className="lp-header__actions">
@@ -406,23 +434,25 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheck
 
             {/* ── Hero ── */}
             <section className="lp-hero">
-                <div className="lp-container">
-                    <div className="lp-eyebrow">{t.heroBadge}</div>
-                    <h1>
-                        {t.heroHeadline1}<br />
-                        <span className="accent">{t.heroHeadline2}</span>
-                    </h1>
-                    <p className="lp-hero__sub">{t.heroSub}</p>
-                    <div className="lp-hero__ctas">
-                        <button className="lp-btn lp-btn--primary lp-btn--lg" onClick={onContinueAsGuest}>
-                            <Sparkles size={ICON_MD} strokeWidth={STROKE} />
-                            {t.heroCtaPrimary}
-                        </button>
-                        <button className="lp-btn lp-btn--secondary lp-btn--lg" onClick={onContinueAsGuest}>
-                            {t.heroCtaSecondary}
-                        </button>
+                <div className="lp-container lp-hero__grid">
+                    <div className="lp-hero__copy">
+                        <div className="lp-eyebrow">{t.heroBadge}</div>
+                        <h1>
+                            {t.heroHeadline1}<br />
+                            <span className="accent">{t.heroHeadline2}</span>
+                        </h1>
+                        <p className="lp-hero__sub">{t.heroSub}</p>
+                        <div className="lp-hero__ctas">
+                            <button className="lp-btn lp-btn--primary lp-btn--lg" onClick={onContinueAsGuest}>
+                                <Sparkles size={ICON_MD} strokeWidth={STROKE} />
+                                {t.heroCtaPrimary}
+                            </button>
+                            <button className="lp-btn lp-btn--secondary lp-btn--lg" onClick={onContinueAsGuest}>
+                                {t.heroCtaSecondary}
+                            </button>
+                        </div>
+                        <div className="lp-hero__note">{t.heroNote}</div>
                     </div>
-                    <div className="lp-hero__note">{t.heroNote}</div>
 
                     {/* Animated AI demo card */}
                     <div className="lp-demo">
@@ -509,14 +539,27 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheck
             <section className="lp-section" id="features">
                 <div className="lp-container">
                     <SectionHead eyebrow={t.featuresEyebrow} title={t.featuresTitle} lead={t.featuresLead} />
-                    <div className="lp-features">
-                        {features.map((f, i) => (
-                            <div key={i} className="lp-feature">
-                                <div className={`lp-feature__icon${f.alt ? ' lp-feature__icon--alt' : ''}`}>
-                                    <f.Icon size={20} strokeWidth={STROKE} />
+                    <div className="lp-features-grouped">
+                        {featureGroups.map((g, gi) => (
+                            <div key={gi} className="lp-fgroup">
+                                <div className="lp-fgroup__head">
+                                    <span className="lp-fgroup__index">{g.index}</span>
+                                    <h3 className="lp-fgroup__label">{g.label}</h3>
+                                    <p className="lp-fgroup__desc">{g.desc}</p>
                                 </div>
-                                <h3 className="lp-feature__title">{f.title}</h3>
-                                <p className="lp-feature__body">{f.body}</p>
+                                <div className="lp-fgroup__items">
+                                    {g.items.map((it, ii) => (
+                                        <div key={ii} className="lp-fitem">
+                                            <div className={`lp-fitem__icon${ii % 2 === 1 ? ' lp-fitem__icon--alt' : ''}`}>
+                                                <it.Icon size={18} strokeWidth={STROKE} />
+                                            </div>
+                                            <div>
+                                                <h4 className="lp-fitem__title">{it.title}</h4>
+                                                <p className="lp-fitem__body">{it.body}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -563,6 +606,30 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheck
                                 ? <InvoiceMock t={t} />
                                 : <DashboardMock t={t} />}
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* ── FAQ ── */}
+            <section className="lp-section" id="faq">
+                <div className="lp-container">
+                    <SectionHead eyebrow={t.faqEyebrow} title={t.faqTitle} />
+                    <div className="lp-faq">
+                        {faqItems.map((item, i) => (
+                            <div key={i} className="lp-faq__item" data-open={String(faqOpen === i)}>
+                                <button className="lp-faq__q" onClick={() => toggleFaq(i)}>
+                                    {item.q}
+                                    <ChevronDown size={ICON_MD} strokeWidth={STROKE} className="lp-faq__chev" />
+                                </button>
+                                <div className="lp-faq__a">{item.a}</div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="lp-faq__more">
+                        <button className="lp-btn lp-btn--secondary" onClick={openGuide}>
+                            <FileText size={ICON_SM} strokeWidth={STROKE} />
+                            {t.faqGuideCta}
+                        </button>
                     </div>
                 </div>
             </section>
@@ -625,30 +692,6 @@ export default function WelcomeScreen({ onLogin, onContinueAsGuest, onStartCheck
                                 </button>
                             </div>
                         ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* ── FAQ ── */}
-            <section className="lp-section" id="faq">
-                <div className="lp-container">
-                    <SectionHead eyebrow={t.faqEyebrow} title={t.faqTitle} />
-                    <div className="lp-faq">
-                        {faqItems.map((item, i) => (
-                            <div key={i} className="lp-faq__item" data-open={String(faqOpen === i)}>
-                                <button className="lp-faq__q" onClick={() => toggleFaq(i)}>
-                                    {item.q}
-                                    <ChevronDown size={ICON_MD} strokeWidth={STROKE} className="lp-faq__chev" />
-                                </button>
-                                <div className="lp-faq__a">{item.a}</div>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="lp-faq__more">
-                        <button className="lp-btn lp-btn--secondary" onClick={openGuide}>
-                            <FileText size={ICON_SM} strokeWidth={STROKE} />
-                            {t.faqGuideCta}
-                        </button>
                     </div>
                 </div>
             </section>

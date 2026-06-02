@@ -38,24 +38,13 @@ body:has(.welcome-screen) {
 .welcome-screen .lp-metrics__item:nth-child(2) { animation-delay: 0.07s; }
 .welcome-screen .lp-metrics__item:nth-child(3) { animation-delay: 0.14s; }
 
-/* ── Feature cards stagger ─────────────────────────────────── */
-.welcome-screen .lp-feature {
+/* ── Feature groups stagger ────────────────────────────────── */
+.welcome-screen .lp-fgroup {
   animation: fade-in-up 0.6s var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
-.welcome-screen .lp-feature:nth-child(2) { animation-delay: 0.06s; }
-.welcome-screen .lp-feature:nth-child(3) { animation-delay: 0.12s; }
-.welcome-screen .lp-feature:nth-child(4) { animation-delay: 0.18s; }
-.welcome-screen .lp-feature:nth-child(5) { animation-delay: 0.24s; }
-.welcome-screen .lp-feature:nth-child(6) { animation-delay: 0.30s; }
-.welcome-screen .lp-feature:nth-child(7) { animation-delay: 0.36s; }
-.welcome-screen .lp-feature:nth-child(8) { animation-delay: 0.42s; }
-.welcome-screen .lp-feature:nth-child(9) { animation-delay: 0.48s; }
-.welcome-screen .lp-feature:nth-child(10) { animation-delay: 0.54s; }
-.welcome-screen .lp-feature:nth-child(11) { animation-delay: 0.60s; }
-.welcome-screen .lp-feature:nth-child(12) { animation-delay: 0.66s; }
-.welcome-screen .lp-feature:nth-child(13) { animation-delay: 0.72s; }
-.welcome-screen .lp-feature:nth-child(14) { animation-delay: 0.78s; }
-.welcome-screen .lp-feature:nth-child(15) { animation-delay: 0.84s; }
+.welcome-screen .lp-fgroup:nth-child(2) { animation-delay: 0.08s; }
+.welcome-screen .lp-fgroup:nth-child(3) { animation-delay: 0.16s; }
+.welcome-screen .lp-fgroup:nth-child(4) { animation-delay: 0.24s; }
 
 /* ── How-it-works steps stagger ────────────────────────────── */
 .welcome-screen .lp-step {
@@ -105,7 +94,7 @@ body:has(.welcome-screen) {
   .welcome-screen .lp-hero__note,
   .welcome-screen .lp-demo,
   .welcome-screen .lp-metrics__item,
-  .welcome-screen .lp-feature,
+  .welcome-screen .lp-fgroup,
   .welcome-screen .lp-step,
   .welcome-screen .lp-price-card,
   .welcome-screen .lp-faq__item,
