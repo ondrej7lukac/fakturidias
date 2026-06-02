@@ -4,6 +4,7 @@ Allow: /
 # Block private app routes from indexing
 Disallow: /api/
 Disallow: /auth/
+Disallow: /i/
 
 # Traditional search bots
 User-agent: Googlebot
