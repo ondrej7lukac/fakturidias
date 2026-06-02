@@ -81,6 +81,7 @@ export default function InvoiceForm({
   isAuthenticated,
   onShowInvoiceForm,
   onOpenDashboard,
+  onActivity,
 }) {
   const qrCanvasRef = useRef(null);
   const [formData, setFormData] = useState({
@@ -676,6 +677,26 @@ export default function InvoiceForm({
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Czech account numbers may carry an optional prefix ("19-2000145399").
+  // Split it so calculateIban() receives prefix + base number separately.
+  const handleAccountNumberChange = (e) => {
+    const raw = e.target.value;
+    if (raw.includes('-')) {
+      const [prefix, account = ''] = raw.split('-');
+      setFormData((prev) => ({
+        ...prev,
+        prefix: prefix.replace(/\D/g, ''),
+        accountNumber: account.replace(/\D/g, ''),
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        prefix: '',
+        accountNumber: raw.replace(/\D/g, ''),
+      }));
+    }
   };
 
   // Debounce reference for ARES
@@ -1632,6 +1653,8 @@ export default function InvoiceForm({
                 lang={lang}
                 onFillForm={handleAIFill}
                 isGuest={!isAuthenticated}
+                isVatPayer={formData.isVatPayer}
+                onActivity={onActivity}
               />
 
               {/* Region/Tax Warning */}
@@ -2187,6 +2210,42 @@ export default function InvoiceForm({
                   )}
                   <div className='ap-grid ap-grid--2'>
                     <div className='ap-field'>
+                      <label>
+                        {lang === 'cs' ? 'Číslo účtu' : 'Account number'}
+                      </label>
+                      <input
+                        className='ap-input'
+                        name='accountNumber'
+                        value={
+                          formData.prefix
+                            ? `${formData.prefix}-${formData.accountNumber}`
+                            : formData.accountNumber
+                        }
+                        onChange={handleAccountNumberChange}
+                        onPaste={handlePasteBank}
+                        placeholder={lang === 'cs' ? '19-2000145399' : '2000145399'}
+                        inputMode='numeric'
+                      />
+                    </div>
+                    <div className='ap-field'>
+                      <label>{lang === 'cs' ? 'Kód banky' : 'Bank code'}</label>
+                      <select
+                        className='ap-select'
+                        name='bankCode'
+                        value={formData.bankCode}
+                        onChange={handleChange}
+                      >
+                        <option value=''>
+                          {lang === 'cs' ? '— vyberte banku —' : '— select bank —'}
+                        </option>
+                        {Object.entries(BANK_CODES).map(([code, info]) => (
+                          <option key={code} value={code}>
+                            {code} — {info.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className='ap-field'>
                       <label>IBAN</label>
                       <input
                         className='ap-input'
@@ -2216,19 +2275,6 @@ export default function InvoiceForm({
                         className='ap-input'
                         name='variableSymbol'
                         value={formData.variableSymbol}
-                        onChange={handleChange}
-                      />
-                    </div>
-                    <div className='ap-field'>
-                      <label>
-                        {lang === 'cs'
-                          ? 'Konstantní symbol'
-                          : 'Constant symbol'}
-                      </label>
-                      <input
-                        className='ap-input'
-                        name='bankCode'
-                        value={formData.bankCode}
                         onChange={handleChange}
                       />
                     </div>

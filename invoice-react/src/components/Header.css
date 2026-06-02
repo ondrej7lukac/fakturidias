@@ -13,9 +13,13 @@
   max-width: 1400px !important;
   height: 100%;
   padding: 0 24px !important;
+  position: relative; /* anchor for the centered Dynamic Island */
 }
 @media (max-width: 700px) {
-  .lp-header__inner--app { padding: 0 16px !important; gap: 10px !important; }
+  .lp-header__inner--app {
+    padding: 0 16px !important;
+    gap: 10px !important;
+  }
 }
 
 /* Reset button-as-brand / button-as-nav-link */
@@ -42,29 +46,247 @@
   gap: 7px;
 }
 
-/* Segment toggle (Invoice overview + New invoice) in app header */
-.header-seg-desktop {
-  margin-left: 16px !important; /* override ap-seg's auto margin */
+/* ── Dynamic Island — centered live status (mobile + desktop) ─────── */
+.header-island {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  min-width: 280px;
+  max-width: min(60vw, 700px);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--text);
+  box-shadow:
+    var(--shadow-sm),
+    0 10px 28px rgba(0, 0, 0, 0.16);
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    background 0.25s ease;
+  pointer-events: none; /* purely informational (tooltip enabled on desktop below) */
+  cursor: default; /* never clickable — status only */
+  user-select: none;
 }
+.header-island__face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 0 16px;
+  animation: island-pop 0.32s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes island-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+    filter: blur(1.5px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+.header-island__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: background 0.25s ease;
+}
+.header-island__icon {
+  flex: none;
+  color: var(--muted);
+  transition: color 0.25s ease;
+}
+.header-island__icon--spin {
+  animation: island-spin 0.9s linear infinite;
+}
+@keyframes island-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.header-island__label {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* idle — shows the current section */
+.header-island--idle .header-island__dot {
+  background: var(--accent);
+}
+.header-island--idle .header-island__icon {
+  color: var(--accent);
+}
+
+/* live — AI listening / reading / saving in progress */
+.header-island--live {
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--border-strong));
+  box-shadow:
+    var(--shadow-sm),
+    0 10px 30px color-mix(in oklab, var(--accent) 24%, transparent);
+}
+.header-island--live .header-island__dot {
+  background: var(--accent);
+  animation: island-pulse 1.5s ease-out infinite;
+}
+.header-island--live .header-island__icon {
+  color: var(--accent);
+}
+@keyframes island-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+/* done */
+.header-island--done {
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--border-strong));
+}
+.header-island--done .header-island__dot {
+  background: var(--accent);
+}
+.header-island--done .header-island__icon {
+  color: var(--accent);
+}
+
+/* error */
+.header-island--error {
+  border-color: color-mix(in oklab, var(--danger) 55%, var(--border-strong));
+  box-shadow:
+    var(--shadow-sm),
+    0 10px 30px color-mix(in oklab, var(--danger) 22%, transparent);
+}
+.header-island--error .header-island__dot {
+  background: var(--danger);
+}
+.header-island--error .header-island__icon {
+  color: var(--danger);
+}
+
 @media (max-width: 700px) {
-  .header-seg-desktop { display: none !important; }
+  .header-island {
+    height: 34px;
+    min-width: 0;
+    max-width: min(56vw, 240px);
+  }
+  .header-island__face {
+    gap: 7px;
+    padding: 0 12px;
+  }
+  .header-island__label {
+    font-size: 12.5px;
+  }
+}
+
+/* Desktop-only hover tooltip with the detailed narration */
+@media (min-width: 701px) {
+  .header-island[data-tooltip] {
+    pointer-events: auto;
+  }
+  .header-island[data-tooltip]:hover::before {
+    content: '';
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 9px;
+    height: 9px;
+    background: var(--paper);
+    border-left: 1px solid var(--border-strong);
+    border-top: 1px solid var(--border-strong);
+    z-index: 61;
+  }
+  .header-island[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 9px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 340px;
+    padding: 10px 14px;
+    background: var(--paper);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.45;
+    white-space: normal;
+    text-align: center;
+    z-index: 60;
+    pointer-events: none;
+    animation: island-tip 0.16s ease-out;
+  }
+}
+@keyframes island-tip {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 /* Language toggle — hide on small screens */
 @media (max-width: 700px) {
-  .header-lang-desktop { display: none !important; }
+  .header-lang-desktop {
+    display: none !important;
+  }
 }
 
 /* New invoice button — hide on mobile */
-.header-new-desktop { display: inline-flex; }
+.header-new-desktop {
+  display: inline-flex;
+}
 @media (max-width: 700px) {
-  .header-new-desktop { display: none !important; }
+  .header-new-desktop {
+    display: none !important;
+  }
 }
 
 /* Mobile hamburger — hide on desktop */
-.header-mobile-menu { display: none !important; }
+.header-mobile-menu {
+  display: none !important;
+}
 @media (max-width: 700px) {
-  .header-mobile-menu { display: grid !important; }
+  .header-mobile-menu {
+    display: grid !important;
+  }
+}
+
+/* User dropdown (avatar) — desktop only; hidden on mobile in favour of the hamburger */
+.header-user-desktop {
+  display: inline-flex;
+}
+@media (max-width: 700px) {
+  .header-user-desktop {
+    display: none !important;
+  }
 }
 
 /* Mobile logout button variant */
@@ -76,16 +298,20 @@
 
 /* ── User avatar ─────────────────────────────────────────── */
 .ap-avatar {
-  width: 36px; height: 36px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--card);
-  display: grid; place-items: center;
+  display: grid;
+  place-items: center;
   font-weight: 600;
   font-size: 13px;
   color: var(--text);
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
 .ap-avatar--active {
   border-color: var(--accent);
@@ -109,62 +335,190 @@
   padding: 14px 14px 12px;
 }
 .user-dropdown__avatar {
-  width: 42px; height: 42px;
+  width: 42px;
+  height: 42px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), transparent 60%),
-              linear-gradient(135deg, color-mix(in oklab, var(--accent) 42%, transparent), color-mix(in oklab, var(--accent-2) 42%, transparent));
+  background:
+    radial-gradient(
+      circle at 30% 30%,
+      rgba(255, 255, 255, 0.3),
+      transparent 60%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--accent) 42%, transparent),
+      color-mix(in oklab, var(--accent-2) 42%, transparent)
+    );
   border: 1.5px solid var(--success-border);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.1rem; font-weight: 800; color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--accent);
 }
-.user-dropdown__info { min-width: 0; flex: 1; }
+.user-dropdown__info {
+  min-width: 0;
+  flex: 1;
+}
 .user-dropdown__name {
-  font-weight: 700; font-size: 0.9rem; color: var(--text);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 2px;
 }
 .user-dropdown__email {
-  font-size: 0.72rem; color: var(--muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 6px;
 }
 .user-dropdown__badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--success-border); background: var(--success-bg);
-  border: 1px solid var(--accent-soft); border-radius: 6px; padding: 2px 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--success-border);
+  background: var(--success-bg);
+  border: 1px solid var(--accent-soft);
+  border-radius: 6px;
+  padding: 2px 7px;
 }
 .user-dropdown__signin-prompt {
-  display: flex; align-items: center; gap: 12px; padding: 14px 14px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px 12px;
 }
 .user-dropdown__google-icon {
-  width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%;
-  background: var(--card); border: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.1rem; font-weight: 800; color: var(--muted);
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--muted);
 }
-.user-dropdown__prompt-title { font-weight: 700; font-size: 0.875rem; color: var(--text); margin-bottom: 2px; }
-.user-dropdown__prompt-sub { font-size: 0.72rem; color: var(--muted); line-height: 1.4; }
-.user-dropdown__separator { background: var(--border); margin: 0; }
-.user-dropdown__separator--inner { background: var(--border); margin: 4px 0; }
-.user-dropdown__actions { padding: 6px; }
+.user-dropdown__prompt-title {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.user-dropdown__prompt-sub {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.user-dropdown__separator {
+  background: var(--border);
+  margin: 0;
+}
+.user-dropdown__separator--inner {
+  background: var(--border);
+  margin: 4px 0;
+}
+.user-dropdown__actions {
+  padding: 6px;
+}
 .user-dropdown__item {
-  display: flex !important; align-items: center !important;
-  border-radius: 10px !important; padding: 9px 12px !important;
-  cursor: pointer !important; color: var(--text) !important;
-  gap: 10px !important; transition: background 0.15s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  border-radius: 10px !important;
+  padding: 9px 12px !important;
+  cursor: pointer !important;
+  color: var(--text) !important;
+  gap: 10px !important;
+  transition: background 0.15s ease !important;
 }
-.user-dropdown__item:hover { background: var(--card) !important; }
-.user-dropdown__item--danger { color: var(--danger) !important; }
-.user-dropdown__item--danger:hover { background: var(--danger-soft) !important; }
+.user-dropdown__item:hover {
+  background: var(--card) !important;
+}
+.user-dropdown__item--danger {
+  color: var(--danger) !important;
+}
+.user-dropdown__item--danger:hover {
+  background: var(--danger-soft) !important;
+}
 .user-dropdown__item--signin {
-  border-radius: 10px !important; padding: 10px 12px !important;
-  background: linear-gradient(135deg, var(--accent2-soft), var(--accent-soft)) !important;
+  border-radius: 10px !important;
+  padding: 10px 12px !important;
+  background: linear-gradient(
+    135deg,
+    var(--accent2-soft),
+    var(--accent-soft)
+  ) !important;
   border: 1px solid var(--accent-soft) !important;
-  color: var(--accent) !important; font-weight: 700 !important;
+  color: var(--accent) !important;
+  font-weight: 700 !important;
 }
-.user-dropdown__item--signin:hover { filter: brightness(1.08); }
-.user-dropdown__item-icon { color: var(--muted); flex-shrink: 0; }
-.user-dropdown__signin-letter { font-weight: 800; font-size: 14px; flex-shrink: 0; width: 15px; text-align: center; }
+.user-dropdown__item--signin:hover {
+  filter: brightness(1.08);
+}
+.user-dropdown__item-icon {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.user-dropdown__signin-letter {
+  font-weight: 800;
+  font-size: 14px;
+  flex-shrink: 0;
+  width: 15px;
+  text-align: center;
+}
+
+/* ── Dropdown / Sheet shared sections (company switch, recent) ─ */
+.user-dropdown__section {
+  padding: 6px 6px 2px;
+  border-top: 1px solid var(--border);
+}
+.user-dropdown__section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 12px 4px;
+}
+.user-dropdown__company-active {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent);
+  padding: 2px 12px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-dropdown__item--compact {
+  padding: 7px 12px !important;
+  font-size: 0.82rem;
+}
+.user-dropdown__item--accent {
+  color: var(--accent) !important;
+  font-weight: 600 !important;
+}
+.user-dropdown__recent-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ── Mobile Sheet ─────────────────────────────────────────── */
 .header__sheet {
@@ -172,4 +526,20 @@
   backdrop-filter: blur(20px) !important;
   border-left: 1px solid var(--border) !important;
   color: var(--text) !important;
+}
+/* Mobile sheet body reuses the dropdown item styling so the hamburger
+   menu matches the desktop user dropdown. */
+.header__sheet-body {
+  overflow-y: auto;
+  padding-bottom: 12px;
+}
+.header__sheet-body .user-dropdown__item {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-align: left;
+}
+.header__sheet-body .user-dropdown__actions {
+  padding: 6px;
 }
