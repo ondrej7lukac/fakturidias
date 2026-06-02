@@ -70,8 +70,9 @@ function attach(router) {
         }
 
         try {
-            const data = await parseInvoiceAudioWithAI(audio, mime, body.lang || 'en');
-            return sendJson(res, 200, { success: true, data });
+            const result = await parseInvoiceAudioWithAI(audio, mime, body.lang || 'en');
+            const { transcript = '', ...data } = result;
+            return sendJson(res, 200, { success: true, data, transcript });
         } catch (err) {
             return sendJson(res, err.statusCode || 500, { error: err.message || 'AI processing failed' });
         }

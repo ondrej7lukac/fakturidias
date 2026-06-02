@@ -195,42 +195,14 @@ export default function Header({
     if (!liveActivity) return null;
     switch (liveActivity.kind) {
       case 'listening':
-        return {
-          icon: Mic,
-          spin: false,
-          tone: 'live' as const,
-          detail: isCz
-            ? 'Posloucháme — nahlas popište fakturu, kterou chcete vytvořit.'
-            : 'Listening — say out loud the invoice you want to create.',
-        };
+        return { icon: Mic, spin: false, tone: 'live' as const };
       case 'processing':
       case 'scanning':
-        return {
-          icon: Loader2,
-          spin: true,
-          tone: 'live' as const,
-          detail: isCz
-            ? 'AI zpracovává váš vstup a připravuje náhled faktury ke kontrole.'
-            : 'The AI is processing your input and preparing an invoice preview to review.',
-        };
+        return { icon: Loader2, spin: true, tone: 'live' as const };
       case 'done':
-        return {
-          icon: Check,
-          spin: false,
-          tone: 'done' as const,
-          detail: isCz
-            ? 'Náhled faktury je připraven — zkontrolujte ho a potvrďte vytvoření.'
-            : 'Your invoice preview is ready — review it and confirm to create the invoice.',
-        };
+        return { icon: Check, spin: false, tone: 'done' as const };
       case 'error':
-        return {
-          icon: X,
-          spin: false,
-          tone: 'error' as const,
-          detail: isCz
-            ? 'Zpracování se nezdařilo. Upravte vstup a zkuste to prosím znovu.'
-            : 'That didn’t work. Adjust your input and please try again.',
-        };
+        return { icon: X, spin: false, tone: 'error' as const };
     }
   })();
 
@@ -261,7 +233,6 @@ export default function Header({
         label: liveActivity?.label ?? '',
         tone: liveFace.tone,
         spin: liveFace.spin,
-        detail: liveFace.detail,
       }
     : narration
       ? {
@@ -272,29 +243,17 @@ export default function Header({
               : narration.text,
           tone: 'idle' as const,
           spin: false,
-          detail:
-            narration.mode === 'field'
-              ? isCz
-                ? `Právě upravujete pole „${narration.text}".`
-                : `You’re editing the “${narration.text}” field.`
-              : isCz
-                ? `Prohlížíte sekci „${narration.text}".`
-                : `You’re viewing the “${narration.text}” section.`,
         }
       : {
           Icon: sectionFace.icon,
           label: sectionFace.label,
           tone: 'idle' as const,
           spin: false,
-          detail: isCz
-            ? `Aktuální oblast: ${sectionFace.label}.`
-            : `You are in: ${sectionFace.label}.`,
         };
   const IslandIcon = island.Icon;
   const islandLabel = island.label;
   const islandTone = island.tone;
   const islandSpin = island.spin;
-  const islandDetail = island.detail;
 
   return (
     <header className='lp-header lp-header--app'>
@@ -316,7 +275,6 @@ export default function Header({
           className={`header-island header-island--${islandTone}`}
           role='status'
           aria-live='polite'
-          data-tooltip={islandDetail}
         >
           <span key={`${islandTone}-${islandLabel}`} className='header-island__face'>
             <span className='header-island__dot' aria-hidden />
