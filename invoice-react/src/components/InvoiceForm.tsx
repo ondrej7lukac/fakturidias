@@ -1,5 +1,6 @@
 import './InvoiceForm.css';
 import { useState, useEffect, useRef } from 'react';
+import { useLiveActivity } from '@/contexts/activity';
 import {
   formatInvoiceNumber,
   addDays,
@@ -81,8 +82,8 @@ export default function InvoiceForm({
   isAuthenticated,
   onShowInvoiceForm,
   onOpenDashboard,
-  onActivity,
 }) {
+  const { announce } = useLiveActivity();
   const qrCanvasRef = useRef(null);
   const [formData, setFormData] = useState({
     invoiceNumber: '',
@@ -907,10 +908,18 @@ export default function InvoiceForm({
 
   const handleDeleteRow = (index) => {
     setItems((prev) => prev.filter((_, i) => i !== index));
+    announce({
+      kind: 'info',
+      label: lang === 'cs' ? 'Položka odebrána' : 'Item removed',
+    });
     handleBlurSave();
   };
 
   const addItem = () => {
+    announce({
+      kind: 'info',
+      label: lang === 'cs' ? 'Položka přidána' : 'Item added',
+    });
     setItems((prev) => [
       ...prev,
       {
@@ -992,6 +1001,10 @@ export default function InvoiceForm({
     const invoiceData = getCurrentInvoiceData(data.formData, data.items);
     onSave(invoiceData);
     setDefaultSupplier(invoiceData.supplier);
+    announce({
+      kind: 'done',
+      label: lang === 'cs' ? 'Faktura uložena' : 'Invoice saved',
+    });
   };
 
   const handleMarkPaid = () => {
@@ -1001,6 +1014,13 @@ export default function InvoiceForm({
     const updatedData = { ...invoice, status: 'paid' };
     setFormData((prev) => ({ ...prev, status: 'paid' }));
     onSave(updatedData);
+    announce({
+      kind: 'done',
+      label:
+        lang === 'cs'
+          ? 'Faktura označena jako uhrazená'
+          : 'Invoice marked as paid',
+    });
   };
 
   const handleAresData = (data) => {
@@ -1018,6 +1038,10 @@ export default function InvoiceForm({
   const handleDownloadPDF = async () => {
     const currentData = getCurrentInvoiceData();
     setIsGenerating(true);
+    announce({
+      kind: 'processing',
+      label: lang === 'cs' ? 'Generuji PDF…' : 'Generating PDF…',
+    });
     try {
       const { generateInvoicePDF, downloadPDF } = await loadPdfUtils();
       let qrDataUrl = null;
@@ -1034,8 +1058,16 @@ export default function InvoiceForm({
 
       const pdf = await generateInvoicePDF(currentData, t, qrDataUrl);
       downloadPDF(pdf, `${currentData.invoiceNumber}.pdf`);
+      announce({
+        kind: 'done',
+        label: lang === 'cs' ? 'PDF staženo' : 'PDF downloaded',
+      });
     } catch (error) {
       alert('Failed to generate PDF');
+      announce({
+        kind: 'error',
+        label: lang === 'cs' ? 'Chyba PDF' : 'PDF failed',
+      });
     }
     setIsGenerating(false);
   };
@@ -1054,6 +1086,10 @@ export default function InvoiceForm({
     }
     setIsGenerating(true);
     setEmailStatus(lang === 'cs' ? 'Odesílám…' : 'Sending…');
+    announce({
+      kind: 'processing',
+      label: lang === 'cs' ? 'Odesílám e-mail…' : 'Sending email…',
+    });
     try {
       const { generateInvoicePDF, pdfBlobToDataUri } = await loadPdfUtils();
       let qrDataUrl = null;
@@ -1077,13 +1113,25 @@ export default function InvoiceForm({
       const result = await response.json();
       if (response.ok) {
         setEmailStatus(t.alertEmailSuccess);
+        announce({
+          kind: 'done',
+          label: lang === 'cs' ? 'E-mail odeslán' : 'Email sent',
+        });
         setTimeout(() => setEmailStatus(''), 3000);
       } else {
         setEmailStatus('');
+        announce({
+          kind: 'error',
+          label: lang === 'cs' ? 'Chyba odeslání' : 'Email failed',
+        });
         alert(`${t.alertEmailFailed}${result.message || result.error}`);
       }
     } catch (error) {
       setEmailStatus('');
+      announce({
+        kind: 'error',
+        label: lang === 'cs' ? 'Chyba e-mailu' : 'Email error',
+      });
       alert(t.alertError);
     }
     setIsGenerating(false);
@@ -1100,16 +1148,28 @@ export default function InvoiceForm({
     const { id } = getCurrentInvoiceData();
     if (!id) return;
     setPayStatus(lang === 'cs' ? 'Generuji…' : 'Generating…');
+    announce({
+      kind: 'processing',
+      label: lang === 'cs' ? 'Generuji odkaz…' : 'Generating link…',
+    });
     try {
       const url = await createPaymentLink(id);
       await navigator.clipboard?.writeText(url).catch(() => {});
       window.open(url, '_blank', 'noopener');
       setPayStatus(lang === 'cs' ? 'Odkaz zkopírován' : 'Link copied');
+      announce({
+        kind: 'done',
+        label:
+          lang === 'cs' ? 'Platební odkaz zkopírován' : 'Payment link copied',
+      });
       setTimeout(() => setPayStatus(''), 3000);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Error';
+      const message = error instanceof Error ? error.message : 'Error';
       setPayStatus(message);
+      announce({
+        kind: 'error',
+        label: lang === 'cs' ? 'Chyba odkazu' : 'Link error',
+      });
       setTimeout(() => setPayStatus(''), 4000);
     }
   };
@@ -1125,27 +1185,46 @@ export default function InvoiceForm({
     const { id } = getCurrentInvoiceData();
     if (!id) return;
     setPayStatus(lang === 'cs' ? 'Generuji…' : 'Generating…');
+    announce({
+      kind: 'processing',
+      label: lang === 'cs' ? 'Generuji odkaz…' : 'Generating link…',
+    });
     try {
       const { url } = await createShareLink(id);
       await navigator.clipboard?.writeText(url).catch(() => {});
       window.open(url, '_blank', 'noopener');
       setPayStatus(lang === 'cs' ? 'Odkaz zkopírován' : 'Link copied');
+      announce({
+        kind: 'done',
+        label: lang === 'cs' ? 'Odkaz sdílení zkopírován' : 'Share link copied',
+      });
       setTimeout(() => setPayStatus(''), 3000);
     } catch {
       setPayStatus(lang === 'cs' ? 'Chyba' : 'Error');
+      announce({
+        kind: 'error',
+        label: lang === 'cs' ? 'Chyba sdílení' : 'Share failed',
+      });
       setTimeout(() => setPayStatus(''), 3000);
     }
   };
 
   const handleExportIsdoc = async () => {
+    announce({
+      kind: 'processing',
+      label: lang === 'cs' ? 'Exportuji ISDOC…' : 'Exporting ISDOC…',
+    });
     try {
       await downloadInvoiceIsdoc(getCurrentInvoiceData());
+      announce({ kind: 'done', label: 'ISDOC' });
     } catch {
       alert(
-        lang === 'cs'
-          ? 'Export ISDOC se nezdařil.'
-          : 'ISDOC export failed.',
+        lang === 'cs' ? 'Export ISDOC se nezdařil.' : 'ISDOC export failed.',
       );
+      announce({
+        kind: 'error',
+        label: lang === 'cs' ? 'Chyba ISDOC' : 'ISDOC failed',
+      });
     }
   };
 
@@ -1160,6 +1239,10 @@ export default function InvoiceForm({
     const currentData = getCurrentInvoiceData();
     setIsGenerating(true);
     setEmailStatus(lang === 'cs' ? 'Zálohování...' : 'Backing up...');
+    announce({
+      kind: 'processing',
+      label: lang === 'cs' ? 'Zálohuji na Drive…' : 'Backing up to Drive…',
+    });
     try {
       const { generateInvoicePDF, pdfBlobToDataUri } = await loadPdfUtils();
       let qrDataUrl = null;
@@ -1186,14 +1269,27 @@ export default function InvoiceForm({
         }),
       });
       if (response.ok) {
+        announce({
+          kind: 'done',
+          label:
+            lang === 'cs' ? 'Uloženo na Google Drive' : 'Saved to Google Drive',
+        });
         alert(
           lang === 'cs' ? 'Uloženo na Google Drive!' : 'Saved to Google Drive!',
         );
       } else {
         const result = await response.json();
+        announce({
+          kind: 'error',
+          label: lang === 'cs' ? 'Chyba Drive' : 'Drive backup failed',
+        });
         alert(`Backup failed: ${result.message || result.error}`);
       }
     } catch (error) {
+      announce({
+        kind: 'error',
+        label: lang === 'cs' ? 'Chyba zálohy' : 'Backup error',
+      });
       alert(t.alertError);
     }
     setIsGenerating(false);
@@ -1654,7 +1750,6 @@ export default function InvoiceForm({
                 onFillForm={handleAIFill}
                 isGuest={!isAuthenticated}
                 isVatPayer={formData.isVatPayer}
-                onActivity={onActivity}
               />
 
               {/* Region/Tax Warning */}
@@ -1694,7 +1789,9 @@ export default function InvoiceForm({
                         <option value='invoice'>{t.docTypeInvoice}</option>
                         <option value='proforma'>{t.docTypeProforma}</option>
                         <option value='advance'>{t.docTypeAdvance}</option>
-                        <option value='creditNote'>{t.docTypeCreditNote}</option>
+                        <option value='creditNote'>
+                          {t.docTypeCreditNote}
+                        </option>
                       </select>
                     </div>
                     <div className='ap-field'>
@@ -2223,7 +2320,9 @@ export default function InvoiceForm({
                         }
                         onChange={handleAccountNumberChange}
                         onPaste={handlePasteBank}
-                        placeholder={lang === 'cs' ? '19-2000145399' : '2000145399'}
+                        placeholder={
+                          lang === 'cs' ? '19-2000145399' : '2000145399'
+                        }
                         inputMode='numeric'
                       />
                     </div>
@@ -2236,7 +2335,9 @@ export default function InvoiceForm({
                         onChange={handleChange}
                       >
                         <option value=''>
-                          {lang === 'cs' ? '— vyberte banku —' : '— select bank —'}
+                          {lang === 'cs'
+                            ? '— vyberte banku —'
+                            : '— select bank —'}
                         </option>
                         {Object.entries(BANK_CODES).map(([code, info]) => (
                           <option key={code} value={code}>
