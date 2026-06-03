@@ -177,6 +177,7 @@ export default function InvoiceForm({
   const [savedCustomers, setSavedCustomers] = useState([]);
   const [itemSuggestions, setItemSuggestions] = useState([]);
   const [customerSuggestions, setCustomerSuggestions] = useState([]);
+  const [customerActiveIndex, setCustomerActiveIndex] = useState(-1);
   const [supplierSuggestions, setSupplierSuggestions] = useState([]);
   const [saveTimer, setSaveTimer] = useState(null);
   const [aresAutoFilled, setAresAutoFilled] = useState(false);
@@ -707,11 +708,15 @@ export default function InvoiceForm({
     const value = e.target.value;
     setFormData((prev) => ({ ...prev, clientName: value }));
     setAresAutoFilled(false);
+    setCustomerActiveIndex(-1);
 
     if (value.trim().length > 0) {
-      // 1. Saved Customers (Instant)
+      // 1. Saved Customers (Instant) — match ignoring spaces so "skillnav",
+      // "Skill Nav" and "Skill  Nav" all find "Skill Nav s.r.o.".
+      const normalize = (s) => (s || '').replace(/\s+/g, '').toLowerCase();
+      const needle = normalize(value);
       const matches = savedCustomers
-        .filter((c) => c.name.toLowerCase().includes(value.toLowerCase()))
+        .filter((c) => normalize(c.name).includes(needle))
         .slice(0, 5)
         .map((c) => ({ ...c, source: 'saved' }));
       setCustomerSuggestions(matches);
@@ -763,6 +768,29 @@ export default function InvoiceForm({
       setAresAutoFilled(true);
     }
     setCustomerSuggestions([]);
+    setCustomerActiveIndex(-1);
+  };
+
+  // Keyboard navigation for the subscriber suggestions dropdown: arrows to move,
+  // Enter to pick the highlighted (or first) result, Escape to dismiss.
+  const handleClientNameKeyDown = (e) => {
+    if (customerSuggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setCustomerActiveIndex((i) => (i + 1) % customerSuggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setCustomerActiveIndex((i) =>
+        i <= 0 ? customerSuggestions.length - 1 : i - 1,
+      );
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const idx = customerActiveIndex >= 0 ? customerActiveIndex : 0;
+      handleSelectCustomer(customerSuggestions[idx]);
+    } else if (e.key === 'Escape') {
+      setCustomerSuggestions([]);
+      setCustomerActiveIndex(-1);
+    }
   };
 
   const handleSupplierNameChange = (e) => {
@@ -1900,6 +1928,7 @@ export default function InvoiceForm({
                           name='clientName'
                           value={formData.clientName}
                           onChange={handleClientNameChange}
+                          onKeyDown={handleClientNameKeyDown}
                           onBlur={handleInputBlur}
                           placeholder={
                             lang === 'cs'
@@ -1907,6 +1936,9 @@ export default function InvoiceForm({
                               : 'Search a company or enter business ID...'
                           }
                           autoComplete='off'
+                          role='combobox'
+                          aria-expanded={customerSuggestions.length > 0}
+                          aria-autocomplete='list'
                         />
                         {customerSuggestions.length > 0 && (
                           <ul
@@ -1930,20 +1962,21 @@ export default function InvoiceForm({
                             {customerSuggestions.map((c, i) => (
                               <li
                                 key={i}
+                                role='option'
+                                aria-selected={i === customerActiveIndex}
+                                onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => handleSelectCustomer(c)}
+                                onMouseEnter={() => setCustomerActiveIndex(i)}
                                 style={{
                                   padding: '9px 12px',
                                   cursor: 'pointer',
                                   borderRadius: '8px',
                                   transition: 'background 0.1s',
+                                  background:
+                                    i === customerActiveIndex
+                                      ? 'var(--card)'
+                                      : '',
                                 }}
-                                onMouseEnter={(e) =>
-                                  (e.currentTarget.style.background =
-                                    'var(--card)')
-                                }
-                                onMouseLeave={(e) =>
-                                  (e.currentTarget.style.background = '')
-                                }
                               >
                                 <div
                                   style={{

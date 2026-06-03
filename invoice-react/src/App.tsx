@@ -9,6 +9,8 @@ import Mailbox from './components/Mailbox';
 import Recurring from './components/Recurring';
 import Expenses from './components/Expenses';
 import WelcomeScreen from './components/WelcomeScreen';
+import Onboarding from './components/Onboarding';
+import type { OnboardingSupplier } from './components/Onboarding';
 import CookieBanner from './components/CookieBanner';
 import AdminDashboard from './components/AdminDashboard';
 import {
@@ -40,6 +42,11 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [invoicesLoaded, setInvoicesLoaded] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingMode, setOnboardingMode] = useState<'welcome' | 'company'>(
+    'welcome',
+  );
   const [mobileView, setMobileView] = useState('form'); // 'form' or 'list'
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
@@ -273,7 +280,11 @@ function App() {
 
   // Load settings from MongoDB when user logs in
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setSettingsLoaded(false);
+      return;
+    }
+    setSettingsLoaded(false);
     const loadSettings = async () => {
       try {
         const res = await fetch('/api/settings');
@@ -320,10 +331,64 @@ function App() {
         }
       } catch (err) {
         console.error('[Settings] Failed to load from MongoDB:', err);
+      } finally {
+        setSettingsLoaded(true);
       }
     };
     loadSettings();
   }, [user]);
+
+  // Onboarding: show the setup wizard once to logged-in users with no company yet.
+  useEffect(() => {
+    if (!user || !settingsLoaded) return;
+    const skipped = localStorage.getItem('onboarding_skipped_' + user.email);
+    if (!defaultSupplier?.name && !skipped) {
+      setOnboardingMode('welcome');
+      setShowOnboarding(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, settingsLoaded]);
+
+  const handleOnboardingComplete = async (supplier: OnboardingSupplier) => {
+    if (onboardingMode === 'company') {
+      try {
+        const res = await fetch('/api/settings');
+        const data = res.ok ? await res.json() : null;
+        const list = Array.isArray(data?.settings?.supplierProfiles)
+          ? data.settings.supplierProfiles
+          : [];
+        const name =
+          typeof supplier.name === 'string' ? supplier.name.trim() : '';
+        const existing = list.find((p: { name: string }) => p.name === name);
+        const next = existing
+          ? list.map((p: { name: string }) =>
+              p.name === name ? { ...p, supplier } : p,
+            )
+          : [...list, { id: crypto.randomUUID(), name, supplier }];
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ settings: { supplierProfiles: next } }),
+        });
+      } catch (err) {
+        console.error('[Onboarding] Failed to save company profile:', err);
+      }
+    }
+    setDefaultSupplier(supplier);
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingSkip = () => {
+    if (user) {
+      localStorage.setItem('onboarding_skipped_' + user.email, '1');
+    }
+    setShowOnboarding(false);
+  };
+
+  const handleAddCompany = () => {
+    setOnboardingMode('company');
+    setShowOnboarding(true);
+  };
 
   // Listen for Google Login success from OAuth popup
   useEffect(() => {
@@ -618,6 +683,16 @@ function App() {
         </div>
       )}
       <CookieBanner lang={lang} />
+      {showOnboarding && (
+        <Onboarding
+          lang={lang}
+          t={t}
+          mode={onboardingMode}
+          initialSupplier={defaultSupplier}
+          onComplete={handleOnboardingComplete}
+          onSkip={handleOnboardingSkip}
+        />
+      )}
       <Header
         onNewInvoice={handleNewInvoice}
         lang={lang}
@@ -639,6 +714,7 @@ function App() {
         recentInvoices={recentInvoices}
         onOpenInvoice={handleOpenInvoice}
         narration={screenNarration}
+        onAddCompany={handleAddCompany}
       />
       <main
         className={`${dashboardOpen ? 'dashboard-mode' : ''} ${currentView === 'settings' || currentView === 'mailbox' || currentView === 'recurring' || currentView === 'expenses' ? 'settings-view' : ''}`}

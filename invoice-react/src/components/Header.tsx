@@ -1,6 +1,5 @@
 import './Header.css';
 import { useState, useEffect } from 'react';
-import CompanyInfoModal from './CompanyInfoModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +61,7 @@ interface HeaderProps {
   defaultSupplier?: Record<string, unknown> | null;
   setDefaultSupplier?: (supplier: Record<string, unknown>) => void;
   narration?: ScreenNarration | null;
+  onAddCompany?: () => void;
 }
 
 export default function Header({
@@ -82,6 +82,7 @@ export default function Header({
   defaultSupplier = null,
   setDefaultSupplier,
   narration = null,
+  onAddCompany,
 }: HeaderProps) {
   const { liveActivity, settingsTab, announce } = useLiveActivity();
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
@@ -91,7 +92,6 @@ export default function Header({
   );
 
   const [profiles, setProfiles] = useState<CompanyProfile[]>([]);
-  const [companyModalOpen, setCompanyModalOpen] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -119,24 +119,6 @@ export default function Header({
     announce({
       kind: 'info',
       label: isCz ? `Firma: ${profile.name}` : `Company: ${profile.name}`,
-    });
-  };
-
-  const handleSaveCompany = (supplier: Record<string, unknown>) => {
-    setDefaultSupplier?.(supplier);
-    const name = typeof supplier.name === 'string' ? supplier.name.trim() : '';
-    if (!name) return;
-    setProfiles((prev) => {
-      const existing = prev.find((p) => p.name === name);
-      const next = existing
-        ? prev.map((p) => (p.name === name ? { ...p, supplier } : p))
-        : [...prev, { id: crypto.randomUUID(), name, supplier }];
-      fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: { supplierProfiles: next } }),
-      }).catch(() => {});
-      return next;
     });
   };
 
@@ -496,7 +478,7 @@ export default function Header({
                         </DropdownMenuItem>
                       ))}
                     <DropdownMenuItem
-                      onClick={() => setCompanyModalOpen(true)}
+                      onClick={() => onAddCompany?.()}
                       className='user-dropdown__item user-dropdown__item--compact'
                     >
                       <Plus
@@ -504,9 +486,7 @@ export default function Header({
                         strokeWidth={2}
                         className='user-dropdown__item-icon'
                       />
-                      <span>
-                        {isCz ? 'Přidat / upravit firmu' : 'Add / edit company'}
-                      </span>
+                      <span>{isCz ? 'Přidat firmu' : 'Add company'}</span>
                     </DropdownMenuItem>
                   </div>
                 )}
@@ -770,7 +750,7 @@ export default function Header({
                   className='user-dropdown__item user-dropdown__item--compact'
                   onClick={() => {
                     setMobileMenuOpen(false);
-                    setCompanyModalOpen(true);
+                    onAddCompany?.();
                   }}
                 >
                   <Plus
@@ -778,9 +758,7 @@ export default function Header({
                     strokeWidth={2}
                     className='user-dropdown__item-icon'
                   />
-                  <span>
-                    {isCz ? 'Přidat / upravit firmu' : 'Add / edit company'}
-                  </span>
+                  <span>{isCz ? 'Přidat firmu' : 'Add company'}</span>
                 </button>
               </div>
             )}
@@ -942,14 +920,6 @@ export default function Header({
         </SheetContent>
       </Sheet>
 
-      <CompanyInfoModal
-        lang={lang}
-        t={t}
-        open={companyModalOpen}
-        onOpenChange={setCompanyModalOpen}
-        initialSupplier={defaultSupplier}
-        onSave={handleSaveCompany}
-      />
     </header>
   );
 }

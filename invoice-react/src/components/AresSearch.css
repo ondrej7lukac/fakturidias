@@ -16,6 +16,74 @@
   border: 1px solid var(--border);
   cursor: pointer;
   width: 100%;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.ares-result-item:hover,
+.ares-result-item--active {
+  background: var(--card2);
+  border-color: var(--accent);
+}
+
+.ares-result-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ares-result-meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.ares-results-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 0.75rem;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.ares-results-status--empty {
+  color: var(--text);
+}
+
+.ares-spin {
+  animation: ares-spin 0.9s linear infinite;
+}
+
+@keyframes ares-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ares-selected {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.ares-selected__name {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ares-selected__meta {
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .ares-v3-root {
