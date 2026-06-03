@@ -51,45 +51,8 @@ import {
   ICON_MD,
   STROKE,
 } from '@/lib/icons';
-
-interface InvoiceItem {
-  name: string;
-  qty: number;
-  price: number;
-  total: number;
-}
-
-interface Invoice {
-  id: string;
-  invoiceNumber?: string;
-  status?: string;
-  amount?: number;
-  currency?: string;
-  issueDate?: string;
-  dueDate?: string;
-  taxableSupplyDate?: string;
-  category?: string;
-  isVatPayer?: boolean;
-  taxBase?: number | string;
-  taxRate?: number | string;
-  taxAmount?: number | string;
-  client?: {
-    name?: string;
-    area?: string;
-    country?: string;
-    ico?: string;
-    vat?: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-  };
-  supplier?: { name?: string };
-  payment?: {
-    variableSymbol?: string;
-  };
-  items?: InvoiceItem[];
-  note?: string;
-}
+import type { Dispatch, SetStateAction } from 'react';
+import type { Invoice, Supplier } from '../types/invoice';
 
 const DOMESTIC_COUNTRY = 'CZ';
 const EU_COUNTRIES = new Set([
@@ -462,14 +425,14 @@ interface InvoiceDashboardProps {
   lang: string;
   t: Record<string, string>;
   isAuthenticated: boolean;
-  onSave: (invoice: unknown) => Promise<void> | void;
+  onSave: (invoice: Invoice, options?: { autoSave?: boolean }) => Promise<void> | void;
   onAddCategory: (cat: string) => void;
   invoiceCounter: number;
   invoicesLoaded: boolean;
   draftNumber: string;
   setDraftNumber: (n: string) => void;
-  defaultSupplier: unknown;
-  setDefaultSupplier: (fn: (prev: unknown) => unknown) => void;
+  defaultSupplier?: Supplier | null;
+  setDefaultSupplier: Dispatch<SetStateAction<Supplier | null>>;
 }
 
 export default function InvoiceDashboard({
@@ -996,7 +959,10 @@ export default function InvoiceDashboard({
             <div className='invoice-export-modal__grid'>
               <label className='invoice-export-modal__field'>
                 <span>{L.exportYear}</span>
-                <Select value={exportYear} onValueChange={setExportYear}>
+                <Select
+                  value={exportYear}
+                  onValueChange={(value) => setExportYear(value ?? '')}
+                >
                   <SelectTrigger className='invoice-export-modal__select'>
                     <SelectValue />
                   </SelectTrigger>
@@ -1016,7 +982,10 @@ export default function InvoiceDashboard({
 
               <label className='invoice-export-modal__field'>
                 <span>{isCz ? 'Měsíc (KH)' : 'Month (control stmt.)'}</span>
-                <Select value={exportMonth} onValueChange={setExportMonth}>
+                <Select
+                  value={exportMonth}
+                  onValueChange={(value) => setExportMonth(value ?? '')}
+                >
                   <SelectTrigger className='invoice-export-modal__select'>
                     <SelectValue />
                   </SelectTrigger>

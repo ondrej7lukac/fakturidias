@@ -1,16 +1,31 @@
 import { defineConfig } from 'vite';
+import type { ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import https from 'https';
 import zlib from 'zlib';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { RequestOptions } from 'node:https';
+
+interface AresFilter {
+  obchodniJmeno?: string;
+  ico?: string;
+  start?: number;
+  pocet?: number;
+}
+
+interface AresResponse {
+  status: number;
+  data: { ekonomickeSubjekty?: unknown[]; [key: string]: unknown };
+}
 
 // ARES proxy plugin
 function aresProxyPlugin() {
   return {
     name: 'ares-proxy',
-    configureServer(server) {
-      server.middlewares.use(async (req, res, next) => {
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
         // Handle OPTIONS preflight requests first
         if (
           (req.url === '/api/ares/search' ||
@@ -35,7 +50,7 @@ function aresProxyPlugin() {
           req.on('end', async () => {
             try {
               const data = JSON.parse(body);
-              const filter = {};
+              const filter: AresFilter = {};
               if (data.obchodniJmeno && String(data.obchodniJmeno).trim()) {
                 filter.obchodniJmeno = String(data.obchodniJmeno).trim();
               }
@@ -51,7 +66,7 @@ function aresProxyPlugin() {
               const payload = JSON.stringify(filter);
               console.log('[ARES Proxy] Search Payload:', payload);
 
-              const tryAres = async (prefix) => {
+              const tryAres = async (prefix: string) => {
                 return await makeAresRequest(
                   {
                     hostname: 'ares.gov.cz',
@@ -91,9 +106,10 @@ function aresProxyPlugin() {
               });
               res.end(JSON.stringify(result.data));
             } catch (error) {
-              console.error('[ARES Proxy] Search error:', error.message);
+              const message = error instanceof Error ? error.message : String(error);
+              console.error('[ARES Proxy] Search error:', message);
               res.writeHead(500, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: error.message }));
+              res.end(JSON.stringify({ error: message }));
             }
           });
           return;
@@ -146,9 +162,10 @@ function aresProxyPlugin() {
             });
             res.end(JSON.stringify(result.data));
           } catch (error) {
-            console.error('[ARES Proxy] Lookup error:', error.message);
+            const message = error instanceof Error ? error.message : String(error);
+            console.error('[ARES Proxy] Lookup error:', message);
             res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: error.message }));
+            res.end(JSON.stringify({ error: message }));
           }
           return;
         }
@@ -159,8 +176,11 @@ function aresProxyPlugin() {
   };
 }
 
-function makeAresRequest(options, body = null) {
-  return new Promise((resolve, reject) => {
+function makeAresRequest(
+  options: RequestOptions,
+  body: string | null = null,
+): Promise<AresResponse> {
+  return new Promise<AresResponse>((resolve, reject) => {
     const req = https.request(options, (proxyRes) => {
       const status = proxyRes.statusCode || 500;
       const encoding = String(
@@ -194,7 +214,7 @@ function makeAresRequest(options, body = null) {
   });
 }
 
-function getVendorChunkName(id) {
+function getVendorChunkName(id: string) {
   const [, modulePath = ''] = id.split('node_modules/');
   if (!modulePath) return undefined;
 

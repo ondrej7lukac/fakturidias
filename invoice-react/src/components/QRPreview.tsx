@@ -2,9 +2,16 @@ import { useRef } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { money } from '../utils/storage'
 import { getCzechQrPayload } from '../utils/bank'
+import type { Invoice } from '../types/invoice'
 
-export default function QRPreview({ invoice, lang, t }) {
-    const qrContainerRef = useRef(null)
+interface QRPreviewProps {
+    invoice: Invoice
+    lang: string
+    t: Record<string, string>
+}
+
+export default function QRPreview({ invoice, lang, t }: QRPreviewProps) {
+    const qrContainerRef = useRef<HTMLDivElement>(null)
     const qrPayload = getCzechQrPayload(invoice)
 
     return (
@@ -13,7 +20,7 @@ export default function QRPreview({ invoice, lang, t }) {
             <p className="invoice-meta">
                 {t.qrInstruction}
             </p>
-            <div id="qr" ref={qrContainerRef} style={{ background: '#fff', padding: '10px', borderRadius: '8px', display: 'inline-block', marginBottom: '15px' }}>
+            <div id="qr" ref={qrContainerRef} style={{ background: 'var(--card)', padding: '10px', borderRadius: '8px', display: 'inline-block', marginBottom: '15px' }}>
                 {invoice ? (
                     <QRCodeCanvas
                         value={qrPayload}

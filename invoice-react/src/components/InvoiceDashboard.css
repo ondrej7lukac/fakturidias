@@ -248,8 +248,8 @@
 .invoice-export-modal__select-content
   [data-slot='select-item'][data-highlighted],
 .invoice-export-modal__select-content [data-slot='select-item']:focus-visible {
-  background: rgba(109, 232, 255, 0.14);
-  color: #f7fbff;
+  background: var(--accent-soft);
+  color: var(--text);
 }
 
 .invoice-export-modal__select-content [data-slot='select-scroll-up-button'],

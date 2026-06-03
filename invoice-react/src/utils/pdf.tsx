@@ -25,10 +25,11 @@ const C = {
     green800:    '#166534',
     slate50:     '#f8fafc',
     slate200:    '#e2e8f0',
+    white:       '#ffffff',
 }
 
 const S = StyleSheet.create({
-    page: { fontFamily: 'Roboto', fontSize: 10, color: C.gray900, backgroundColor: '#ffffff', padding: 40 },
+    page: { fontFamily: 'Roboto', fontSize: 10, color: C.gray900, backgroundColor: C.white, padding: 40 },
 
     // Header
     header:      { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 2, borderBottomColor: C.indigo, paddingBottom: 14, marginBottom: 22 },
@@ -304,13 +305,13 @@ function _showMobileFallback(url: string, filename: string, cleanup: () => void)
 
     const card = document.createElement('div')
     card.style.cssText = [
-        'background:#fff;border-radius:16px;padding:28px 24px;',
+        'background:var(--card);border-radius:16px;padding:28px 24px;',
         'max-width:320px;width:100%;text-align:center;',
         'box-shadow:0 24px 64px rgba(0,0,0,.35);',
     ].join('')
 
     const msg = document.createElement('p')
-    msg.style.cssText = 'margin:0 0 18px;font-size:15px;color:#111827;line-height:1.5;'
+    msg.style.cssText = 'margin:0 0 18px;font-size:15px;color:var(--text);line-height:1.5;'
     msg.textContent = 'Tap the button below to open your invoice PDF.'
 
     const link = document.createElement('a')
@@ -320,7 +321,7 @@ function _showMobileFallback(url: string, filename: string, cleanup: () => void)
     link.download = filename
     link.textContent = 'Open PDF'
     link.style.cssText = [
-        'display:inline-block;background:#6366f1;color:#fff;',
+        'display:inline-block;background:var(--accent-2);color:var(--on-accent-2);',
         'padding:13px 28px;border-radius:10px;',
         'text-decoration:none;font-weight:600;font-size:15px;',
     ].join('')
@@ -329,7 +330,7 @@ function _showMobileFallback(url: string, filename: string, cleanup: () => void)
     dismiss.textContent = 'Dismiss'
     dismiss.style.cssText = [
         'display:block;margin:16px auto 0;background:none;border:none;',
-        'color:#64748b;font-size:13px;cursor:pointer;',
+        'color:var(--muted);font-size:13px;cursor:pointer;',
     ].join('')
 
     const close = () => { overlay.remove(); cleanup() }

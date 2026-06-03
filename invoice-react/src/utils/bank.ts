@@ -2,7 +2,7 @@
  * Czech Bank Codes and IBAN Utilities
  */
 
-export const BANK_CODES = {
+export const BANK_CODES: Record<string, { name: string; bic: string }> = {
     '0100': { name: 'Komerční banka', bic: 'KOMB CZ PP' },
     '0300': { name: 'ČSOB', bic: 'CEKO CZ PP' },
     '0600': { name: 'MONETA Money Bank', bic: 'AGBA CZ PP' },
@@ -56,7 +56,7 @@ export const BANK_CODES = {
  * @param {string} prefix 
  * @returns {string} IBAN
  */
-export const calculateIban = (accountNumber, bankCode, prefix = '') => {
+export const calculateIban = (accountNumber: string, bankCode: string, prefix = '') => {
     if (!accountNumber || !bankCode) return ''
 
     const cleanAccount = accountNumber.padStart(10, '0')
@@ -68,13 +68,13 @@ export const calculateIban = (accountNumber, bankCode, prefix = '') => {
     const b = bankCode + fullAccount + '1235' + '00'
 
     // Modulo 97... large numbers handling
-    const mod97 = (string) => {
-        let checksum = string.slice(0, 2)
-        for (let offset = 2; offset < string.length; offset += 7) {
-            const chunk = checksum + string.slice(offset, offset + 7)
-            checksum = parseInt(chunk, 10) % 97
+    const mod97 = (input: string): number => {
+        let remainder = input.slice(0, 2)
+        for (let offset = 2; offset < input.length; offset += 7) {
+            const chunk = remainder + input.slice(offset, offset + 7)
+            remainder = String(parseInt(chunk, 10) % 97)
         }
-        return checksum
+        return parseInt(remainder, 10)
     }
 
     const checkDigits = (98 - mod97(b)).toString().padStart(2, '0')
@@ -84,7 +84,7 @@ export const calculateIban = (accountNumber, bankCode, prefix = '') => {
 /**
  * Parses IBAN into account number, prefix and bank code
  */
-export const parseIban = (iban) => {
+export const parseIban = (iban: string) => {
     const clean = iban.replace(/\s/g, '')
     if (clean.length !== 24 || !clean.startsWith('CZ')) return null
 
@@ -94,19 +94,26 @@ export const parseIban = (iban) => {
 
     return { bankCode, prefix, accountNumber }
 }
+interface QrPayloadInvoice {
+    amount?: number;
+    currency?: string;
+    invoiceNumber?: string;
+    payment?: { iban?: string; note?: string };
+}
+
 /**
  * Generates Czech QR (Short Payment Descriptor - SPD) payload string
  */
-export const getCzechQrPayload = (invoice) => {
+export const getCzechQrPayload = (invoice: QrPayloadInvoice | null | undefined) => {
     if (!invoice) return ''
-    const iban = (invoice.payment.iban || '').replace(/\s/g, '')
+    const iban = (invoice.payment?.iban || '').replace(/\s/g, '')
     const amount = invoice.amount ? invoice.amount.toFixed(2) : ''
     const currency = invoice.currency || 'CZK'
     // Limited message length for SPD
-    const note = (invoice.payment.note || invoice.invoiceNumber || '').substring(0, 60)
+    const note = (invoice.payment?.note || invoice.invoiceNumber || '').substring(0, 60)
 
     // Extract numbers for Variable Symbol from invoice number (max 10 digits)
-    const vs = invoice.invoiceNumber.replace(/\D/g, '').substring(0, 10)
+    const vs = (invoice.invoiceNumber || '').replace(/\D/g, '').substring(0, 10)
 
     let payload = `SPD*1.0*ACC:${iban}`
     if (amount) payload += `*AM:${amount}`

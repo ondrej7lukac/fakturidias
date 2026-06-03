@@ -79,7 +79,7 @@
 
 .cb-btn--accept {
     background: var(--accent);
-    color: #0a1f1a;
+    color: var(--on-accent);
     border: 1px solid var(--accent);
 }
 

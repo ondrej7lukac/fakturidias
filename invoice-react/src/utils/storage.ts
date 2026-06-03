@@ -1,5 +1,16 @@
 // Server-based storage functions
 
+// Invoices carry many optional, view-specific fields across the app (the form
+// uses a flat shape, the dashboard a nested one). Storage only needs the
+// identity/date fields it reads here; the index signature keeps both shapes
+// assignable without forcing a single canonical model.
+export interface StoredInvoice {
+  id: string;
+  invoiceNumber?: string;
+  issueDate?: string;
+  [key: string]: unknown;
+}
+
 // --- API Storage (Authenticated) ---
 
 export async function loadApiData() {
@@ -17,7 +28,7 @@ export async function loadApiData() {
   }
 }
 
-export async function saveApiInvoice(invoice) {
+export async function saveApiInvoice(invoice: StoredInvoice) {
   const response = await fetch('/api/invoices', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -37,7 +48,7 @@ export async function saveApiInvoice(invoice) {
   return data.invoice;
 }
 
-export async function deleteApiInvoice(invoiceId) {
+export async function deleteApiInvoice(invoiceId: string) {
   const response = await fetch(`/api/invoices/${invoiceId}`, {
     method: 'DELETE',
   });
@@ -49,17 +60,17 @@ export async function deleteApiInvoice(invoiceId) {
 
 const LOCAL_STORAGE_KEY = 'invoices_guest';
 
-export function loadLocalData() {
+export function loadLocalData(): { invoices: StoredInvoice[] } {
   try {
     const data = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return { invoices: data ? JSON.parse(data) : [] };
+    return { invoices: data ? (JSON.parse(data) as StoredInvoice[]) : [] };
   } catch (e) {
     console.error('Failed to load local data', e);
     return { invoices: [] };
   }
 }
 
-export function saveLocalInvoice(invoice) {
+export function saveLocalInvoice(invoice: StoredInvoice) {
   // Guest Validations are handled in App.jsx (e.g. max count)
   const { invoices } = loadLocalData();
   const existingIndex = invoices.findIndex((inv) => inv.id === invoice.id);
@@ -74,7 +85,7 @@ export function saveLocalInvoice(invoice) {
   return invoice;
 }
 
-export function deleteLocalInvoice(invoiceId) {
+export function deleteLocalInvoice(invoiceId: string) {
   const { invoices } = loadLocalData();
   const newInvoices = invoices.filter((inv) => inv.id !== invoiceId);
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newInvoices));
@@ -255,10 +266,10 @@ export function attachmentUrl(id: string, index = 0): string {
 export async function loadData() {
   return loadApiData();
 }
-export async function saveInvoice(inv) {
+export async function saveInvoice(inv: StoredInvoice) {
   return saveApiInvoice(inv);
 }
-export async function deleteInvoice(id) {
+export async function deleteInvoice(id: string) {
   return deleteApiInvoice(id);
 }
 
@@ -593,7 +604,7 @@ export function previewInvoiceNumber(
   return formatInvoiceNumber(1, format);
 }
 
-export function getNextInvoiceCounter(invoices) {
+export function getNextInvoiceCounter(invoices: StoredInvoice[]) {
   const year = new Date().getFullYear();
   const yearStr = String(year);
 
@@ -618,25 +629,28 @@ export function getNextInvoiceCounter(invoices) {
   return Math.max(...counters) + 1;
 }
 
-export function addDays(date, days) {
+export function addDays(date: Date | string | number, days: number) {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
 }
 
-export function formatDate(date) {
+export function formatDate(date: Date | string | number | null | undefined) {
   if (!date) return '';
   const d = new Date(date);
   return d.toISOString().split('T')[0];
 }
 
-export function money(value) {
+export function money(value: number | string | null | undefined) {
   return Number(value || 0).toFixed(2);
 }
 
-export function debounce(callback, wait = 400) {
-  let timeoutId;
-  return (...args) => {
+export function debounce<Args extends unknown[]>(
+  callback: (...args: Args) => void,
+  wait = 400,
+) {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return (...args: Args) => {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => callback(...args), wait);
   };

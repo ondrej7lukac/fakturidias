@@ -50,7 +50,7 @@
     radial-gradient(14px 14px at 18% 18%, rgba(255, 255, 255, 0.4), transparent 60%),
     linear-gradient(135deg, var(--accent), var(--accent-2));
   display: grid; place-items: center;
-  color: #061022; font-weight: 700; font-size: 18px;
+  color: var(--on-accent); font-weight: 700; font-size: 18px;
   flex: none;
 }
 .ap-brand__text { line-height: 1.15; min-width: 0; }
@@ -341,21 +341,8 @@
 }
 
 .ap-select option {
-  background-color: #fbf9f3;
-  color: #18150f;
-}
-
-html.theme-dark .ap-select option,
-.dark .ap-select option {
-  background-color: #11152a;
-  color: #eef1fb;
-}
-
-@media (prefers-color-scheme: dark) {
-  .ap-select option {
-    background-color: #11152a;
-    color: #eef1fb;
-  }
+  background-color: var(--card);
+  color: var(--text);
 }
 
 .ap-input:focus, .ap-select:focus, .ap-textarea:focus {
@@ -500,7 +487,7 @@ html.theme-dark .ap-select option,
   background:
     radial-gradient(14px 14px at 18% 18%, rgba(255, 255, 255, 0.3), transparent 60%),
     var(--accent);
-  color: #06140e;
+  color: var(--on-accent);
   border-color: transparent;
 }
 @keyframes mic-ring {

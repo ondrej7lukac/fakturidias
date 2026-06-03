@@ -55,7 +55,7 @@ button.secondary, .btn--soft {
 /* Success variant */
 button.success {
   --btn-bg: var(--accent);
-  --btn-color: #06140e;
+  --btn-color: var(--on-accent);
   --btn-hover-filter: brightness(1.05);
   --btn-hover-bg: var(--btn-bg);
   box-shadow: var(--shadow-lg);

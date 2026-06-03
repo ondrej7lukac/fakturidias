@@ -9,7 +9,7 @@
   flex-wrap: wrap;
   padding: 8px 16px;
   background: var(--accent-2);
-  color: #fff;
+  color: var(--on-accent-2);
   font-size: 13px;
   text-align: center;
 }
@@ -21,7 +21,7 @@
 .viewing-as-banner button {
   border: 1px solid rgba(255, 255, 255, 0.6);
   background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  color: var(--on-accent-2);
   border-radius: 8px;
   padding: 3px 12px;
   font-size: 12px;

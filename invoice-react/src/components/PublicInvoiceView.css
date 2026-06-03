@@ -1,6 +1,6 @@
 .public-invoice {
   min-height: 100vh;
-  background: var(--bg2, #f4f5fb);
+  background: var(--bg2);
   padding: 0 0 48px;
 }
 
@@ -25,7 +25,7 @@
 
 .public-invoice__brand {
   font-weight: 700;
-  color: var(--accent, #2dd7a6);
+  color: var(--accent);
   letter-spacing: -0.01em;
 }
 
@@ -35,7 +35,7 @@
 }
 
 .public-invoice__lang button {
-  border: 1px solid var(--border, rgba(10, 18, 60, 0.14));
+  border: 1px solid var(--border);
   background: transparent;
   border-radius: 8px;
   padding: 4px 10px;
@@ -45,15 +45,15 @@
 }
 
 .public-invoice__lang button.is-active {
-  background: var(--accent, #2dd7a6);
-  color: #04231a;
+  background: var(--accent);
+  color: var(--on-accent);
   border-color: transparent;
 }
 
 .public-invoice__sheet {
   max-width: 820px;
   margin: 0 auto;
-  background: #fff;
+  background: var(--card);
   border-radius: 14px;
   box-shadow: 0 8px 40px rgba(10, 18, 60, 0.1);
   overflow: hidden;

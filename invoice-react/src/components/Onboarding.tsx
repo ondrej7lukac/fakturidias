@@ -2,6 +2,7 @@ import './Onboarding.css';
 import { useEffect, useMemo, useState } from 'react';
 import AresSearch from './AresSearch';
 import { calculateIban } from '../utils/bank';
+import type { Supplier } from '../types/invoice';
 import {
   Sparkles,
   Activity,
@@ -17,26 +18,8 @@ import {
   STROKE,
 } from '@/lib/icons';
 
-export interface OnboardingSupplier {
-  name?: string;
-  ico?: string;
-  vat?: string;
-  address?: string;
-  email?: string;
-  phone?: string;
-  web?: string;
-  region?: string;
-  isVatPayer?: boolean;
-  vatRate?: string;
-  defaultCurrency?: string;
-  defaultDueDays?: string;
-  accountNumber?: string;
-  bankCode?: string;
-  prefix?: string;
-  iban?: string;
-  bic?: string;
-  [key: string]: unknown;
-}
+// Retained name for existing imports; the canonical shape lives in types/invoice.
+export type OnboardingSupplier = Supplier;
 
 interface OnboardingProps {
   lang: string;
