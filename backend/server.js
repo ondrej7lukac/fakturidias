@@ -17,6 +17,7 @@ const { connectDB, isUserSuspended, hasAccessGrant } = require("./lib/storage");
 const { getCurrentUserEmail } = require("./lib/auth");
 const { createRouter } = require("./routes/router");
 const { startScheduler } = require("./lib/scheduler");
+const { createRateLimiter, getClientIp } = require("./lib/rateLimit");
 
 const isProd = process.env.NODE_ENV === "production";
 const port = process.env.PORT || 5500;
@@ -97,6 +98,33 @@ require("./routes/access").attach(protectedRouter);
 admin.attach(protectedRouter);
 billing.attachProtected(protectedRouter);
 
+// Per-IP rate limits on abuse-prone unauthenticated endpoints. Authenticated
+// /api/* routes are gated by the session and are not limited here.
+const authLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30 });
+const lookupLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 60 });
+const RATE_LIMIT_RULES = [
+  { prefix: "/auth/", limiter: authLimiter },
+  { prefix: "/api/ares/", limiter: lookupLimiter },
+  { prefix: "/api/rpo/", limiter: lookupLimiter },
+  { prefix: "/api/vat/", limiter: lookupLimiter },
+  { prefix: "/api/exchange-rate", limiter: lookupLimiter },
+];
+
+function checkRateLimit(req, res, requestPath) {
+  if (req.method === "OPTIONS") return true; // never throttle CORS preflight
+  for (const rule of RATE_LIMIT_RULES) {
+    if (!requestPath.startsWith(rule.prefix)) continue;
+    const { allowed, retryAfter } = rule.limiter.check(getClientIp(req));
+    if (!allowed) {
+      res.setHeader("Retry-After", String(retryAfter));
+      sendJson(res, 429, { error: "Too many requests. Please slow down." });
+      return false;
+    }
+    break;
+  }
+  return true;
+}
+
 function serveStatic(req, res, requestPath) {
   const distDir = fs.existsSync(rootDist) ? rootDist : subDist;
 
@@ -150,6 +178,8 @@ const handleRequest = async (req, res) => {
     method: req.method,
     path: requestPath,
   });
+
+  if (!checkRateLimit(req, res, requestPath)) return;
 
   const ctx = { req, res, url, requestPath, userEmail: null, params: {} };
 

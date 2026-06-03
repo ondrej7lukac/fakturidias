@@ -580,7 +580,6 @@ export default function InvoiceForm({
           body: JSON.stringify({ customer: invoiceData.client }),
         }).catch((e) => console.error(e));
       }
-      console.log('[Auto-Save] Invoice saved:', invoiceData.invoiceNumber);
     }, 1000);
     setSaveTimer(timer);
   };
@@ -945,7 +944,6 @@ export default function InvoiceForm({
       total,
     };
 
-    console.log('[InvoiceForm] Adding item:', newItem);
     setItems([...items, newItem]);
 
     try {
