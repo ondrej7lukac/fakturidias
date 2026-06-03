@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "npm install --prefix invoice-react && npm run build --prefix invoice-react",
+    "build": "npm ci --prefix invoice-react && npm run build --prefix invoice-react",
     "start": "node backend/server.js",
     "test:e2e": "npm test --prefix e2e"
   },
@@ -16,7 +16,6 @@
     "jsonwebtoken": "^9.0.3",
     "jszip": "^3.10.1",
     "mongoose": "^8.21.1",
-    "nodemailer": "^7.0.12",
     "stripe": "^22.1.1"
   },
   "engines": {

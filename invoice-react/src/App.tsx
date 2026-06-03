@@ -305,16 +305,11 @@ function App() {
             Object.keys(settings.defaultSupplier).length > 0
           ) {
             supplier = settings.defaultSupplier;
-            console.log('[Settings] Loaded (new format):', supplier);
           } else if (settings?.name || settings?.iban) {
             // Legacy: migrate root-level fields into defaultSupplier format
             const { _id, userEmail, updatedAt, __v, smtp, ...supplierFields } =
               settings;
             supplier = supplierFields;
-            console.log(
-              '[Settings] Loaded (legacy format), migrating:',
-              supplier,
-            );
             // Auto-fix: re-save in correct format immediately
             fetch('/api/settings', {
               method: 'POST',
@@ -326,7 +321,6 @@ function App() {
           if (supplier) {
             setDefaultSupplier(supplier);
           } else {
-            console.log('[Settings] No supplier settings found in MongoDB yet');
             setDefaultSupplier(null);
           }
 
