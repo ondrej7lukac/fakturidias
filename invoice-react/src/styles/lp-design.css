@@ -863,7 +863,7 @@ html.theme-dark .lp-step__num { color: var(--accent); }
   position: absolute;
   top: -11px; left: 26px;
   background: var(--accent);
-  color: #061a14;
+  color: var(--on-accent);
   font-family: var(--font-mono);
   font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
   padding: 5px 12px; border-radius: 999px; white-space: nowrap;
@@ -964,7 +964,7 @@ html.theme-dark .lp-faq__q:hover { color: var(--accent); }
 }
 .lp-final__sub { color: color-mix(in oklab, var(--bg) 70%, transparent); margin: 0 0 28px; font-size: 16px; position: relative; }
 .lp-final__ctas { display: flex; gap: 10px; flex-wrap: wrap; position: relative; }
-.lp-final .lp-btn--primary { background: var(--accent); color: #061a14; border-color: var(--accent); }
+.lp-final .lp-btn--primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .lp-final .lp-btn--primary:hover { filter: brightness(1.06); }
 .lp-final .lp-btn--secondary { background: transparent; color: var(--bg); border-color: color-mix(in oklab, var(--bg) 40%, transparent); }
 .lp-final .lp-btn--secondary:hover { background: color-mix(in oklab, var(--bg) 12%, transparent); }

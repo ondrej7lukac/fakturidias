@@ -17,6 +17,9 @@
   --accent-2: #3f51e8;      /* indigo */
   --danger: #d63b5e;
   --warn: #b6791a;
+  --on-accent: #06140e;     /* ink on --accent (teal) surfaces */
+  --on-accent-2: #ffffff;   /* text on --accent-2 (indigo) surfaces */
+  --on-danger: #ffffff;     /* text on --danger surfaces */
   --shadow: 0 22px 60px rgba(24, 21, 15, 0.16);
   --shadow-lg: 0 10px 30px rgba(24, 21, 15, 0.12);
   --shadow-sm: 0 2px 0 rgba(24, 21, 15, 0.05);

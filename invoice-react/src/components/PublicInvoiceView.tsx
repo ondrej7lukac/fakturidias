@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import InvoicePreview from './InvoicePreview';
 import { getPublicInvoice } from '../utils/storage';
 import { languages } from '../utils/i18n';
+import type { Invoice } from '../types/invoice';
 
 interface PublicInvoiceViewProps {
   token: string;
@@ -11,7 +12,7 @@ interface PublicInvoiceViewProps {
 type Lang = 'cs' | 'en';
 
 export default function PublicInvoiceView({ token }: PublicInvoiceViewProps) {
-  const [invoice, setInvoice] = useState<Record<string, unknown> | null>(null);
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [lang, setLang] = useState<Lang>('cs');
 
@@ -20,7 +21,9 @@ export default function PublicInvoiceView({ token }: PublicInvoiceViewProps) {
     getPublicInvoice(token)
       .then((inv) => {
         if (!active) return;
-        setInvoice(inv);
+        // getPublicInvoice stays decoupled from the view model (returns a loose
+        // record); the public endpoint always yields a full invoice shape.
+        setInvoice(inv as Invoice);
         const country = String(
           (inv?.client as { country?: string })?.country || 'CZ',
         ).toUpperCase();

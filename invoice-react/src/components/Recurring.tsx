@@ -20,19 +20,12 @@ import {
   type RecurringTemplate,
   type RecurringCadence,
 } from '../utils/storage';
-
-interface SourceInvoice {
-  id: string;
-  invoiceNumber: string;
-  amount: number;
-  currency: string;
-  client?: { name?: string };
-}
+import type { Invoice } from '../types/invoice';
 
 interface RecurringProps {
   lang: string;
   t: Record<string, string>;
-  invoices: SourceInvoice[];
+  invoices: Invoice[];
   isPro: boolean;
 }
 

@@ -1,4 +1,24 @@
-export async function searchAres(query) {
+interface AresAddress {
+    textovaAdresa?: string
+    ulice?: string
+    cisloDomovni?: string | number
+    cisloOrientacni?: string | number
+    nazevObce?: string
+    obec?: string
+    psc?: string | number
+}
+
+interface AresEntity {
+    obchodniJmeno?: string
+    nazev?: string
+    adresa?: string
+    textovaAdresa?: string
+    sidlo?: AresAddress
+    ico?: string
+    dic?: string
+}
+
+export async function searchAres(query: string) {
     // Collapse internal whitespace and trim — tolerate sloppy paste/typing.
     const trimmed = (query || '').trim().replace(/\s+/g, ' ')
     if (trimmed.length < 3) return []
@@ -38,7 +58,7 @@ export async function searchAres(query) {
     }
 }
 
-export async function lookupAresByIco(ico) {
+export async function lookupAresByIco(ico: string) {
     // ... existing logic adaptation if needed
     // For now searchAres handles ICO too via POST if only numbers
     // But GET /api/ares/ico is more specific for details
@@ -50,7 +70,7 @@ export async function lookupAresByIco(ico) {
     } catch (e) { return null }
 }
 
-export function formatAresAddress(address) {
+export function formatAresAddress(address: AresAddress | null | undefined) {
     if (!address) return ''
     if (address.textovaAdresa) return address.textovaAdresa
     const parts = [
@@ -63,7 +83,7 @@ export function formatAresAddress(address) {
     return [parts.trim(), `${city} ${zip}`.trim()].filter(Boolean).join(', ')
 }
 
-export function parseAresItem(entity) {
+export function parseAresItem(entity: AresEntity) {
     const name = entity.obchodniJmeno || entity.nazev || ''
     const address = entity.adresa || entity.textovaAdresa || formatAresAddress(entity.sidlo)
     const city = entity.sidlo?.nazevObce || entity.sidlo?.obec || ''

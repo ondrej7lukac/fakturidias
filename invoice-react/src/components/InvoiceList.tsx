@@ -1,23 +1,14 @@
 import './InvoiceList.css';
 import { useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { money } from '../utils/storage';
+import type { Invoice, Supplier } from '../types/invoice';
 import { BarChart2 } from '@/lib/icons';
 import { useLiveActivity } from '@/contexts/activity';
 import InvoiceDashboard from './InvoiceDashboard';
 import StatusBadge from './StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-
-interface Invoice {
-  id: string;
-  invoiceNumber: string;
-  status: string;
-  amount: number;
-  currency: string;
-  issueDate?: string;
-  category?: string;
-  client: { name: string; area?: string };
-}
 
 interface InvoiceListProps {
   invoices: Invoice[];
@@ -34,14 +25,14 @@ interface InvoiceListProps {
   setDashboardOpen: (open: boolean) => void;
   onCloseDashboard?: () => void;
   onNewInvoice?: () => void;
-  onSave: (invoice: unknown) => void;
+  onSave: (invoice: Invoice, options?: { autoSave?: boolean }) => void;
   onAddCategory: (cat: string) => void;
   invoiceCounter: number;
   invoicesLoaded: boolean;
   draftNumber: string;
   setDraftNumber: (n: string) => void;
-  defaultSupplier: unknown;
-  setDefaultSupplier: (fn: (prev: unknown) => unknown) => void;
+  defaultSupplier?: Supplier | null;
+  setDefaultSupplier: Dispatch<SetStateAction<Supplier | null>>;
 }
 
 export default function InvoiceList({
@@ -80,9 +71,9 @@ export default function InvoiceList({
     const query = searchText.trim().toLowerCase();
     const matchQuery =
       !query ||
-      inv.invoiceNumber.toLowerCase().includes(query) ||
-      inv.client.name.toLowerCase().includes(query) ||
-      (inv.client.area || '').toLowerCase().includes(query);
+      (inv.invoiceNumber || '').toLowerCase().includes(query) ||
+      (inv.client?.name || '').toLowerCase().includes(query) ||
+      (inv.client?.area || '').toLowerCase().includes(query);
     const matchStatus = filterStatus === 'all' || inv.status === filterStatus;
     const matchCategory =
       filterCategory === 'all' || (inv.category || '') === filterCategory;
@@ -225,16 +216,16 @@ export default function InvoiceList({
               <div className='flex justify-between items-center mb-2'>
                 <strong className='text-base'>{inv.invoiceNumber}</strong>
                 <StatusBadge
-                  status={inv.status}
+                  status={inv.status || 'draft'}
                   invoiceId={inv.id}
                   onStatusChange={onStatusChange}
                   lang={lang}
                 />
               </div>
-              <div className='font-medium mb-1'>{inv.client.name}</div>
+              <div className='font-medium mb-1'>{inv.client?.name}</div>
               <div className='invoice-meta mb-3 text-sm opacity-70'>
                 {inv.currency} {money(inv.amount)} •{' '}
-                {inv.client.area || (lang === 'cs' ? 'Bez oblasti' : 'No area')}
+                {inv.client?.area || (lang === 'cs' ? 'Bez oblasti' : 'No area')}
                 {inv.issueDate && (
                   <span className='ml-2'>
                     • {lang === 'cs' ? 'Vystaveno' : 'Issued'}: {inv.issueDate}

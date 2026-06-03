@@ -2,7 +2,7 @@
  * Slovak Business Register (RPO) Utilities
  */
 
-export const searchRpo = async (name) => {
+export const searchRpo = async (name: string) => {
     try {
         const res = await fetch('/api/rpo/search', {
             method: 'POST',
@@ -17,7 +17,7 @@ export const searchRpo = async (name) => {
     }
 };
 
-export const lookupRpoByIco = async (ico) => {
+export const lookupRpoByIco = async (ico: string) => {
     try {
         const res = await fetch(`/api/rpo/ico?ico=${encodeURIComponent(ico)}`);
         if (!res.ok) throw new Error('RPO lookup failed');

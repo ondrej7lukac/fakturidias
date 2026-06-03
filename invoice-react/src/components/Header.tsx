@@ -62,6 +62,8 @@ interface HeaderProps {
   setDefaultSupplier?: (supplier: Record<string, unknown>) => void;
   narration?: ScreenNarration | null;
   onAddCompany?: () => void;
+  recentInvoices?: { id: string; invoiceNumber: string; clientName: string }[];
+  onOpenInvoice?: (id: string) => void;
 }
 
 export default function Header({

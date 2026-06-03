@@ -2,8 +2,15 @@ import './InvoicePreview.css'
 import { QRCodeCanvas } from 'qrcode.react'
 import { getCzechQrPayload } from '../utils/bank'
 import { documentTypeTitleKey } from '../utils/storage'
+import type { Invoice } from '../types/invoice'
 
-export default function InvoicePreview({ invoice, t, lang }) {
+interface InvoicePreviewProps {
+    invoice: Invoice
+    t: Record<string, string>
+    lang: string
+}
+
+export default function InvoicePreview({ invoice, t, lang }: InvoicePreviewProps) {
     return (
         <div className="invoice-preview">
             {/* Header */}
@@ -11,7 +18,7 @@ export default function InvoicePreview({ invoice, t, lang }) {
                 <div>
                     <h1 style={{
                         margin: 0,
-                        color: '#6366f1',
+                        color: 'var(--accent-2)',
                         fontSize: '32px',
                         fontWeight: 800,
                         textTransform: 'uppercase',
@@ -19,19 +26,19 @@ export default function InvoicePreview({ invoice, t, lang }) {
                     }}>{t[documentTypeTitleKey(invoice.documentType)]}</h1>
                     <p style={{
                         margin: '5px 0',
-                        color: '#64748b',
+                        color: 'var(--muted)',
                         fontSize: '16px',
                         fontWeight: 500
                     }}># {invoice.invoiceNumber}</p>
                 </div>
-                <div style={{ textAlign: 'right', color: '#1f2937' }}>
+                <div style={{ textAlign: 'right', color: 'var(--text)' }}>
                     <p style={{ margin: 0, fontWeight: 600 }}>
                         {t.issueDate}: <span style={{ fontWeight: 400 }}>{invoice.issueDate}</span>
                     </p>
                     <p style={{ margin: '5px 0', fontWeight: 600 }}>
                         {t.dueDate}: <span style={{
                             fontWeight: 400,
-                            color: new Date(invoice.dueDate) < new Date() ? '#ef4444' : 'inherit'
+                            color: new Date(invoice.dueDate || '') < new Date() ? 'var(--danger)' : 'inherit'
                         }}>{invoice.dueDate || 'N/A'}</span>
                     </p>
                     {invoice.taxableSupplyDate && invoice.taxableSupplyDate !== invoice.issueDate && (
@@ -51,21 +58,21 @@ export default function InvoicePreview({ invoice, t, lang }) {
                         fontSize: '13px',
                         fontWeight: 700,
                         textTransform: 'uppercase',
-                        color: '#64748b',
+                        color: 'var(--muted)',
                         letterSpacing: '0.05em'
                     }}>{t.issuer}</h3>
                     <p style={{
                         margin: 0,
                         fontWeight: 700,
                         fontSize: '18px',
-                        color: '#111827'
+                        color: 'var(--text)'
                     }}>{invoice.supplier?.name || '---'}</p>
                     <p style={{
                         margin: '6px 0',
                         lineHeight: 1.5,
-                        color: '#374151'
+                        color: 'var(--text)'
                     }}>{invoice.supplier?.address || ''}</p>
-                    <div style={{ fontSize: '14px', color: '#4b5563' }}>
+                    <div style={{ fontSize: '14px', color: 'var(--muted)' }}>
                         {invoice.supplier?.ico && (
                             <p style={{ margin: '2px 0' }}>
                                 <strong>{t.ico}:</strong> {invoice.supplier.ico}
@@ -91,7 +98,7 @@ export default function InvoicePreview({ invoice, t, lang }) {
                     {!invoice.isVatPayer && (
                         <p style={{
                             marginTop: '10px',
-                            color: '#64748b',
+                            color: 'var(--muted)',
                             fontSize: '11px',
                             fontStyle: 'italic'
                         }}>Nejsem plátce DPH</p>
@@ -105,27 +112,27 @@ export default function InvoicePreview({ invoice, t, lang }) {
                         fontSize: '13px',
                         fontWeight: 700,
                         textTransform: 'uppercase',
-                        color: '#64748b',
+                        color: 'var(--muted)',
                         letterSpacing: '0.05em'
                     }}>{t.billTo}</h3>
                     <p style={{
                         margin: 0,
                         fontWeight: 700,
                         fontSize: '18px',
-                        color: '#111827'
-                    }}>{invoice.client.name}</p>
+                        color: 'var(--text)'
+                    }}>{invoice.client?.name}</p>
                     <p style={{
                         margin: '6px 0',
                         lineHeight: 1.5,
-                        color: '#374151'
-                    }}>{invoice.client.address || ''}</p>
-                    <div style={{ fontSize: '14px', color: '#4b5563' }}>
-                        {invoice.client.ico && (
+                        color: 'var(--text)'
+                    }}>{invoice.client?.address || ''}</p>
+                    <div style={{ fontSize: '14px', color: 'var(--muted)' }}>
+                        {invoice.client?.ico && (
                             <p style={{ margin: '2px 0' }}>
                                 <strong>{t.ico}:</strong> {invoice.client.ico}
                             </p>
                         )}
-                        {invoice.client.vat && (
+                        {invoice.client?.vat && (
                             <p style={{ margin: '2px 0' }}>
                                 <strong>{t.vat}:</strong> {invoice.client.vat}
                             </p>
@@ -144,81 +151,81 @@ export default function InvoicePreview({ invoice, t, lang }) {
                     marginBottom: '40px'
                 }}>
                     <thead>
-                        <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                        <tr style={{ borderBottom: '2px solid var(--border)' }}>
                             <th style={{
                                 textAlign: 'left',
                                 padding: '10px 0',
-                                color: '#64748b',
+                                color: 'var(--muted)',
                                 fontSize: '12px',
                                 textTransform: 'uppercase'
                             }}>{t.itemDescription}</th>
                             <th style={{
                                 textAlign: 'center',
                                 padding: '10px 0',
-                                color: '#64748b',
+                                color: 'var(--muted)',
                                 fontSize: '12px',
                                 textTransform: 'uppercase'
                             }}>{t.qty}</th>
                             <th style={{
                                 textAlign: 'right',
                                 padding: '10px 0',
-                                color: '#64748b',
+                                color: 'var(--muted)',
                                 fontSize: '12px',
                                 textTransform: 'uppercase'
                             }}>{lang === 'cs' ? 'CENA/JEDN.' : 'PRICE/UNIT'}</th>
                             <th style={{
                                 textAlign: 'center',
                                 padding: '10px 0',
-                                color: '#64748b',
+                                color: 'var(--muted)',
                                 fontSize: '12px',
                                 textTransform: 'uppercase'
                             }}>{lang === 'cs' ? 'DPH %' : 'TAX %'}</th>
                             <th style={{
                                 textAlign: 'right',
                                 padding: '10px 0',
-                                color: '#64748b',
+                                color: 'var(--muted)',
                                 fontSize: '12px',
                                 textTransform: 'uppercase'
                             }}>{lang === 'cs' ? 'SLEVA' : 'DISC.'}</th>
                             <th style={{
                                 textAlign: 'right',
                                 padding: '10px 0',
-                                color: '#64748b',
+                                color: 'var(--muted)',
                                 fontSize: '12px',
                                 textTransform: 'uppercase'
                             }}>{t.total}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {invoice.items.map((item, idx) => (
+                        {(invoice.items || []).map((item, idx) => (
                             <tr key={idx}>
                                 <td style={{
                                     padding: '12px 0',
-                                    borderBottom: '1px solid #e5e7eb'
+                                    borderBottom: '1px solid var(--border)'
                                 }}>{item.name}</td>
                                 <td style={{
                                     padding: '12px 0',
-                                    borderBottom: '1px solid #e5e7eb',
+                                    borderBottom: '1px solid var(--border)',
                                     textAlign: 'center'
                                 }}>{item.qty}</td>
                                 <td style={{
                                     padding: '12px 0',
-                                    borderBottom: '1px solid #e5e7eb',
+                                    borderBottom: '1px solid var(--border)',
                                     textAlign: 'right'
                                 }}>{invoice.currency} {item.price.toFixed(2)}</td>
                                 <td style={{
                                     padding: '12px 0',
-                                    borderBottom: '1px solid #e5e7eb',
+                                    borderBottom: '1px solid var(--border)',
                                     textAlign: 'center'
                                 }}>{item.taxRate || 0}%</td>
                                 <td style={{
                                     padding: '12px 0',
-                                    borderBottom: '1px solid #e5e7eb',
+                                    borderBottom: '1px solid var(--border)',
                                     textAlign: 'right'
-                                }}>{item.discount > 0 ? `${invoice.currency} ${item.discount.toFixed(2)}` : '-'}</td>
+                                }}>{item.discount && item.discount > 0 ? `${invoice.currency} ${item.discount.toFixed(2)}` : '-'}</td>
                                 <td style={{
                                     padding: '12px 0',
-                                    borderBottom: '1px solid #e5e7eb',
+                                    borderBottom: '1px solid var(--border)',
                                     textAlign: 'right'
                                 }}>{invoice.currency} {item.total.toFixed(2)}</td>
                             </tr>
@@ -232,8 +239,8 @@ export default function InvoicePreview({ invoice, t, lang }) {
                 <div style={{
                     marginBottom: '30px',
                     padding: '15px',
-                    background: '#f0fdf4',
-                    border: '1px solid #86efac',
+                    background: 'var(--success-bg)',
+                    border: '1px solid var(--success-border)',
                     borderRadius: '8px'
                 }}>
                     <h3 style={{
@@ -241,7 +248,7 @@ export default function InvoicePreview({ invoice, t, lang }) {
                         fontSize: '13px',
                         fontWeight: 700,
                         textTransform: 'uppercase',
-                        color: '#166534',
+                        color: 'var(--accent-ink)',
                         letterSpacing: '0.05em'
                     }}>Daňový doklad - Rozpis DPH</h3>
                     <div className="preview-vat-grid">
@@ -249,40 +256,40 @@ export default function InvoicePreview({ invoice, t, lang }) {
                             <p style={{
                                 margin: 0,
                                 fontSize: '11px',
-                                color: '#166534',
+                                color: 'var(--accent-ink)',
                                 textTransform: 'uppercase'
                             }}>Základ daně</p>
                             <p style={{
                                 margin: '4px 0',
                                 fontWeight: 600,
-                                color: '#15803d'
-                            }}>{invoice.currency} {parseFloat(invoice.taxBase || 0).toFixed(2)}</p>
+                                color: 'var(--accent-ink)'
+                            }}>{invoice.currency} {parseFloat(String(invoice.taxBase || 0)).toFixed(2)}</p>
                         </div>
                         <div>
                             <p style={{
                                 margin: 0,
                                 fontSize: '11px',
-                                color: '#166534',
+                                color: 'var(--accent-ink)',
                                 textTransform: 'uppercase'
                             }}>Sazba DPH</p>
                             <p style={{
                                 margin: '4px 0',
                                 fontWeight: 600,
-                                color: '#15803d'
+                                color: 'var(--accent-ink)'
                             }}>{invoice.taxRate || '21'}%</p>
                         </div>
                         <div>
                             <p style={{
                                 margin: 0,
                                 fontSize: '11px',
-                                color: '#166534',
+                                color: 'var(--accent-ink)',
                                 textTransform: 'uppercase'
                             }}>Výše daně</p>
                             <p style={{
                                 margin: '4px 0',
                                 fontWeight: 600,
-                                color: '#15803d'
-                            }}>{invoice.currency} {parseFloat(invoice.taxAmount || 0).toFixed(2)}</p>
+                                color: 'var(--accent-ink)'
+                            }}>{invoice.currency} {parseFloat(String(invoice.taxAmount || 0)).toFixed(2)}</p>
                         </div>
                     </div>
                 </div>
@@ -295,12 +302,12 @@ export default function InvoicePreview({ invoice, t, lang }) {
                         margin: '0 0 8px',
                         fontSize: '12px',
                         textTransform: 'uppercase',
-                        color: '#64748b'
+                        color: 'var(--muted)'
                     }}>{t.qrPreview}</h3>
                     <div style={{
                         width: '120px',
                         height: '120px',
-                        border: '1px solid #e5e7eb',
+                        border: '1px solid var(--border)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
@@ -319,33 +326,33 @@ export default function InvoicePreview({ invoice, t, lang }) {
                         justifyContent: 'space-between',
                         marginBottom: '10px'
                     }}>
-                        <span style={{ color: '#64748b' }}>{t.subtotal}:</span>
-                        <span style={{ fontWeight: 600 }}>{invoice.currency} {parseFloat(invoice.isVatPayer ? (invoice.taxBase || invoice.amount) : invoice.amount).toFixed(2)}</span>
+                        <span style={{ color: 'var(--muted)' }}>{t.subtotal}:</span>
+                        <span style={{ fontWeight: 600 }}>{invoice.currency} {parseFloat(String((invoice.isVatPayer ? (invoice.taxBase || invoice.amount) : invoice.amount) || 0)).toFixed(2)}</span>
                     </div>
 
                     <div style={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         marginBottom: '10px',
-                        color: '#64748b',
+                        color: 'var(--muted)',
                         fontSize: '13px'
                     }}>
                         <span>{lang === 'cs' ? 'DPH' : 'VAT'} ({invoice.isVatPayer ? invoice.taxRate : '0'}%)</span>
-                        <span>{invoice.currency} {parseFloat(invoice.isVatPayer ? (invoice.taxAmount || 0) : 0).toFixed(2)}</span>
+                        <span>{invoice.currency} {parseFloat(String(invoice.isVatPayer ? (invoice.taxAmount || 0) : 0)).toFixed(2)}</span>
                     </div>
 
                     <div style={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         paddingTop: '10px',
-                        borderTop: '2px solid #6366f1'
+                        borderTop: '2px solid var(--accent-2)'
                     }}>
                         <span style={{ fontWeight: 700, fontSize: '18px' }}>{t.total}:</span>
                         <span style={{
                             fontWeight: 700,
                             fontSize: '18px',
-                            color: '#6366f1'
-                        }}>{invoice.currency} {invoice.amount.toFixed(2)}</span>
+                            color: 'var(--accent-2)'
+                        }}>{invoice.currency} {(invoice.amount || 0).toFixed(2)}</span>
                     </div>
                 </div>
             </div>
@@ -355,11 +362,11 @@ export default function InvoicePreview({ invoice, t, lang }) {
                 <div style={{ 
                     margin: '20px 0', 
                     padding: '15px 20px', 
-                    border: '1px solid #e2e8f0', 
+                    border: '1px solid var(--border)', 
                     borderRadius: '8px', 
-                    background: '#f8fafc',
+                    background: 'var(--card2)',
                     fontSize: '13px',
-                    color: '#0f172a'
+                    color: 'var(--text)'
                 }}>
                     {invoice.reverseChargeText && (
                         <div style={{ marginBottom: invoice.exchangeRate ? '8px' : '0' }}>
@@ -367,7 +374,7 @@ export default function InvoicePreview({ invoice, t, lang }) {
                         </div>
                     )}
                     {invoice.exchangeRate && invoice.exchangeRate !== '1.0000' && (
-                        <div style={{ fontStyle: 'italic', color: '#64748b' }}>
+                        <div style={{ fontStyle: 'italic', color: 'var(--muted)' }}>
                             {t.exchangeRate}: 1 {invoice.currency} = {invoice.exchangeRate} {(invoice.supplier?.region === 'SK' ? 'EUR' : 'CZK')}
                         </div>
                     )}
@@ -377,8 +384,8 @@ export default function InvoicePreview({ invoice, t, lang }) {
             {/* Minimalistic Payment Details (Bottom) */}
             <div style={{
                 padding: '15px 20px',
-                background: '#f8fafc',
-                borderTop: '1px solid #e2e8f0',
+                background: 'var(--card2)',
+                borderTop: '1px solid var(--border)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 flexWrap: 'wrap',
@@ -386,27 +393,27 @@ export default function InvoicePreview({ invoice, t, lang }) {
                 fontSize: '13px'
             }}>
                 <div>
-                    <span style={{ color: '#64748b', marginRight: '6px' }}>{t.bankAccount}:</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{invoice.payment.accountNumber}/{invoice.payment.bankCode}</span>
+                    <span style={{ color: 'var(--muted)', marginRight: '6px' }}>{t.bankAccount}:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>{invoice.payment?.accountNumber}/{invoice.payment?.bankCode}</span>
                 </div>
                 <div>
-                    <span style={{ color: '#64748b', marginRight: '6px' }}>{t.iban}:</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a', fontFamily: 'monospace' }}>{invoice.payment.iban}</span>
+                    <span style={{ color: 'var(--muted)', marginRight: '6px' }}>{t.iban}:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'monospace' }}>{invoice.payment?.iban}</span>
                 </div>
                 <div>
-                    <span style={{ color: '#64748b', marginRight: '6px' }}>{t.bic}:</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{invoice.payment.bic}</span>
+                    <span style={{ color: 'var(--muted)', marginRight: '6px' }}>{t.bic}:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>{invoice.payment?.bic}</span>
                 </div>
                 <div>
-                    <span style={{ color: '#64748b', marginRight: '6px' }}>{t.variableSymbol}:</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{invoice.payment.variableSymbol}</span>
+                    <span style={{ color: 'var(--muted)', marginRight: '6px' }}>{t.variableSymbol}:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>{invoice.payment?.variableSymbol}</span>
                 </div>
             </div>
 
             {/* Thank you note */}
             <div style={{
                 marginTop: '20px',
-                color: '#94a3b8',
+                color: 'var(--muted2)',
                 fontSize: '11px',
                 textAlign: 'center'
             }}>

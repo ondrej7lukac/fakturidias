@@ -63,22 +63,9 @@ select {
   }
 }
 
-/* Styling for option dropdowns to fix dark mode contrast issues in native selects */
+/* Native select options — tokens flip with theme (manual class + system) */
 select option {
-  background-color: #fbf9f3;
-  color: #18150f;
-}
-
-html.theme-dark select option,
-.dark select option {
-  background-color: #11152a;
-  color: #eef1fb;
-}
-
-@media (prefers-color-scheme: dark) {
-  select option {
-    background-color: #11152a;
-    color: #eef1fb;
-  }
+  background-color: var(--card);
+  color: var(--text);
 }
 

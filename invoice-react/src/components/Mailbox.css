@@ -345,7 +345,7 @@
 .mbx-btn--primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #06231b;
+  color: var(--on-accent);
 }
 
 .mbx-btn--ghost {

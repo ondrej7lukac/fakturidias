@@ -25,18 +25,23 @@ import {
   stopViewingAs,
 } from './utils/storage';
 import { languages } from './utils/i18n';
+import type { Invoice } from './types/invoice';
 import { useScreenNarration } from './hooks/useScreenNarration';
 import { useLiveActivity } from './contexts/activity';
 
+interface AppUser {
+  email: string;
+}
+
 function App() {
-  const [user, setUser] = useState(null); // Auth state lifted to App
-  const [invoices, setInvoices] = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
-  const [categories, setCategories] = useState([]);
+  const [user, setUser] = useState<AppUser | null>(null); // Auth state lifted to App
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
   const [invoiceCounter, setInvoiceCounter] = useState(1);
   const [draftNumber, setDraftNumber] = useState('');
   const [lang, setLang] = useState('cs');
-  const [defaultSupplier, setDefaultSupplier] = useState(null);
+  const [defaultSupplier, setDefaultSupplier] = useState<OnboardingSupplier | null>(null);
   const [currentView, setCurrentView] = useState('invoices');
   const [viewingAs, setViewingAs] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,7 +82,7 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [impersonating, setImpersonating] = useState<string | null>(null);
 
-  const t = languages[lang];
+  const t = languages[lang as keyof typeof languages] ?? languages.cs;
 
   const screenNarration = useScreenNarration(
     `${showWelcome}:${currentView}:${dashboardOpen}`,
@@ -245,7 +250,7 @@ function App() {
   const fetchInvoices = async () => {
     setIsLoading(true);
     try {
-      let loadedInvoices = [];
+      let loadedInvoices: Invoice[] = [];
 
       if (user) {
         // Authenticated: Load from API
@@ -470,7 +475,7 @@ function App() {
     });
   }, [selectedId, invoices]);
 
-  const handleOpenInvoice = (id) => {
+  const handleOpenInvoice = (id: string) => {
     setSelectedId(id);
     setCurrentView('invoices');
     setDashboardOpen(false);
@@ -479,7 +484,10 @@ function App() {
 
   const selectedInvoice = invoices.find((inv) => inv.id === selectedId);
 
-  const handleSaveInvoice = async (invoice, { autoSave = false } = {}) => {
+  const handleSaveInvoice = async (
+    invoice: Invoice,
+    { autoSave = false }: { autoSave?: boolean } = {},
+  ) => {
     try {
       // Guest Mode Restriction
       if (!user) {
@@ -540,7 +548,7 @@ function App() {
     }
   };
 
-  const handleDeleteInvoice = async (id) => {
+  const handleDeleteInvoice = async (id: string) => {
     if (!window.confirm(lang === 'cs' ? 'Smazat fakturu?' : 'Delete invoice?'))
       return;
 
@@ -589,14 +597,14 @@ function App() {
 
   // handleSendReminderEmail removed for production deployment
 
-  const handleAddCategory = (category) => {
+  const handleAddCategory = (category: string) => {
     if (!categories.includes(category)) {
       setCategories([...categories, category].sort());
     }
   };
 
   // Quick status change from list/dashboard without opening the form
-  const handleStatusChange = async (invoiceId, newStatus) => {
+  const handleStatusChange = async (invoiceId: string, newStatus: string) => {
     const invoice = invoices.find((inv) => inv.id === invoiceId);
     if (!invoice) return;
     await handleSaveInvoice({ ...invoice, status: newStatus });
@@ -857,8 +865,8 @@ function App() {
             justifyContent: 'center',
             gap: '14px',
             padding: '10px 16px',
-            background: '#e33d63',
-            color: '#fff',
+            background: 'var(--danger)',
+            color: 'var(--on-danger)',
             fontSize: '0.86rem',
             fontWeight: 600,
             boxShadow: '0 -4px 16px rgba(0,0,0,0.25)',
@@ -871,8 +879,8 @@ function App() {
           <button
             onClick={handleStopImpersonating}
             style={{
-              background: '#fff',
-              color: '#e33d63',
+              background: 'var(--on-danger)',
+              color: 'var(--danger)',
               border: 'none',
               borderRadius: '8px',
               padding: '5px 14px',

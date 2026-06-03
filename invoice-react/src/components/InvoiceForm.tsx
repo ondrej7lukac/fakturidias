@@ -1,5 +1,13 @@
 import './InvoiceForm.css';
 import { useState, useEffect, useRef } from 'react';
+import type {
+  Dispatch,
+  SetStateAction,
+  ChangeEvent,
+  ClipboardEvent,
+  KeyboardEvent,
+  FormEvent,
+} from 'react';
 import { useLiveActivity } from '@/contexts/activity';
 import {
   formatInvoiceNumber,
@@ -13,7 +21,9 @@ import {
   type DocumentType,
 } from '../utils/storage';
 import { searchAres, parseAresItem, lookupAresByIco } from '../utils/ares';
+import { searchRpo } from '../utils/rpo';
 import type { BankAccount } from './BankAccounts';
+import type { Invoice, InvoiceLineItem, Supplier } from '../types/invoice';
 import {
   BarChart2,
   Pencil,
@@ -66,6 +76,49 @@ function randomUUID(): string {
   });
 }
 
+interface InvoiceFormProps {
+  invoice?: Invoice | null;
+  categories: string[];
+  onSave: (invoice: Invoice, options?: { autoSave?: boolean }) => void;
+  onAddCategory: (cat: string) => void;
+  invoiceCounter: number;
+  invoicesLoaded: boolean;
+  draftNumber: string;
+  setDraftNumber: (n: string) => void;
+  lang: string;
+  t: Record<string, string>;
+  defaultSupplier?: Supplier | null;
+  setDefaultSupplier: Dispatch<SetStateAction<Supplier | null>>;
+  isAuthenticated: boolean;
+  onShowInvoiceForm?: () => void;
+  onOpenDashboard?: () => void;
+}
+
+// Autocomplete suggestion rows merge saved customers and ARES/RPO lookups, so
+// every field is optional plus a `source` tag identifying its origin.
+interface CustomerSuggestion {
+  name?: string;
+  email?: string;
+  emailCopy?: string;
+  phone?: string;
+  area?: string;
+  city?: string;
+  ico?: string;
+  vat?: string;
+  address?: string;
+  country?: string;
+  source?: string;
+  [key: string]: unknown;
+}
+
+interface ItemSuggestion {
+  name?: string;
+  price?: number | string;
+  unit?: string;
+  taxRate?: number | string;
+  [key: string]: unknown;
+}
+
 export default function InvoiceForm({
   invoice,
   categories,
@@ -82,9 +135,9 @@ export default function InvoiceForm({
   isAuthenticated,
   onShowInvoiceForm,
   onOpenDashboard,
-}) {
+}: InvoiceFormProps) {
   const { announce } = useLiveActivity();
-  const qrCanvasRef = useRef(null);
+  const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [formData, setFormData] = useState({
     invoiceNumber: '',
     documentType: 'invoice',
@@ -128,11 +181,11 @@ export default function InvoiceForm({
     taxAmount: '0.00',
   });
 
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<InvoiceLineItem[]>([]);
   const stateRef = useRef({ formData, items });
-  const itemSuggestionsRef = useRef(null);
+  const itemSuggestionsRef = useRef<HTMLDivElement | null>(null);
   // Stable ID for this new-invoice session — generated once, reused across all auto-saves
-  const newInvoiceIdRef = useRef(null);
+  const newInvoiceIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     stateRef.current = { formData, items };
@@ -140,16 +193,17 @@ export default function InvoiceForm({
 
   // Close item suggestions when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const handleClickOutside = (event: Event) => {
+      const target = event.target as Node;
       if (
         itemSuggestionsRef.current &&
-        !itemSuggestionsRef.current.contains(event.target)
+        !itemSuggestionsRef.current.contains(target)
       ) {
         setItemSuggestions([]);
       }
       if (
         supplierSuggestionsRef.current &&
-        !supplierSuggestionsRef.current.contains(event.target)
+        !supplierSuggestionsRef.current.contains(target)
       ) {
         setSupplierSuggestions([]);
       }
@@ -172,18 +226,28 @@ export default function InvoiceForm({
   const [payStatus, setPayStatus] = useState('');
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [previewMode, setPreviewMode] = useState(false);
-  const [viesStatus, setViesStatus] = useState(null); // null | 'loading' | 'valid' | 'invalid'
-  const [savedItems, setSavedItems] = useState([]);
-  const [savedCustomers, setSavedCustomers] = useState([]);
-  const [itemSuggestions, setItemSuggestions] = useState([]);
-  const [customerSuggestions, setCustomerSuggestions] = useState([]);
+  const [viesStatus, setViesStatus] = useState<
+    'loading' | 'valid' | 'invalid' | null
+  >(null);
+  const [savedItems, setSavedItems] = useState<ItemSuggestion[]>([]);
+  const [savedCustomers, setSavedCustomers] = useState<CustomerSuggestion[]>([]);
+  const [itemSuggestions, setItemSuggestions] = useState<ItemSuggestion[]>([]);
+  const [customerSuggestions, setCustomerSuggestions] = useState<
+    CustomerSuggestion[]
+  >([]);
   const [customerActiveIndex, setCustomerActiveIndex] = useState(-1);
-  const [supplierSuggestions, setSupplierSuggestions] = useState([]);
-  const [saveTimer, setSaveTimer] = useState(null);
+  const [supplierSuggestions, setSupplierSuggestions] = useState<
+    CustomerSuggestion[]
+  >([]);
+  const [saveTimer, setSaveTimer] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
   const [aresAutoFilled, setAresAutoFilled] = useState(false);
   const [supplierAresAutoFilled, setSupplierAresAutoFilled] = useState(false);
-  const supplierSuggestionsRef = useRef(null);
-  const supplierAresDebounceRef = useRef(null);
+  const supplierSuggestionsRef = useRef<HTMLDivElement | null>(null);
+  const supplierAresDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   // ─── Effect 1: Load invoice data when selected invoice changes ────────────
   // ONLY this effect may call setItems — prevents items being wiped by unrelated state changes
@@ -198,35 +262,36 @@ export default function InvoiceForm({
     if (invoice) {
       // Opening an existing invoice for editing
       newInvoiceIdRef.current = null;
-      const ibanData = parseIban(invoice.payment.iban || '');
-      setFormData({
-        invoiceNumber: invoice.invoiceNumber,
+      const ibanData = parseIban(invoice.payment?.iban || '');
+      setFormData((prev) => ({
+        ...prev,
+        invoiceNumber: invoice.invoiceNumber || '',
         documentType: invoice.documentType || 'invoice',
-        issueDate: invoice.issueDate,
+        issueDate: invoice.issueDate || '',
         dueDate: invoice.dueDate || '',
         taxableSupplyDate: invoice.taxableSupplyDate || '',
-        status: invoice.status,
+        status: invoice.status || 'draft',
         category: invoice.category || '',
-        clientName: invoice.client.name,
-        clientEmail: invoice.client.email || '',
-        clientEmailCopy: invoice.client.emailCopy || '',
-        clientPhone: invoice.client.phone || '',
-        clientArea: invoice.client.area || '',
-        clientIco: invoice.client.ico || '',
-        clientVat: invoice.client.vat || '',
-        clientAddress: invoice.client.address || '',
-        clientCountry: invoice.client.country || 'CZ',
-        currency: invoice.currency,
+        clientName: invoice.client?.name || '',
+        clientEmail: invoice.client?.email || '',
+        clientEmailCopy: invoice.client?.emailCopy || '',
+        clientPhone: invoice.client?.phone || '',
+        clientArea: invoice.client?.area || '',
+        clientIco: invoice.client?.ico || '',
+        clientVat: invoice.client?.vat || '',
+        clientAddress: invoice.client?.address || '',
+        clientCountry: invoice.client?.country || 'CZ',
+        currency: invoice.currency || 'CZK',
         amount: money(invoice.amount),
-        iban: invoice.payment.iban || '',
-        bic: invoice.payment.bic || '',
-        paymentNote: invoice.payment.note || '',
+        iban: invoice.payment?.iban || '',
+        bic: invoice.payment?.bic || '',
+        paymentNote: invoice.payment?.note || '',
         accountNumber: ibanData?.accountNumber || '',
         bankCode: ibanData?.bankCode || '',
         prefix: ibanData?.prefix || '',
         variableSymbol:
-          invoice.payment.variableSymbol ||
-          invoice.invoiceNumber.replace(/\D/g, ''),
+          invoice.payment?.variableSymbol ||
+          (invoice.invoiceNumber || '').replace(/\D/g, ''),
         supplierName: invoice.supplier?.name || '',
         supplierIco: invoice.supplier?.ico || '',
         supplierVat: invoice.supplier?.vat || '',
@@ -236,10 +301,10 @@ export default function InvoiceForm({
         supplierEmail: invoice.supplier?.email || '',
         supplierWebsite: invoice.supplier?.website || '',
         isVatPayer: invoice.isVatPayer || false,
-        taxBase: invoice.taxBase || '0.00',
-        taxRate: invoice.taxRate || '21',
-        taxAmount: invoice.taxAmount || '0.00',
-      });
+        taxBase: String(invoice.taxBase || '0.00'),
+        taxRate: String(invoice.taxRate || '21'),
+        taxAmount: String(invoice.taxAmount || '0.00'),
+      }));
       setItems(invoice.items || []);
     } else {
       // Switching to new invoice mode — reset everything
@@ -248,6 +313,7 @@ export default function InvoiceForm({
       }
       const today = new Date();
       setFormData((prev) => ({
+        ...prev,
         // Keep only layout/supplier defaults, reset client/invoice-specific fields
         invoiceNumber: prev.invoiceNumber || '...',
         documentType: 'invoice',
@@ -431,10 +497,10 @@ export default function InvoiceForm({
   useEffect(() => {
     const calculatedTotals = items.reduce(
       (acc, item) => {
-        const qty = parseFloat(item.qty) || 0;
-        const price = parseFloat(item.price) || 0;
-        const taxRate = parseFloat(item.taxRate) || 0;
-        const discount = parseFloat(item.discount) || 0;
+        const qty = parseFloat(String(item.qty)) || 0;
+        const price = parseFloat(String(item.price)) || 0;
+        const taxRate = parseFloat(String(item.taxRate)) || 0;
+        const discount = parseFloat(String(item.discount)) || 0;
 
         const subtotal = qty * price;
         const afterDiscount = subtotal - discount;
@@ -459,7 +525,7 @@ export default function InvoiceForm({
   }, [items]);
 
   useEffect(() => {
-    let updates = {};
+    const updates: { bic?: string; iban?: string } = {};
     if (formData.bankCode) {
       const bankInfo = BANK_CODES[formData.bankCode];
       if (bankInfo?.bic && bankInfo.bic !== formData.bic) {
@@ -544,7 +610,7 @@ export default function InvoiceForm({
     currentItems = items,
   ) => {
     return {
-      id: invoice?.id || newInvoiceIdRef.current,
+      id: invoice?.id || newInvoiceIdRef.current || randomUUID(),
       invoiceNumber: currentFormData.invoiceNumber.trim(),
       documentType: currentFormData.documentType || 'invoice',
       issueDate: currentFormData.issueDate,
@@ -599,7 +665,7 @@ export default function InvoiceForm({
     };
   };
 
-  const handleDocTypeChange = (e) => {
+  const handleDocTypeChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const documentType = e.target.value as DocumentType;
     setFormData((prev) => {
       // Existing invoices keep their issued number; only re-prefix drafts.
@@ -631,7 +697,7 @@ export default function InvoiceForm({
     };
   }, []);
 
-  const handleSelectBankAccount = (e) => {
+  const handleSelectBankAccount = (e: ChangeEvent<HTMLSelectElement>) => {
     const account = bankAccounts.find((a) => a.id === e.target.value);
     if (!account) return;
     setFormData((prev) => ({
@@ -643,20 +709,20 @@ export default function InvoiceForm({
     }));
   };
 
-  const handlePasteBank = (e) => {
+  const handlePasteBank = (e: ClipboardEvent<HTMLInputElement>) => {
     const text = e.clipboardData.getData('text').trim();
     if (!text) return;
     const cleanIban = text.replace(/\s/g, '').toUpperCase();
     if (/^[A-Z]{2}\d{10,}/.test(cleanIban)) {
       e.preventDefault();
       const parsed = parseIban(cleanIban);
-      const bankInfo = BANK_CODES[parsed.bankCode];
+      const bankInfo = parsed ? BANK_CODES[parsed.bankCode] : undefined;
       setFormData((prev) => ({
         ...prev,
         iban: cleanIban,
-        bankCode: parsed.bankCode || prev.bankCode,
-        prefix: parsed.prefix || prev.prefix,
-        accountNumber: parsed.accountNumber || prev.accountNumber,
+        bankCode: parsed?.bankCode || prev.bankCode,
+        prefix: parsed?.prefix || prev.prefix,
+        accountNumber: parsed?.accountNumber || prev.accountNumber,
         bic: bankInfo?.bic || prev.bic,
       }));
       return;
@@ -676,14 +742,16 @@ export default function InvoiceForm({
     }
   };
 
-  const handleChange = (e) => {
+  const handleChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   // Czech account numbers may carry an optional prefix ("19-2000145399").
   // Split it so calculateIban() receives prefix + base number separately.
-  const handleAccountNumberChange = (e) => {
+  const handleAccountNumberChange = (e: ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     if (raw.includes('-')) {
       const [prefix, account = ''] = raw.split('-');
@@ -702,9 +770,9 @@ export default function InvoiceForm({
   };
 
   // Debounce reference for ARES
-  const aresDebounceRef = useRef(null);
+  const aresDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleClientNameChange = (e) => {
+  const handleClientNameChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setFormData((prev) => ({ ...prev, clientName: value }));
     setAresAutoFilled(false);
@@ -713,9 +781,10 @@ export default function InvoiceForm({
     if (value.trim().length > 0) {
       // 1. Saved Customers (Instant) — match ignoring spaces so "skillnav",
       // "Skill Nav" and "Skill  Nav" all find "Skill Nav s.r.o.".
-      const normalize = (s) => (s || '').replace(/\s+/g, '').toLowerCase();
+      const normalize = (s?: string) =>
+        (s || '').replace(/\s+/g, '').toLowerCase();
       const needle = normalize(value);
-      const matches = savedCustomers
+      const matches: CustomerSuggestion[] = savedCustomers
         .filter((c) => normalize(c.name).includes(needle))
         .slice(0, 5)
         .map((c) => ({ ...c, source: 'saved' }));
@@ -724,21 +793,19 @@ export default function InvoiceForm({
       // 2. ARES/RPO Search (Debounced)
       if (value.trim().length >= 3) {
         if (aresDebounceRef.current) clearTimeout(aresDebounceRef.current);
+        const isSk = formData.clientCountry === 'SK';
         aresDebounceRef.current = setTimeout(() => {
-          const searchFn =
-            formData.clientCountry === 'SK' ? searchRpo : searchAres;
-          searchFn(value).then((results) => {
-            const matches = results.map((item) => {
-              const parsed =
-                formData.clientCountry === 'SK' ? item : parseAresItem(item);
-              return {
-                ...parsed,
-                source: formData.clientCountry === 'SK' ? 'rpo' : 'ares',
-              };
+          const lookup = isSk ? searchRpo(value) : searchAres(value);
+          lookup.then((results: unknown[]) => {
+            const newMatches: CustomerSuggestion[] = results.map((item) => {
+              const parsed = isSk
+                ? (item as CustomerSuggestion)
+                : parseAresItem(item as Parameters<typeof parseAresItem>[0]);
+              return { ...parsed, source: isSk ? 'rpo' : 'ares' };
             });
             setCustomerSuggestions((prev) => {
               const existingNames = new Set(prev.map((p) => p.name));
-              const newResults = matches
+              const newResults = newMatches
                 .filter((a) => !existingNames.has(a.name))
                 .slice(0, 3);
               return [...prev, ...newResults];
@@ -751,10 +818,10 @@ export default function InvoiceForm({
     }
   };
 
-  const handleSelectCustomer = (customer) => {
+  const handleSelectCustomer = (customer: CustomerSuggestion) => {
     setFormData((prev) => ({
       ...prev,
-      clientName: customer.name,
+      clientName: customer.name || '',
       clientEmail: customer.email || '',
       clientEmailCopy: customer.emailCopy || '',
       clientPhone: customer.phone || '',
@@ -773,7 +840,7 @@ export default function InvoiceForm({
 
   // Keyboard navigation for the subscriber suggestions dropdown: arrows to move,
   // Enter to pick the highlighted (or first) result, Escape to dismiss.
-  const handleClientNameKeyDown = (e) => {
+  const handleClientNameKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (customerSuggestions.length === 0) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -793,7 +860,7 @@ export default function InvoiceForm({
     }
   };
 
-  const handleSupplierNameChange = (e) => {
+  const handleSupplierNameChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setFormData((prev) => ({ ...prev, supplierName: value }));
     setSupplierAresAutoFilled(false);
@@ -801,10 +868,15 @@ export default function InvoiceForm({
       if (supplierAresDebounceRef.current)
         clearTimeout(supplierAresDebounceRef.current);
       supplierAresDebounceRef.current = setTimeout(async () => {
-        const results = await searchAres(value);
+        const results = (await searchAres(value)) as unknown[];
         setSupplierSuggestions(
           results
-            .map((item) => ({ ...parseAresItem(item), source: 'ares' }))
+            .map(
+              (item): CustomerSuggestion => ({
+                ...parseAresItem(item as Parameters<typeof parseAresItem>[0]),
+                source: 'ares',
+              }),
+            )
             .slice(0, 5),
         );
       }, 500);
@@ -813,7 +885,7 @@ export default function InvoiceForm({
     }
   };
 
-  const handleSupplierIcoChange = async (e) => {
+  const handleSupplierIcoChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setFormData((prev) => ({ ...prev, supplierIco: value }));
     if (/^\d{8}$/.test(value.trim())) {
@@ -831,7 +903,7 @@ export default function InvoiceForm({
     }
   };
 
-  const handleSelectSupplier = (entity) => {
+  const handleSelectSupplier = (entity: CustomerSuggestion) => {
     setFormData((prev) => ({
       ...prev,
       supplierName: entity.name || prev.supplierName,
@@ -911,12 +983,14 @@ export default function InvoiceForm({
 
   const handleClearItems = () => setItems([]);
 
-  const handleItemNameChange = (value) => {
+  const handleItemNameChange = (value: string) => {
     setItemInput((prev) => ({ ...prev, name: value }));
     if (value.trim().length > 0) {
       const itemsToFilter = Array.isArray(savedItems) ? savedItems : [];
       const matches = itemsToFilter
-        .filter((item) => item.name.toLowerCase().includes(value.toLowerCase()))
+        .filter((item) =>
+          (item.name || '').toLowerCase().includes(value.toLowerCase()),
+        )
         .slice(0, 5);
       setItemSuggestions(matches);
     } else {
@@ -924,17 +998,17 @@ export default function InvoiceForm({
     }
   };
 
-  const handleSelectSuggestion = (item) => {
+  const handleSelectSuggestion = (item: ItemSuggestion) => {
     setItemInput((prev) => ({
       ...prev,
-      name: item.name,
-      price: item.price || 0,
-      taxRate: item.taxRate || '21',
+      name: item.name || '',
+      price: String(item.price ?? ''),
+      taxRate: String(item.taxRate ?? '21'),
     }));
     setItemSuggestions([]);
   };
 
-  const handleDeleteRow = (index) => {
+  const handleDeleteRow = (index: number) => {
     setItems((prev) => prev.filter((_, i) => i !== index));
     announce({
       kind: 'info',
@@ -990,7 +1064,7 @@ export default function InvoiceForm({
     );
   };
 
-  const handleItemTotalChange = (e) => {
+  const handleItemTotalChange = (e: ChangeEvent<HTMLInputElement>) => {
     const newTotalStr = e.target.value;
     const newTotal = Number(newTotalStr);
 
@@ -1022,7 +1096,7 @@ export default function InvoiceForm({
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     // Ensure we use the very latest state from stateRef for saving
     const data = stateRef.current;
@@ -1051,7 +1125,7 @@ export default function InvoiceForm({
     });
   };
 
-  const handleAresData = (data) => {
+  const handleAresData = (data: CustomerSuggestion) => {
     setFormData((prev) => ({
       ...prev,
       clientName: data.name || prev.clientName,
@@ -1625,28 +1699,30 @@ export default function InvoiceForm({
         {/* Page header */}
         <div className='ap-page__head'>
           <div>
-            <div className='invoice-form-mobile-tabs' role='tablist'>
-              <button
-                className='invoice-form-mobile-tabs__tab invoice-form-mobile-tabs__tab--active'
-                type='button'
-                role='tab'
-                aria-selected='true'
-                onClick={onShowInvoiceForm}
-              >
-                <FileText size={ICON_SM} strokeWidth={STROKE} />
-                <span>{lang === 'cs' ? 'Faktura' : 'Invoice form'}</span>
-              </button>
-              <button
-                className='invoice-form-mobile-tabs__tab'
-                type='button'
-                role='tab'
-                aria-selected='false'
-                onClick={onOpenDashboard}
-              >
-                <BarChart2 size={ICON_SM} strokeWidth={STROKE} />
-                <span>{lang === 'cs' ? 'Přehled' : 'Invoice dashboard'}</span>
-              </button>
-            </div>
+            {onShowInvoiceForm && onOpenDashboard && (
+              <div className='invoice-form-mobile-tabs' role='tablist'>
+                <button
+                  className='invoice-form-mobile-tabs__tab invoice-form-mobile-tabs__tab--active'
+                  type='button'
+                  role='tab'
+                  aria-selected='true'
+                  onClick={onShowInvoiceForm}
+                >
+                  <FileText size={ICON_SM} strokeWidth={STROKE} />
+                  <span>{lang === 'cs' ? 'Faktura' : 'Invoice form'}</span>
+                </button>
+                <button
+                  className='invoice-form-mobile-tabs__tab'
+                  type='button'
+                  role='tab'
+                  aria-selected='false'
+                  onClick={onOpenDashboard}
+                >
+                  <BarChart2 size={ICON_SM} strokeWidth={STROKE} />
+                  <span>{lang === 'cs' ? 'Přehled' : 'Invoice dashboard'}</span>
+                </button>
+              </div>
+            )}
             <h1 className='ap-page__title'>
               {invoice
                 ? lang === 'cs'
