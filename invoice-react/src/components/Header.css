@@ -235,13 +235,6 @@
   }
 }
 
-/* Mobile logout button variant */
-.header__mobile-auth--logout {
-  background: var(--danger-soft) !important;
-  border: 1px solid var(--danger) !important;
-  color: var(--danger) !important;
-}
-
 /* ── User avatar ─────────────────────────────────────────── */
 .ap-avatar {
   width: 36px;
@@ -468,24 +461,72 @@
 
 /* ── Mobile Sheet ─────────────────────────────────────────── */
 .header__sheet {
-  background: color-mix(in oklab, var(--bg) 90%, transparent) !important;
-  backdrop-filter: blur(20px) !important;
+  /* Clamp to viewport so narrow phones never overflow */
+  width: min(288px, 100svw) !important;
+  max-width: 288px !important;
+  background: color-mix(in oklab, var(--bg) 94%, transparent) !important;
+  backdrop-filter: blur(24px) saturate(1.5) !important;
   border-left: 1px solid var(--border) !important;
   color: var(--text) !important;
+  overflow: hidden !important;
+  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.28) !important;
 }
-/* Mobile sheet body reuses the dropdown item styling so the hamburger
-   menu matches the desktop user dropdown. */
+
 .header__sheet-body {
-  overflow-y: auto;
-  padding-bottom: 12px;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  padding-top: 90px;
+  padding-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
+
+/* Every button in the sheet is full-width and left-aligned */
 .header__sheet-body .user-dropdown__item {
   width: 100%;
   background: transparent;
   border: 0;
   font: inherit;
   text-align: left;
+  justify-content: flex-start !important;
 }
+
 .header__sheet-body .user-dropdown__actions {
-  padding: 6px;
+  padding: 5px 8px;
+}
+
+/* Section blocks have consistent horizontal padding */
+.header__sheet-body .user-dropdown__section {
+  padding: 6px 8px 2px;
+  border-top: 1px solid var(--border);
+}
+
+/* User card fills the full sheet width */
+.header__sheet-body .user-dropdown__card {
+  padding: 16px 16px 14px;
+}
+
+/* Separator line */
+.header__sheet-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 0;
+  flex-shrink: 0;
+}
+.header__sheet-sep--inner {
+  margin: 2px 0;
+}
+
+/* Language toggle — full-width pill row */
+.header__sheet-lang {
+  display: flex !important;
+  width: 100% !important;
+  border-radius: 10px !important;
+}
+.header__sheet-lang .lp-lang__btn {
+  flex: 1 !important;
+  text-align: center !important;
+  padding: 8px 0 !important;
+  border-radius: 7px !important;
 }

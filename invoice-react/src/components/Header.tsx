@@ -26,7 +26,6 @@ import {
   RefreshCw,
   Wallet,
   Contact,
-  Clock,
   FileText,
   Loader2,
   Mic,
@@ -41,12 +40,6 @@ interface CompanyProfile {
   id: string;
   name: string;
   supplier: Record<string, unknown>;
-}
-
-interface RecentInvoice {
-  id: string;
-  invoiceNumber: string;
-  clientName: string;
 }
 
 interface HeaderProps {
@@ -68,8 +61,6 @@ interface HeaderProps {
   dashboardOpen?: boolean;
   defaultSupplier?: Record<string, unknown> | null;
   setDefaultSupplier?: (supplier: Record<string, unknown>) => void;
-  recentInvoices?: RecentInvoice[];
-  onOpenInvoice?: (id: string) => void;
   narration?: ScreenNarration | null;
 }
 
@@ -90,8 +81,6 @@ export default function Header({
   dashboardOpen = false,
   defaultSupplier = null,
   setDefaultSupplier,
-  recentInvoices = [],
-  onOpenInvoice,
   narration = null,
 }: HeaderProps) {
   const { liveActivity, settingsTab, announce } = useLiveActivity();
@@ -521,31 +510,6 @@ export default function Header({
                     </DropdownMenuItem>
                   </div>
                 )}
-                {user && recentInvoices.length > 0 && (
-                  <div className='user-dropdown__section'>
-                    <div className='user-dropdown__section-label'>
-                      <Clock size={12} strokeWidth={2} />
-                      {isCz ? 'Naposledy otevřené' : 'Recent'}
-                    </div>
-                    {recentInvoices.slice(0, 4).map((r) => (
-                      <DropdownMenuItem
-                        key={r.id}
-                        onClick={() => onOpenInvoice?.(r.id)}
-                        className='user-dropdown__item user-dropdown__item--compact'
-                      >
-                        <FileText
-                          size={14}
-                          strokeWidth={2}
-                          className='user-dropdown__item-icon'
-                        />
-                        <span className='user-dropdown__recent-text'>
-                          {r.invoiceNumber || (isCz ? 'Faktura' : 'Invoice')}
-                          {r.clientName ? ` · ${r.clientName}` : ''}
-                        </span>
-                      </DropdownMenuItem>
-                    ))}
-                  </div>
-                )}
                 <DropdownMenuSeparator className='user-dropdown__separator' />
                 <div className='user-dropdown__actions'>
                   {user && (
@@ -655,16 +619,23 @@ export default function Header({
             </DropdownMenu>
           </div>
 
-          {/* Mobile hamburger */}
+          {/* Mobile hamburger — toggles the sheet open/closed */}
           <button
             className='lp-icon-toggle header-mobile-menu'
             onClick={() => {
-              setMobileMenuOpen(true);
-              announce({ kind: 'info', label: isCz ? 'Nabídka' : 'Menu' });
+              const next = !mobileMenuOpen;
+              setMobileMenuOpen(next);
+              if (next)
+                announce({ kind: 'info', label: isCz ? 'Nabídka' : 'Menu' });
             }}
-            aria-label='Menu'
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileMenuOpen}
           >
-            <Menu size={18} strokeWidth={2} />
+            {mobileMenuOpen ? (
+              <X size={18} strokeWidth={2} />
+            ) : (
+              <Menu size={18} strokeWidth={2} />
+            )}
           </button>
         </div>
       </div>
@@ -673,19 +644,16 @@ export default function Header({
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
         <SheetContent
           side='right'
-          className='flex flex-col gap-0 p-0 w-[300px] header__sheet'
+          showCloseButton={false}
+          className='flex flex-col gap-0 p-0 header__sheet'
         >
-          <SheetHeader
-            className='px-6 py-5 border-b'
-            style={{ borderColor: 'var(--border)' }}
-          >
-            <SheetTitle style={{ color: 'var(--text)', fontWeight: 700 }}>
-              Menu
-            </SheetTitle>
+          {/* Visually hidden title keeps the dialog accessible */}
+          <SheetHeader className='sr-only'>
+            <SheetTitle>Menu</SheetTitle>
           </SheetHeader>
 
           <div className='header__sheet-body flex flex-col flex-1'>
-            {/* User identity card — mirrors the desktop dropdown */}
+            {/* User identity card — identical to the desktop dropdown */}
             {user ? (
               <div className='user-dropdown__card'>
                 <div className='user-dropdown__avatar'>
@@ -718,7 +686,9 @@ export default function Header({
               </div>
             )}
 
-            {/* Primary navigation */}
+            <div className='header__sheet-sep' />
+
+            {/* Primary navigation (mobile-only nav links) */}
             <div className='user-dropdown__actions'>
               <button
                 className='user-dropdown__item'
@@ -815,37 +785,9 @@ export default function Header({
               </div>
             )}
 
-            {/* Recent invoices */}
-            {user && recentInvoices.length > 0 && (
-              <div className='user-dropdown__section'>
-                <div className='user-dropdown__section-label'>
-                  <Clock size={12} strokeWidth={2} />
-                  {isCz ? 'Naposledy otevřené' : 'Recent'}
-                </div>
-                {recentInvoices.slice(0, 4).map((r) => (
-                  <button
-                    key={r.id}
-                    className='user-dropdown__item user-dropdown__item--compact'
-                    onClick={() => {
-                      onOpenInvoice?.(r.id);
-                      setMobileMenuOpen(false);
-                    }}
-                  >
-                    <FileText
-                      size={14}
-                      strokeWidth={2}
-                      className='user-dropdown__item-icon'
-                    />
-                    <span className='user-dropdown__recent-text'>
-                      {r.invoiceNumber || (isCz ? 'Faktura' : 'Invoice')}
-                      {r.clientName ? ` · ${r.clientName}` : ''}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className='header__sheet-sep' />
 
-            {/* Account actions */}
+            {/* Account actions — mirrors the desktop dropdown actions section */}
             <div className='user-dropdown__actions'>
               {user && (
                 <button
@@ -929,84 +871,73 @@ export default function Header({
                 </button>
               )}
             </div>
-          </div>
 
-          <div
-            className='flex flex-col gap-4 px-6 py-6 border-t'
-            style={{ borderColor: 'var(--border)' }}
-          >
-            <div>
-              <p className='text-xs font-semibold mb-2 text-center opacity-60 uppercase tracking-wider'>
-                {isCz ? 'Jazyk' : 'Language'}
-              </p>
-              <div
-                className='lp-lang'
-                style={{ width: '100%', borderRadius: 12 }}
-              >
+            <div className='header__sheet-sep header__sheet-sep--inner' />
+
+            {/* Sign in / out — inline item, matches desktop dropdown style */}
+            <div className='user-dropdown__actions'>
+              {user ? (
+                <button
+                  className='user-dropdown__item user-dropdown__item--danger'
+                  onClick={() => {
+                    announce({
+                      kind: 'info',
+                      label: isCz ? 'Odhlášení…' : 'Signing out…',
+                    });
+                    onLogout();
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  <X size={15} strokeWidth={2} style={{ flexShrink: 0 }} />
+                  <span>{isCz ? 'Odhlásit se' : 'Sign out'}</span>
+                </button>
+              ) : (
+                <button
+                  className='user-dropdown__item user-dropdown__item--signin'
+                  onClick={() => {
+                    announce({
+                      kind: 'processing',
+                      label: isCz ? 'Přihlašování…' : 'Signing in…',
+                    });
+                    handleLogin();
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  <span className='user-dropdown__signin-letter'>G</span>
+                  <span>
+                    {isCz ? 'Přihlásit se přes Google' : 'Sign in with Google'}
+                  </span>
+                </button>
+              )}
+            </div>
+
+            <div className='header__sheet-sep header__sheet-sep--inner' />
+
+            {/* Language toggle — compact CS/EN pills matching the desktop header toggle */}
+            <div className='user-dropdown__actions'>
+              <div className='lp-lang header__sheet-lang'>
                 <button
                   className={`lp-lang__btn${lang === 'cs' ? ' lp-lang__btn--active' : ''}`}
-                  style={{ flex: 1, textAlign: 'center', padding: '8px 0' }}
                   onClick={() => {
                     setLang('cs');
                     announce({ kind: 'info', label: 'Čeština' });
                     setMobileMenuOpen(false);
                   }}
                 >
-                  CS — Čeština
+                  CS
                 </button>
                 <button
                   className={`lp-lang__btn${lang === 'en' ? ' lp-lang__btn--active' : ''}`}
-                  style={{ flex: 1, textAlign: 'center', padding: '8px 0' }}
                   onClick={() => {
                     setLang('en');
                     announce({ kind: 'info', label: 'English' });
                     setMobileMenuOpen(false);
                   }}
                 >
-                  EN — English
+                  EN
                 </button>
               </div>
             </div>
-
-            {user && (
-              <p className='text-xs text-center opacity-60'>
-                {isCz ? 'Přihlášen jako' : 'Logged in as'}:{' '}
-                <strong>{user.email}</strong>
-              </p>
-            )}
-
-            <button
-              className={`lp-btn lp-btn--lg ${user ? 'header__mobile-auth--logout' : 'lp-btn--primary'}`}
-              style={{ justifyContent: 'center', width: '100%' }}
-              onClick={() => {
-                if (user) {
-                  announce({
-                    kind: 'info',
-                    label: isCz ? 'Odhlášení…' : 'Signing out…',
-                  });
-                  onLogout();
-                } else {
-                  announce({
-                    kind: 'processing',
-                    label: isCz ? 'Přihlašování…' : 'Signing in…',
-                  });
-                  handleLogin();
-                }
-                setMobileMenuOpen(false);
-              }}
-            >
-              {user ? (
-                <>
-                  <X size={ICON_SM} strokeWidth={2} />{' '}
-                  {isCz ? 'Odhlásit se' : 'Log out'}
-                </>
-              ) : (
-                <>
-                  <span style={{ fontWeight: 800, marginRight: 6 }}>G</span>{' '}
-                  {isCz ? 'Přihlásit se přes Google' : 'Sign in with Google'}
-                </>
-              )}
-            </button>
           </div>
         </SheetContent>
       </Sheet>
