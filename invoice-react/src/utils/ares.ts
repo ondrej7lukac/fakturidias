@@ -1,16 +1,24 @@
 export async function searchAres(query) {
-    const trimmed = query.trim()
+    // Collapse internal whitespace and trim — tolerate sloppy paste/typing.
+    const trimmed = (query || '').trim().replace(/\s+/g, ' ')
     if (trimmed.length < 3) return []
 
-    const isIco = /^\d+$/.test(trimmed)
+    // Treat "mostly numeric" input (digits possibly separated by spaces, dots,
+    // dashes or slashes) as an IČO. A Czech IČO is 8 digits; users often paste it
+    // with spaces ("123 456 78") or drop a leading zero, so normalize + zero-pad.
+    const isMostlyNumeric = /^[\d\s.\-/]+$/.test(trimmed)
+    const digitsOnly = trimmed.replace(/\D/g, '')
+    const isIco = isMostlyNumeric && digitsOnly.length >= 6 && digitsOnly.length <= 8
+    const ico = isIco ? digitsOnly.padStart(8, '0') : undefined
+
     try {
         const response = await fetch('/api/ares/search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 obchodniJmeno: isIco ? undefined : trimmed,
-                ico: isIco ? trimmed : undefined,
-                pocet: 5,
+                ico,
+                pocet: 8,
                 strana: 1
             })
         })

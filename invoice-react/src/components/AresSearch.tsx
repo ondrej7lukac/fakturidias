@@ -1,10 +1,10 @@
 import './AresSearch.css';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Sparkles } from '@/lib/icons';
+import { Sparkles, Loader2, Search, ICON_SM, STROKE } from '@/lib/icons';
 import { debounce } from '../utils/storage';
 import { useLiveActivity } from '@/contexts/activity';
-import { searchAres, lookupAresByIco, formatAresAddress } from '../utils/ares';
-import { searchRpo, lookupRpoByIco } from '../utils/rpo';
+import { searchAres, formatAresAddress } from '../utils/ares';
+import { searchRpo } from '../utils/rpo';
 
 interface AresEntity {
   obchodniJmeno?: string;
@@ -40,6 +40,8 @@ export default function AresSearch({
   const [status, setStatus] = useState(t.aresPlaceholder);
   const [results, setResults] = useState<AresEntity[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [selectedEntity, setSelectedEntity] = useState<{
     name: string;
     ico: string;
@@ -50,63 +52,116 @@ export default function AresSearch({
       : null,
   );
   const initialMountRef = useRef(true);
+  const rootRef = useRef<HTMLDivElement>(null);
   const { announce } = useLiveActivity();
 
-  const searchAresLocal = async (query: string) => {
-    const trimmed = query?.trim() || '';
+  // Prefer a complete-looking IČO over the name when deciding what to search.
+  const icoDigits = (clientIco || '').replace(/\D/g, '');
+  const icoReady =
+    /^[\d\s.\-/]*$/.test(clientIco || '') &&
+    icoDigits.length >= 6 &&
+    icoDigits.length <= 8;
+  const query = icoReady ? icoDigits : clientName;
+
+  const searchAresLocal = async (raw: string) => {
+    const trimmed = raw?.trim() || '';
     if (trimmed.length < 3) {
       setShowResults(false);
-      if (trimmed.length === 0 && !selectedEntity) setSelectedEntity(null);
+      setSearching(false);
       return;
     }
+    setSearching(true);
     setStatus(t.aresSearching);
     announce({ kind: 'scanning', label: t.aresSearching || 'Searching…' });
     try {
       const resultsCandidate =
         region === 'SK' ? await searchRpo(trimmed) : await searchAres(trimmed);
       setResults(resultsCandidate);
+      setActiveIndex(-1);
+      setShowResults(true);
       if (resultsCandidate.length > 0) {
-        setShowResults(true);
         setStatus(t.aresSelect);
         announce({ kind: 'info', label: t.aresSelect || 'Results found' });
       } else {
-        setShowResults(false);
         setStatus(t.aresNotFound);
         announce({ kind: 'info', label: t.aresNotFound || 'Not found' });
       }
     } catch (error) {
+      setShowResults(false);
       setStatus(t.aresError);
       announce({ kind: 'error', label: t.aresError || 'Search error' });
+    } finally {
+      setSearching(false);
     }
   };
 
   const debouncedSearch = useCallback(
-    debounce((query) => searchAresLocal(query), 400),
-    [],
+    debounce((q: string) => searchAresLocal(q), 400),
+    [region],
   );
 
   useEffect(() => {
-    if (!initialMountRef.current && !selectedEntity)
-      debouncedSearch(clientName);
-    initialMountRef.current = false;
-  }, [clientName, selectedEntity]);
+    if (initialMountRef.current) {
+      initialMountRef.current = false;
+      return;
+    }
+    if (!selectedEntity) debouncedSearch(query);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, selectedEntity]);
+
+  // Dismiss the results dropdown when clicking outside the component.
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const applyAresEntity = (entity: AresEntity) => {
-    const name = entity.obchodniJmeno || entity.nazev || entity.name || '';
-    const address =
+    const name = (
+      entity.obchodniJmeno ||
+      entity.nazev ||
+      entity.name ||
+      ''
+    ).trim();
+    const address = (
       entity.adresa ||
       entity.textovaAdresa ||
       entity.address ||
-      (entity.sidlo ? formatAresAddress(entity.sidlo) : '');
-    const ico = entity.ico || '';
+      (entity.sidlo ? formatAresAddress(entity.sidlo) : '') ||
+      ''
+    ).trim();
+    const ico = (entity.ico || '').trim();
     onAresData({ ...entity, name, address, ico });
     setSelectedEntity({ name, ico, address });
     setShowResults(false);
+    setActiveIndex(-1);
     announce({ kind: 'done', label: name ? `${name}` : 'Firma vybrána' });
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showResults || results.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((i) => (i + 1) % results.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((i) => (i <= 0 ? results.length - 1 : i - 1));
+    } else if (e.key === 'Enter') {
+      if (activeIndex >= 0 && activeIndex < results.length) {
+        e.preventDefault();
+        applyAresEntity(results[activeIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setShowResults(false);
+    }
+  };
+
   return (
-    <div className='ares-v3-root'>
+    <div className='ares-v3-root' ref={rootRef}>
       {!selectedEntity ? (
         <>
           <div className='settings-v3-form-grid'>
@@ -115,8 +170,15 @@ export default function AresSearch({
               <input
                 value={clientName}
                 onChange={(e) => onClientNameChange(e.target.value)}
-                placeholder='Vyhledat firmu...'
+                onKeyDown={handleKeyDown}
+                onFocus={() => {
+                  if (results.length > 0) setShowResults(true);
+                }}
+                placeholder={t.aresPlaceholder || 'Vyhledat firmu...'}
                 autoComplete='off'
+                role='combobox'
+                aria-expanded={showResults}
+                aria-autocomplete='list'
               />
             </div>
             <div className='settings-v3-field'>
@@ -124,24 +186,48 @@ export default function AresSearch({
               <input
                 value={clientIco}
                 onChange={(e) => onClientIcoChange(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder='IČO'
+                inputMode='numeric'
                 autoComplete='off'
               />
             </div>
           </div>
-          {showResults && (
-            <div className='ares-results-list'>
+
+          {searching && (
+            <div className='ares-results-status'>
+              <Loader2
+                size={ICON_SM}
+                strokeWidth={STROKE}
+                className='ares-spin'
+              />
+              {t.aresSearching || 'Searching…'}
+            </div>
+          )}
+
+          {!searching && showResults && results.length === 0 && query.trim().length >= 3 && (
+            <div className='ares-results-status ares-results-status--empty'>
+              <Search size={ICON_SM} strokeWidth={STROKE} />
+              {t.aresNotFound || 'No results found.'}
+            </div>
+          )}
+
+          {!searching && showResults && results.length > 0 && (
+            <div className='ares-results-list' role='listbox'>
               {results.map((item, index) => (
                 <button
                   key={index}
                   type='button'
-                  className='ares-result-item'
+                  className={`ares-result-item${index === activeIndex ? ' ares-result-item--active' : ''}`}
+                  role='option'
+                  aria-selected={index === activeIndex}
+                  onMouseEnter={() => setActiveIndex(index)}
                   onClick={() => applyAresEntity(item)}
                 >
-                  <div style={{ fontWeight: 600 }}>
+                  <div className='ares-result-name'>
                     {item.obchodniJmeno || item.nazev || item.name}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+                  <div className='ares-result-meta'>
                     IČO: {item.ico} • {item.adresa || item.address}
                   </div>
                 </button>
@@ -150,33 +236,19 @@ export default function AresSearch({
           )}
         </>
       ) : (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
+        <div className='ares-selected'>
           <div>
-            <div
-              style={{
-                fontWeight: 700,
-                color: 'var(--accent)',
-                fontSize: '1.1rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
-              <Sparkles size={16} strokeWidth={2} />
+            <div className='ares-selected__name'>
+              <Sparkles size={ICON_SM} strokeWidth={STROKE} />
               {selectedEntity.name}
             </div>
-            <div style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>
+            <div className='ares-selected__meta'>
               IČO: {selectedEntity.ico} • {selectedEntity.address}
             </div>
           </div>
           <button
             className='settings-v3-edit-link'
+            type='button'
             onClick={() => {
               setSelectedEntity(null);
               setResults([]);
@@ -184,7 +256,7 @@ export default function AresSearch({
               announce({ kind: 'info', label: 'Změna firmy' });
             }}
           >
-            Změnit firmu
+            {t.aresChange || 'Změnit firmu'}
           </button>
         </div>
       )}
