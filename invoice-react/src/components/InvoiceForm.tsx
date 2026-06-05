@@ -666,14 +666,20 @@ export default function InvoiceForm({
       amount: savedItems.reduce((sum, item) => sum + item.total, 0),
       payment: {
         iban: currentFormData.iban.trim(),
-        bic: currentFormData.bic.trim(),
+        // Persist a valid contiguous SWIFT/BIC regardless of source (manual
+        // masked entry or the spaced values in BANK_CODES); the spacing is a
+        // display-only concern.
+        bic: currentFormData.bic.replace(/[^A-Za-z0-9]/g, '').toUpperCase(),
         note: currentFormData.paymentNote.trim(),
         accountNumber: currentFormData.accountNumber,
         bankCode: currentFormData.bankCode,
         prefix: currentFormData.prefix || '',
-        variableSymbol:
-          currentFormData.variableSymbol ||
-          currentFormData.invoiceNumber.replace(/\D/g, '').slice(0, 10),
+        // Normalize both branches so no path can persist an invalid VS.
+        variableSymbol: (
+          currentFormData.variableSymbol || currentFormData.invoiceNumber
+        )
+          .replace(/\D/g, '')
+          .slice(0, 10),
       },
       supplier: {
         name: currentFormData.supplierName.trim(),
