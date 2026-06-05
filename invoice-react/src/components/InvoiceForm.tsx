@@ -529,6 +529,9 @@ export default function InvoiceForm({
 
   // Always keep at least one empty line item ready in the editor so users never
   // face an empty Items card (item 12). Blank rows are filtered out on save.
+  // NOTE: This effect intentionally calls setItems() as an exception to the
+  // "only the invoice-load effect sets items" invariant, purely to guarantee a
+  // single placeholder row when the list is empty.
   useEffect(() => {
     if (previewMode) return;
     if (items.length === 0) {
@@ -1460,7 +1463,9 @@ export default function InvoiceForm({
     currency: data.currency || prev.currency,
     dueDate: data.dueDate || prev.dueDate,
     issueDate: data.issueDate || prev.issueDate,
-    variableSymbol: data.variableSymbol || prev.variableSymbol,
+    variableSymbol: data.variableSymbol
+      ? String(data.variableSymbol).replace(/\D/g, '').slice(0, 10)
+      : prev.variableSymbol,
     paymentNote: data.paymentNote || prev.paymentNote,
     ...(data.supplierName ? { supplierName: data.supplierName } : {}),
     ...(data.supplierIco ? { supplierIco: data.supplierIco } : {}),

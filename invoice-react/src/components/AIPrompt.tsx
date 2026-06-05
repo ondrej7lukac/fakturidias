@@ -392,17 +392,22 @@ export default function AIPrompt({
     if (!preview) return;
     // Create invoice: persist immediately if the parent supports it, otherwise
     // fall back to just filling the form.
-    if (onCreate) onCreate(preview.data);
+    const didCreate = typeof onCreate === 'function';
+    if (didCreate) onCreate!(preview.data);
     else onFillForm(preview.data);
     setPreview(null);
     setPrompt('');
     setScanPreview(null);
     setError('');
-    setFilled('created');
-    onActivity?.({
-      kind: 'done',
-      label: isCz ? 'Faktura vytvořena' : 'Invoice created',
-    });
+    setFilled(didCreate ? 'created' : 'edited');
+    // The parent announces "Invoice created" on the create path; only announce
+    // here for the fill-only fallback to avoid a duplicate toast.
+    if (!didCreate) {
+      onActivity?.({
+        kind: 'done',
+        label: isCz ? 'Faktura vyplněna' : 'Invoice filled in',
+      });
+    }
   };
 
   // "Edit" populates the form too, then hands control to the form below so the
