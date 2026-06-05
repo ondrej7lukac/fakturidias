@@ -28,6 +28,7 @@ export interface InvoicePayment {
   note?: string;
   accountNumber?: string;
   bankCode?: string;
+  prefix?: string;
   variableSymbol?: string;
 }
 

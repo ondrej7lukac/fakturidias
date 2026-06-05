@@ -2,7 +2,25 @@
 const https = require('https');
 const { fetchAresByIco, fetchAresByName } = require('./ares');
 
-function buildSystemPrompt(lang = 'en') {
+// Czech VAT rate categories — guides per-item taxRate selection (item 8).
+const VAT_RATE_GUIDANCE = `VAT RATE SELECTION (Czech rates) — pick the taxRate per item from the goods/service it represents:
+- 21% (standard / "základní sazba"): professional & B2B services (IT, marketing, legal, consulting, accounting, design), general goods & retail (electronics, clothing, vehicles, machinery, fuel, furniture), alcoholic & soft drinks, standard commercial construction, SaaS / digital products & downloads.
+- 12% (reduced / "snížená sazba"): foodstuffs & agricultural products, animal feed, plants & seeds, tap water & sewage, district heating, residential/social housing construction & repairs, public passenger transport, taxi, hotel accommodation, tickets to cultural & sport venues, pharmaceuticals & medical devices, hairdressing & small repairs (shoes, bikes, clothing), newspapers, magazines & periodicals.
+- 0% (exempt with right to deduction): books, e-books and audiobooks (advertising content under 50%), and similar exempt supplies.
+Coffee, tea and food products are 12%. When unsure between 21% and 12%, prefer 21% for services and 12% for foodstuffs.`;
+
+// Supplier tax-status clause — makes the model honour the supplier's DPH status (item 9).
+function taxStatusClause(vatPayer) {
+    if (vatPayer === false) {
+        return `SUPPLIER TAX STATUS: The supplier is NOT a VAT payer (neplátce DPH).
+- Set taxRate to 0 for EVERY item, regardless of the goods or whether the user mentions VAT.`;
+    }
+    return `SUPPLIER TAX STATUS: The supplier IS a VAT payer (plátce DPH).
+- Assign the correct VAT rate per item using the VAT RATE SELECTION rules above.
+- If the user asks to add tax/VAT but no specific rate is given, use the category-appropriate rate (default 21% for services).`;
+}
+
+function buildSystemPrompt(lang = 'en', vatPayer = true) {
     const today = new Date().toISOString().split('T')[0];
     const outputLang = lang === 'cs' ? 'Czech' : 'English';
     return `You are an invoice data extractor for a Czech/Slovak invoice application.
@@ -10,18 +28,21 @@ Extract invoice information from the user's natural language description.
 
 Today's date is ${today}. Use this when computing relative dates like "due in 14 days" or "due end of month".
 
+${VAT_RATE_GUIDANCE}
+
+${taxStatusClause(vatPayer)}
+
 Rules:
 - supplierName / supplierIco: only set if the prompt explicitly names the issuing company (e.g. "from ABC s.r.o." or "Invoice by XYZ"); otherwise return empty string
 - clientCountry: "CZ" for Czech clients, "SK" for Slovak clients, default "CZ"
 - currency: "CZK" unless EUR is explicitly mentioned
 - prices are plain numbers, no currency symbols
 - qty is a plain number
-- taxRate per item: 0 if VAT not mentioned, otherwise 21 (CZ standard rate)
 - dueDate: calculate from today (${today}) — "due in 14 days" → add 14 days; default to 14 days if not mentioned
 - Text field values (item names, paymentNote) must be in ${outputLang}`;
 }
 
-function buildAudioSystemPrompt(lang = 'en') {
+function buildAudioSystemPrompt(lang = 'en', vatPayer = true) {
     const today = new Date().toISOString().split('T')[0];
     const outputLang = lang === 'cs' ? 'Czech' : 'English';
     return `You are an invoice data extractor for a Czech/Slovak invoice application.
@@ -29,25 +50,32 @@ The user has recorded a spoken description of an invoice they want to create. Ex
 
 Today's date is ${today}. Use this when computing relative dates like "due in 14 days" or "due end of month".
 
+${VAT_RATE_GUIDANCE}
+
+${taxStatusClause(vatPayer)}
+
 Rules:
 - supplierName / supplierIco: only set if explicitly mentioned in speech; otherwise return empty string
 - clientCountry: "CZ" for Czech clients, "SK" for Slovak clients, default "CZ"
 - currency: "CZK" unless EUR is explicitly mentioned
 - prices are plain numbers, no currency symbols
 - qty is a plain number
-- taxRate per item: 0 if VAT not mentioned, otherwise 21 (CZ standard rate)
 - dueDate: calculate from today (${today}); default to 14 days if not mentioned
 - transcript: include a faithful, verbatim transcription of what was said, in the original spoken language
 - Text field values (item names, paymentNote) must be in ${outputLang}`;
 }
 
-function buildImageSystemPrompt(lang = 'en') {
+function buildImageSystemPrompt(lang = 'en', vatPayer = true) {
     const today = new Date().toISOString().split('T')[0];
     const outputLang = lang === 'cs' ? 'Czech' : 'English';
     return `You are an invoice data extractor for a Czech/Slovak invoice application.
-Extract invoice fields from the photo/scan provided. The image is an existing invoice, receipt, or bill.
+Extract invoice fields from the photo/scan provided. The image may be an existing invoice, receipt, bill, price list or menu — extract the orderable items and their prices.
 
 Today's date is ${today}. Use this when a date is missing or relative.
+
+${VAT_RATE_GUIDANCE}
+
+${taxStatusClause(vatPayer)}
 
 Rules:
 - Treat the entity that ISSUED the invoice (top of document, with IČO/DIČ, "Dodavatel") as the supplier — fill supplierName / supplierIco / supplierVat / supplierAddress if visible.
@@ -56,10 +84,19 @@ Rules:
 - currency: read from the invoice; CZK, EUR or USD only. Default "CZK".
 - issueDate / dueDate: YYYY-MM-DD. If only one date is shown, set issueDate; default dueDate to issueDate + 14 days.
 - variableSymbol: numeric only if shown.
-- items: one row per line item. price = unit price excluding VAT (plain number). qty = quantity. taxRate = VAT % as number (0, 12, 15, or 21). If only totals are shown and line items aren't itemized, create a single item with the total as price and qty 1.
+- items: one row per line item. price = unit price excluding VAT (plain number). qty = quantity. taxRate per the rules above. If only totals are shown and line items aren't itemized, create a single item with the total as price and qty 1.
+- If the user provides extra written instructions alongside the image, honour them (e.g. which items to include, quantities, the client's IČO).
 - If a field is not visible, return an empty string (or 0 for numeric).
 - DO NOT invent data. Do not hallucinate IČO or VAT numbers.
 - Text field values (item names, paymentNote) must be in ${outputLang}.`;
+}
+
+// Defensive guard: when the supplier is a non-payer, force every item to 0% VAT (item 9).
+function enforceTaxStatus(data, vatPayer) {
+    if (vatPayer === false && Array.isArray(data?.items)) {
+        data.items.forEach((item) => { item.taxRate = 0; });
+    }
+    return data;
 }
 
 function buildResponseSchema() {
@@ -90,7 +127,7 @@ function buildResponseSchema() {
                         name: { type: 'string', description: 'Item description' },
                         qty: { type: 'number', description: 'Quantity' },
                         price: { type: 'number', description: 'Unit price, plain number without currency symbol' },
-                        taxRate: { type: 'number', description: 'VAT rate: 0 if not mentioned, otherwise 21' }
+                        taxRate: { type: 'number', description: 'Czech VAT rate (0, 12 or 21) chosen per the VAT RATE SELECTION rules; 0 if the supplier is not a VAT payer' }
                     },
                     required: ['name', 'qty', 'price', 'taxRate']
                 }
@@ -111,14 +148,14 @@ function buildAudioResponseSchema() {
     };
 }
 
-function callGeminiApi(prompt, lang = 'en') {
+function callGeminiApi(prompt, lang = 'en', vatPayer = true) {
     const apiKey = process.env.GEMINI_API_KEY;
     const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
     if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
 
     const payload = JSON.stringify({
-        system_instruction: { parts: [{ text: buildSystemPrompt(lang) }] },
+        system_instruction: { parts: [{ text: buildSystemPrompt(lang, vatPayer) }] },
         contents: [{
             role: 'user',
             parts: [{ text: `Invoice description: ${prompt}` }]
@@ -201,8 +238,9 @@ async function enrichSupplierWithAres(data) {
     if (addr) data.supplierAddress = addr;
 }
 
-async function parseInvoiceWithAI(prompt, lang = 'en') {
-    const data = await callGeminiApi(prompt, lang);
+async function parseInvoiceWithAI(prompt, lang = 'en', vatPayer = true) {
+    const data = await callGeminiApi(prompt, lang, vatPayer);
+    enforceTaxStatus(data, vatPayer);
     await Promise.all([
         enrichWithAres(data).catch(() => {}),
         enrichSupplierWithAres(data).catch(() => {})
@@ -210,24 +248,29 @@ async function parseInvoiceWithAI(prompt, lang = 'en') {
     return data;
 }
 
-function callGeminiImageApi(imageBase64, mimeType, lang = 'en') {
+function callGeminiImageApi(imageBase64, mimeType, lang = 'en', opts = {}) {
     const apiKey = process.env.GEMINI_API_KEY;
     const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
     if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
 
+    const { vatPayer = true, userText = '' } = opts;
+    const instruction = userText
+        ? `Extract invoice data from this image. Additional written instructions from the user: ${userText}`
+        : 'Extract invoice data from this image.';
+
     const payload = JSON.stringify({
-        system_instruction: { parts: [{ text: buildImageSystemPrompt(lang) }] },
+        system_instruction: { parts: [{ text: buildImageSystemPrompt(lang, vatPayer) }] },
         contents: [{
             role: 'user',
             parts: [
-                { text: 'Extract invoice data from this image.' },
+                { text: instruction },
                 { inline_data: { mime_type: mimeType, data: imageBase64 } }
             ]
         }],
         generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 4096,
             responseMimeType: 'application/json',
             responseSchema: buildResponseSchema()
         }
@@ -266,8 +309,9 @@ function callGeminiImageApi(imageBase64, mimeType, lang = 'en') {
     });
 }
 
-async function parseInvoiceImageWithAI(imageBase64, mimeType, lang = 'en') {
-    const data = await callGeminiImageApi(imageBase64, mimeType, lang);
+async function parseInvoiceImageWithAI(imageBase64, mimeType, lang = 'en', opts = {}) {
+    const data = await callGeminiImageApi(imageBase64, mimeType, lang, opts);
+    enforceTaxStatus(data, opts.vatPayer);
     await Promise.all([
         enrichWithAres(data).catch(() => {}),
         enrichSupplierWithAres(data).catch(() => {})
@@ -275,14 +319,14 @@ async function parseInvoiceImageWithAI(imageBase64, mimeType, lang = 'en') {
     return data;
 }
 
-function callGeminiAudioApi(audioBase64, mimeType, lang = 'en') {
+function callGeminiAudioApi(audioBase64, mimeType, lang = 'en', vatPayer = true) {
     const apiKey = process.env.GEMINI_API_KEY;
     const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
     if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
 
     const payload = JSON.stringify({
-        system_instruction: { parts: [{ text: buildAudioSystemPrompt(lang) }] },
+        system_instruction: { parts: [{ text: buildAudioSystemPrompt(lang, vatPayer) }] },
         contents: [{
             role: 'user',
             parts: [
@@ -331,8 +375,9 @@ function callGeminiAudioApi(audioBase64, mimeType, lang = 'en') {
     });
 }
 
-async function parseInvoiceAudioWithAI(audioBase64, mimeType, lang = 'en') {
-    const data = await callGeminiAudioApi(audioBase64, mimeType, lang);
+async function parseInvoiceAudioWithAI(audioBase64, mimeType, lang = 'en', vatPayer = true) {
+    const data = await callGeminiAudioApi(audioBase64, mimeType, lang, vatPayer);
+    enforceTaxStatus(data, vatPayer);
     await Promise.all([
         enrichWithAres(data).catch(() => {}),
         enrichSupplierWithAres(data).catch(() => {})

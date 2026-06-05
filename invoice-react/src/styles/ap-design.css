@@ -418,6 +418,23 @@
   position: relative;
   overflow: hidden;
 }
+.ap-ai__filled {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ap-ai__filled-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.ap-ai__filled-text strong { color: var(--text); font-size: 15px; }
+.ap-ai__filled-text span { color: var(--muted); font-size: 13px; }
+@media (max-width: 560px) {
+  .ap-ai__filled { flex-direction: column; align-items: flex-start; }
+}
 .ap-ai__head {
   display: flex;
   align-items: center;
