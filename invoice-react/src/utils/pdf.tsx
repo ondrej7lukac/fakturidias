@@ -2,11 +2,16 @@ import React from 'react'
 import { Document, Page, Text, View, StyleSheet, Image, pdf as renderPdf, Font } from '@react-pdf/renderer'
 import { documentTypeTitleKey } from './storage'
 
+// Bundled locally (Vite asset) so PDF rendering never depends on a third-party
+// font CDN at render time. Full latin + latin-ext coverage for Czech/Slovak diacritics.
+import RobotoRegular from '@/assets/fonts/Roboto-Regular.ttf?url'
+import RobotoBold from '@/assets/fonts/Roboto-Bold.ttf?url'
+
 Font.register({
     family: 'Roboto',
     fonts: [
-        { src: 'https://fonts.gstatic.com/l/font?kit=KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWubEbVmaiA4&skey=a0a0114a1dcab3ac&v=v51' },
-        { src: 'https://fonts.gstatic.com/l/font?kit=KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuYjalmUiA4&skey=a0a0114a1dcab3ac&v=v51', fontWeight: 'bold' }
+        { src: RobotoRegular },
+        { src: RobotoBold, fontWeight: 'bold' }
     ]
 })
 
@@ -46,7 +51,7 @@ const S = StyleSheet.create({
     partyName:   { fontSize: 14, fontFamily: 'Roboto', fontWeight: 'bold', marginBottom: 4 },
     partyAddr:   { fontSize: 10, color: C.gray700, lineHeight: 1.5, marginBottom: 2 },
     partyDetail: { fontSize: 9, color: C.gray500, marginTop: 1 },
-    nonVat:      { fontSize: 9, color: C.slate500, marginTop: 6, fontStyle: 'italic' },
+    nonVat:      { fontSize: 9, color: C.slate500, marginTop: 6 },
 
     // Items table
     tblSection:    { marginBottom: 22 },
@@ -228,7 +233,7 @@ function InvoicePDF({ invoice, t, qrDataUrl }: { invoice: any; t: any; qrDataUrl
                             </Text>
                         )}
                         {invoice.exchangeRate && invoice.exchangeRate !== '1.0000' && (
-                            <Text style={{ color: C.slate500, fontStyle: 'italic' }}>
+                            <Text style={{ color: C.slate500 }}>
                                 {t.exchangeRate}: 1 {invoice.currency} = {invoice.exchangeRate} {invoice.supplier?.region === 'SK' ? 'EUR' : 'CZK'}
                             </Text>
                         )}

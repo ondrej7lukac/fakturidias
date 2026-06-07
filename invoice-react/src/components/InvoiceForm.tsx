@@ -1220,6 +1220,7 @@ export default function InvoiceForm({
         label: lang === 'cs' ? 'PDF staženo' : 'PDF downloaded',
       });
     } catch (error) {
+      console.error('PDF generation failed:', error);
       alert('Failed to generate PDF');
       announce({
         kind: 'error',
