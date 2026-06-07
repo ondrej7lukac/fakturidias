@@ -20,7 +20,7 @@ function attach(router) {
         if (!body.prompt?.trim()) return sendJson(res, 400, { error: 'prompt is required' });
 
         try {
-            const data = await parseInvoiceWithAI(body.prompt.trim(), body.lang || 'en');
+            const data = await parseInvoiceWithAI(body.prompt.trim(), body.lang || 'en', body.vatPayer !== false);
             return sendJson(res, 200, { success: true, data });
         } catch (err) {
             return sendJson(res, err.statusCode || 500, { error: err.message || 'AI processing failed' });
@@ -45,7 +45,11 @@ function attach(router) {
         }
 
         try {
-            const data = await parseInvoiceImageWithAI(image, mime, body.lang || 'en');
+            const userText = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+            const data = await parseInvoiceImageWithAI(image, mime, body.lang || 'en', {
+                vatPayer: body.vatPayer !== false,
+                userText,
+            });
             return sendJson(res, 200, { success: true, data });
         } catch (err) {
             return sendJson(res, err.statusCode || 500, { error: err.message || 'AI processing failed' });
@@ -70,7 +74,7 @@ function attach(router) {
         }
 
         try {
-            const result = await parseInvoiceAudioWithAI(audio, mime, body.lang || 'en');
+            const result = await parseInvoiceAudioWithAI(audio, mime, body.lang || 'en', body.vatPayer !== false);
             const { transcript = '', ...data } = result;
             return sendJson(res, 200, { success: true, data, transcript });
         } catch (err) {

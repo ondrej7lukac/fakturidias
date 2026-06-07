@@ -4,6 +4,9 @@ main {
   gap: 2rem;
   max-width: 1400px;
   margin: 0 auto;
+  /* Equal left/right gutters so the list column isn't flush to the screen edge */
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
   align-items: start;
 }
 

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Sparkles,
   Mic,
@@ -107,6 +107,7 @@ function summarizeItems(
 interface AIPromptProps {
   lang: string;
   onFillForm: (data: any) => void;
+  onCreate?: (data: any) => void;
   isGuest?: boolean;
   isVatPayer?: boolean;
 }
@@ -114,6 +115,7 @@ interface AIPromptProps {
 export default function AIPrompt({
   lang,
   onFillForm,
+  onCreate,
   isGuest,
   isVatPayer = true,
 }: AIPromptProps) {
@@ -132,8 +134,24 @@ export default function AIPrompt({
     name: string;
   } | null>(null);
   const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [filled, setFilled] = useState<null | 'created' | 'edited'>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const isCz = lang === 'cs';
+
+  // Grow the prompt textarea with its content, up to a max before scrolling (item 2).
+  const TEXTAREA_MAX_HEIGHT = 220;
+  const autoGrowTextarea = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, TEXTAREA_MAX_HEIGHT)}px`;
+    el.style.overflowY = el.scrollHeight > TEXTAREA_MAX_HEIGHT ? 'auto' : 'hidden';
+  };
+
+  useEffect(() => {
+    autoGrowTextarea();
+  }, [prompt]);
 
   const handleVoice = async () => {
     if (isListening) {
@@ -201,7 +219,12 @@ export default function AIPrompt({
           const res = await fetch('/api/ai/invoice-audio', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ audio: base64, mimeType: baseMime, lang }),
+            body: JSON.stringify({
+              audio: base64,
+              mimeType: baseMime,
+              lang,
+              vatPayer: isVatPayer,
+            }),
           });
           const result = await res.json();
           if (!res.ok) throw new Error(result.message || result.error);
@@ -287,7 +310,13 @@ export default function AIPrompt({
       const res = await fetch('/api/ai/invoice-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mimeType, lang }),
+        body: JSON.stringify({
+          image: base64,
+          mimeType,
+          lang,
+          vatPayer: isVatPayer,
+          prompt: prompt.trim(),
+        }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.message || result.error);
@@ -337,7 +366,7 @@ export default function AIPrompt({
       const res = await fetch('/api/ai/invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: text, lang }),
+        body: JSON.stringify({ prompt: text, lang, vatPayer: isVatPayer }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.message || result.error);
@@ -361,19 +390,44 @@ export default function AIPrompt({
 
   const confirmPreview = () => {
     if (!preview) return;
-    onFillForm(preview.data);
+    // Create invoice: persist immediately if the parent supports it, otherwise
+    // fall back to just filling the form.
+    const didCreate = typeof onCreate === 'function';
+    if (didCreate) onCreate!(preview.data);
+    else onFillForm(preview.data);
     setPreview(null);
     setPrompt('');
     setScanPreview(null);
     setError('');
+    setFilled(didCreate ? 'created' : 'edited');
+    // The parent announces "Invoice created" on the create path; only announce
+    // here for the fill-only fallback to avoid a duplicate toast.
+    if (!didCreate) {
+      onActivity?.({
+        kind: 'done',
+        label: isCz ? 'Faktura vyplněna' : 'Invoice filled in',
+      });
+    }
   };
 
+  // "Edit" populates the form too, then hands control to the form below so the
+  // user can tweak fields manually instead of being bounced back to an empty box.
   const editPreview = () => {
-    if (preview?.source === 'text' && preview.text) {
-      setPrompt(preview.text);
-    }
+    if (!preview) return;
+    onFillForm(preview.data);
     setPreview(null);
     setScanPreview(null);
+    setPrompt('');
+    setError('');
+    setFilled('edited');
+  };
+
+  const resetAi = () => {
+    setFilled(null);
+    setPreview(null);
+    setScanPreview(null);
+    setPrompt('');
+    setError('');
   };
 
   if (isGuest) {
@@ -521,6 +575,48 @@ export default function AIPrompt({
     );
   }
 
+  if (filled) {
+    return (
+      <div className='ap-ai'>
+        <div className='ap-ai__filled'>
+          <CheckCircle2
+            size={ICON_LG}
+            strokeWidth={STROKE}
+            style={{ color: 'var(--accent)', flexShrink: 0 }}
+          />
+          <div className='ap-ai__filled-text'>
+            <strong>
+              {filled === 'created'
+                ? isCz
+                  ? 'Faktura vytvořena'
+                  : 'Invoice created'
+                : isCz
+                  ? 'Faktura vyplněna'
+                  : 'Invoice filled in'}
+            </strong>
+            <span>
+              {filled === 'created'
+                ? isCz
+                  ? 'Faktura byla uložena. Můžete ji zkontrolovat a upravit níže.'
+                  : 'The invoice has been saved. You can review and edit it below.'
+                : isCz
+                  ? 'Zkontrolujte a upravte údaje níže, poté fakturu uložte.'
+                  : 'Review and edit the details below, then save the invoice.'}
+            </span>
+          </div>
+          <button
+            type='button'
+            className='ap-btn ap-btn--ghost'
+            onClick={resetAi}
+          >
+            <Sparkles size={ICON_SM} strokeWidth={STROKE} />
+            {isCz ? 'Nové zadání' : 'New AI input'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className='ap-ai'>
       <div className='ap-ai__head'>
@@ -540,6 +636,7 @@ export default function AIPrompt({
       <div className='ap-ai__row'>
         <div className='ap-ai__input'>
           <textarea
+            ref={textareaRef}
             className='ap-ai__textarea'
             placeholder={
               isCz
@@ -549,6 +646,7 @@ export default function AIPrompt({
             rows={2}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
+            onInput={autoGrowTextarea}
             disabled={isLoading}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -677,8 +775,8 @@ export default function AIPrompt({
           style={{ verticalAlign: '-2px', marginRight: 6 }}
         />
         {isCz
-          ? 'AI přečte fakturu z fotografie a zobrazí náhled ke kontrole.'
-          : 'AI reads the invoice from your photo and shows a preview to review.'}
+          ? 'AI přečte fakturu z fotografie. Můžete přidat i text výše (např. IČO nebo které položky) a obojí se zpracuje společně.'
+          : 'AI reads the invoice from your photo. You can also add text above (e.g. an IČO or which items) and both are processed together.'}
       </p>
 
       {scanPreview && (

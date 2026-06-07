@@ -23,6 +23,11 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Breathing room under the category filter and a gutter so the scrollbar
+     doesn't sit flush against the cards (item 10). */
+  margin-top: 0.5rem;
+  padding-right: 0.4rem;
+  scrollbar-gutter: stable;
 }
 
 .invoice-item {

@@ -57,6 +57,7 @@ const STATIC_MIMES = {
   ".ico": "image/x-icon",
   ".woff": "font/woff",
   ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
   ".json": "application/json",
 };
 

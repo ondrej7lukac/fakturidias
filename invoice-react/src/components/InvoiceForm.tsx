@@ -286,12 +286,15 @@ export default function InvoiceForm({
         iban: invoice.payment?.iban || '',
         bic: invoice.payment?.bic || '',
         paymentNote: invoice.payment?.note || '',
-        accountNumber: ibanData?.accountNumber || '',
-        bankCode: ibanData?.bankCode || '',
-        prefix: ibanData?.prefix || '',
+        // Prefer the explicitly saved bank fields; only fall back to re-deriving
+        // them from the IBAN so a not-yet-computed IBAN can't blank them out.
+        accountNumber:
+          invoice.payment?.accountNumber || ibanData?.accountNumber || '',
+        bankCode: invoice.payment?.bankCode || ibanData?.bankCode || '',
+        prefix: invoice.payment?.prefix || ibanData?.prefix || '',
         variableSymbol:
           invoice.payment?.variableSymbol ||
-          (invoice.invoiceNumber || '').replace(/\D/g, ''),
+          (invoice.invoiceNumber || '').replace(/\D/g, '').slice(0, 10),
         supplierName: invoice.supplier?.name || '',
         supplierIco: invoice.supplier?.ico || '',
         supplierVat: invoice.supplier?.vat || '',
@@ -339,7 +342,7 @@ export default function InvoiceForm({
         accountNumber: prev.accountNumber,
         bankCode: prev.bankCode,
         prefix: prev.prefix,
-        variableSymbol: (prev.invoiceNumber || '').replace(/\D/g, ''),
+        variableSymbol: (prev.invoiceNumber || '').replace(/\D/g, '').slice(0, 10),
         supplierName: prev.supplierName,
         supplierIco: prev.supplierIco,
         supplierVat: prev.supplierVat,
@@ -374,13 +377,13 @@ export default function InvoiceForm({
       setFormData((prev) => ({
         ...prev,
         invoiceNumber: newNumber,
-        variableSymbol: newNumber.replace(/\D/g, ''),
+        variableSymbol: newNumber.replace(/\D/g, '').slice(0, 10),
       }));
     } else {
       setFormData((prev) => ({
         ...prev,
         invoiceNumber: draftNumber,
-        variableSymbol: draftNumber.replace(/\D/g, ''),
+        variableSymbol: draftNumber.replace(/\D/g, '').slice(0, 10),
       }));
     }
   }, [invoice, invoiceCounter, invoicesLoaded, draftNumber, setDraftNumber]);
@@ -524,6 +527,31 @@ export default function InvoiceForm({
     }));
   }, [items]);
 
+  // Always keep at least one empty line item ready in the editor so users never
+  // face an empty Items card (item 12). Blank rows are filtered out on save.
+  // NOTE: This effect intentionally calls setItems() as an exception to the
+  // "only the invoice-load effect sets items" invariant, purely to guarantee a
+  // single placeholder row when the list is empty.
+  useEffect(() => {
+    if (previewMode) return;
+    if (items.length === 0) {
+      setItems([
+        {
+          id: randomUUID(),
+          name: '',
+          qty: 1,
+          unit: 'h',
+          price: 0,
+          discount: 0,
+          taxRate: stateRef.current.formData.isVatPayer ? 21 : 0,
+          subtotal: 0,
+          taxAmount: 0,
+          total: 0,
+        },
+      ]);
+    }
+  }, [items.length, previewMode]);
+
   useEffect(() => {
     const updates: { bic?: string; iban?: string } = {};
     if (formData.bankCode) {
@@ -608,6 +636,10 @@ export default function InvoiceForm({
     currentFormData = formData,
     currentItems = items,
   ) => {
+    // Drop the always-present blank placeholder rows so they aren't persisted.
+    const savedItems = currentItems.filter(
+      (it) => (it.name && it.name.trim() !== '') || Number(it.price) > 0,
+    );
     return {
       id: invoice?.id || newInvoiceIdRef.current || randomUUID(),
       invoiceNumber: currentFormData.invoiceNumber.trim(),
@@ -629,18 +661,25 @@ export default function InvoiceForm({
         address: currentFormData.clientAddress.trim(),
         country: (currentFormData.clientCountry || 'CZ').trim().toUpperCase(),
       },
-      items: currentItems,
+      items: savedItems,
       currency: currentFormData.currency,
-      amount: currentItems.reduce((sum, item) => sum + item.total, 0),
+      amount: savedItems.reduce((sum, item) => sum + item.total, 0),
       payment: {
         iban: currentFormData.iban.trim(),
-        bic: currentFormData.bic.trim(),
+        // Persist a valid contiguous SWIFT/BIC regardless of source (manual
+        // masked entry or the spaced values in BANK_CODES); the spacing is a
+        // display-only concern.
+        bic: currentFormData.bic.replace(/[^A-Za-z0-9]/g, '').toUpperCase(),
         note: currentFormData.paymentNote.trim(),
         accountNumber: currentFormData.accountNumber,
         bankCode: currentFormData.bankCode,
-        variableSymbol:
-          currentFormData.variableSymbol ||
-          currentFormData.invoiceNumber.replace(/\D/g, ''),
+        prefix: currentFormData.prefix || '',
+        // Normalize both branches so no path can persist an invalid VS.
+        variableSymbol: (
+          currentFormData.variableSymbol || currentFormData.invoiceNumber
+        )
+          .replace(/\D/g, '')
+          .slice(0, 10),
       },
       supplier: {
         name: currentFormData.supplierName.trim(),
@@ -677,7 +716,7 @@ export default function InvoiceForm({
         ...prev,
         documentType,
         invoiceNumber,
-        variableSymbol: invoiceNumber.replace(/\D/g, ''),
+        variableSymbol: invoiceNumber.replace(/\D/g, '').slice(0, 10),
       };
     });
   };
@@ -766,6 +805,24 @@ export default function InvoiceForm({
         accountNumber: raw.replace(/\D/g, ''),
       }));
     }
+  };
+
+  // Czech Variable Symbol (variabilní symbol): numeric only, max 10 digits.
+  // Longer or non-numeric values are rejected by domestic bank exports (CNB).
+  const handleVariableSymbolChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setFormData((prev) => ({ ...prev, variableSymbol: value }));
+  };
+
+  // BIC/SWIFT mask: uppercase alphanumerics grouped as XXXX XX XX [XXX].
+  const handleBicChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 11);
+    const groups = [raw.slice(0, 4), raw.slice(4, 6), raw.slice(6, 8), raw.slice(8, 11)];
+    const value = groups.filter(Boolean).join(' ');
+    setFormData((prev) => ({ ...prev, bic: value }));
   };
 
   // Debounce reference for ARES
@@ -1163,6 +1220,7 @@ export default function InvoiceForm({
         label: lang === 'cs' ? 'PDF staženo' : 'PDF downloaded',
       });
     } catch (error) {
+      console.error('PDF generation failed:', error);
       alert('Failed to generate PDF');
       announce({
         kind: 'error',
@@ -1398,53 +1456,86 @@ export default function InvoiceForm({
 
   const togglePreview = () => setPreviewMode(!previewMode);
 
+  // Merge AI-extracted fields onto a form-state snapshot (shared by fill + create).
+  const applyAIData = (prev: typeof formData, data: any): typeof formData => ({
+    ...prev,
+    clientName: data.clientName || prev.clientName,
+    clientEmail: data.clientEmail || prev.clientEmail,
+    clientPhone: data.clientPhone || prev.clientPhone,
+    clientAddress: data.clientAddress || prev.clientAddress,
+    clientIco: data.clientIco || prev.clientIco,
+    clientVat: data.clientVat || prev.clientVat,
+    clientArea: data.clientArea || prev.clientArea,
+    clientCountry: data.clientCountry || prev.clientCountry,
+    currency: data.currency || prev.currency,
+    dueDate: data.dueDate || prev.dueDate,
+    issueDate: data.issueDate || prev.issueDate,
+    variableSymbol: data.variableSymbol
+      ? String(data.variableSymbol).replace(/\D/g, '').slice(0, 10)
+      : prev.variableSymbol,
+    paymentNote: data.paymentNote || prev.paymentNote,
+    ...(data.supplierName ? { supplierName: data.supplierName } : {}),
+    ...(data.supplierIco ? { supplierIco: data.supplierIco } : {}),
+    ...(data.supplierVat ? { supplierVat: data.supplierVat } : {}),
+    ...(data.supplierAddress ? { supplierAddress: data.supplierAddress } : {}),
+  });
+
+  const mapAIItems = (data: any): InvoiceLineItem[] | null => {
+    if (!Array.isArray(data.items) || data.items.length === 0) return null;
+    const vatPayer = stateRef.current.formData.isVatPayer;
+    return data.items.map((item: any) => {
+      const qty = Number(item.qty) || 1;
+      const price = Number(item.price) || 0;
+      const taxRate =
+        item.taxRate != null ? Number(item.taxRate) : vatPayer ? 21 : 0;
+      const subtotal = qty * price;
+      const taxAmount = subtotal * (taxRate / 100);
+      return {
+        id: randomUUID(),
+        name: String(item.name || ''),
+        qty,
+        price,
+        discount: 0,
+        taxRate,
+        subtotal,
+        taxAmount,
+        total: subtotal + taxAmount,
+      };
+    });
+  };
+
+  // "Edit": populate the form for manual review (no save).
   const handleAIFill = (data: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      clientName: data.clientName || prev.clientName,
-      clientEmail: data.clientEmail || prev.clientEmail,
-      clientPhone: data.clientPhone || prev.clientPhone,
-      clientAddress: data.clientAddress || prev.clientAddress,
-      clientIco: data.clientIco || prev.clientIco,
-      clientVat: data.clientVat || prev.clientVat,
-      clientArea: data.clientArea || prev.clientArea,
-      clientCountry: data.clientCountry || prev.clientCountry,
-      currency: data.currency || prev.currency,
-      dueDate: data.dueDate || prev.dueDate,
-      issueDate: data.issueDate || prev.issueDate,
-      variableSymbol: data.variableSymbol || prev.variableSymbol,
-      paymentNote: data.paymentNote || prev.paymentNote,
-      ...(data.supplierName ? { supplierName: data.supplierName } : {}),
-      ...(data.supplierIco ? { supplierIco: data.supplierIco } : {}),
-      ...(data.supplierVat ? { supplierVat: data.supplierVat } : {}),
-      ...(data.supplierAddress
-        ? { supplierAddress: data.supplierAddress }
-        : {}),
-    }));
-    if (Array.isArray(data.items) && data.items.length > 0) {
-      const vatPayer = formData.isVatPayer;
-      setItems(
-        data.items.map((item: any) => {
-          const qty = Number(item.qty) || 1;
-          const price = Number(item.price) || 0;
-          const taxRate =
-            item.taxRate != null ? Number(item.taxRate) : vatPayer ? 21 : 0;
-          const subtotal = qty * price;
-          const taxAmount = subtotal * (taxRate / 100);
-          return {
-            id: randomUUID(),
-            name: String(item.name || ''),
-            qty,
-            price,
-            discount: 0,
-            taxRate,
-            subtotal,
-            taxAmount,
-            total: subtotal + taxAmount,
-          };
-        }),
-      );
-    }
+    setFormData((prev) => applyAIData(prev, data));
+    const items = mapAIItems(data);
+    if (items) setItems(items);
+  };
+
+  // "Create invoice": fill the form AND persist immediately, then jump to the
+  // saved invoice. Builds the payload synchronously so it isn't stale.
+  const handleAICreate = (data: any) => {
+    const nextFormData = applyAIData(stateRef.current.formData, data);
+    const nextItems = mapAIItems(data) ?? stateRef.current.items;
+    setFormData(nextFormData);
+    setItems(nextItems);
+
+    const totals = nextItems.reduce(
+      (acc, it) => ({
+        taxBase: acc.taxBase + (it.subtotal || 0),
+        taxAmount: acc.taxAmount + (it.taxAmount || 0),
+      }),
+      { taxBase: 0, taxAmount: 0 },
+    );
+    const formForSave = {
+      ...nextFormData,
+      taxBase: totals.taxBase.toFixed(2),
+      taxAmount: totals.taxAmount.toFixed(2),
+    };
+    onSave(getCurrentInvoiceData(formForSave, nextItems));
+    announce({
+      kind: 'done',
+      label: lang === 'cs' ? 'Faktura vytvořena' : 'Invoice created',
+    });
   };
 
   // Supplier section — rendered in sidebar
@@ -1850,6 +1941,7 @@ export default function InvoiceForm({
               <AIPrompt
                 lang={lang}
                 onFillForm={handleAIFill}
+                onCreate={handleAICreate}
                 isGuest={!isAuthenticated}
                 isVatPayer={formData.isVatPayer}
               />
@@ -2470,7 +2562,8 @@ export default function InvoiceForm({
                         className='ap-input'
                         name='bic'
                         value={formData.bic}
-                        onChange={handleChange}
+                        onChange={handleBicChange}
+                        placeholder='RZBC CZ PP'
                       />
                     </div>
                     <div className='ap-field'>
@@ -2483,7 +2576,10 @@ export default function InvoiceForm({
                         className='ap-input'
                         name='variableSymbol'
                         value={formData.variableSymbol}
-                        onChange={handleChange}
+                        onChange={handleVariableSymbolChange}
+                        inputMode='numeric'
+                        maxLength={10}
+                        placeholder='10 číslic / digits max'
                       />
                     </div>
                   </div>
