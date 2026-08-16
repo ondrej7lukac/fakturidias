@@ -641,7 +641,7 @@
 }
 .ap-items__row {
   display: grid;
-  grid-template-columns: 1fr 80px 80px 100px 70px 110px 36px;
+  grid-template-columns: 1fr 65px 65px 90px 125px 60px 95px 36px;
   gap: 8px;
   padding: 10px 12px;
   align-items: center;
@@ -660,6 +660,57 @@
   padding: 7px 10px;
   font-size: 13.5px;
   border-radius: 9px;
+}
+.ap-discount-input {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card, #ffffff);
+  overflow: hidden;
+  height: 34px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ap-discount-input:focus-within {
+  border-color: var(--accent-2, #5869ff);
+  box-shadow: 0 0 0 3px rgba(88, 105, 255, 0.15);
+}
+.ap-discount-input__field {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 6px 8px !important;
+  font-size: 13.5px !important;
+  text-align: right !important;
+  color: var(--text) !important;
+  outline: none !important;
+  box-shadow: none !important;
+  height: 100% !important;
+}
+.ap-discount-input__select {
+  flex: 0 0 36px !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  height: 100% !important;
+  border: none !important;
+  border-left: 1px solid var(--border) !important;
+  background: rgba(88, 105, 255, 0.08) !important;
+  padding: 0 2px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: var(--accent-2, #5869ff) !important;
+  cursor: pointer;
+  outline: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  text-align: center !important;
+  text-align-last: center !important;
 }
 .ap-items__row .num {
   font-family: 'Geist', 'Geist Variable', system-ui, sans-serif;

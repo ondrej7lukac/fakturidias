@@ -42,6 +42,7 @@ import {
   Send,
   Save,
   CreditCard,
+  Printer,
   ICON_MD,
   ICON_SM,
   STROKE,
@@ -176,6 +177,9 @@ export default function InvoiceForm({
     clientCountry: 'CZ', // CZ or SK
     exchangeRate: '1.00',
     reverseChargeText: '',
+    invoiceDiscount: 0,
+    invoiceDiscountType: 'percent' as 'percent' | 'amount',
+    itemsSubtotal: '0.00',
     taxBase: '0.00',
     taxRate: '21',
     taxAmount: '0.00',
@@ -218,6 +222,7 @@ export default function InvoiceForm({
     price: '',
     taxRate: formData.isVatPayer ? '21' : '0',
     discount: 0,
+    discountType: 'percent' as 'percent' | 'amount',
     total: '',
   });
   const [categoryInput, setCategoryInput] = useState('');
@@ -249,9 +254,17 @@ export default function InvoiceForm({
     null,
   );
 
+  const loadedInvoiceIdRef = useRef<string | null | undefined>(undefined);
+
   // ─── Effect 1: Load invoice data when selected invoice changes ────────────
   // ONLY this effect may call setItems — prevents items being wiped by unrelated state changes
   useEffect(() => {
+    const currentId = invoice ? invoice.id : 'NEW_INVOICE';
+    if (loadedInvoiceIdRef.current === currentId) {
+      return;
+    }
+    loadedInvoiceIdRef.current = currentId;
+
     // Cancel any pending auto-save from the PREVIOUS invoice before switching
     // Prevents stale timer from firing with wrong invoice ID / form data mix
     setSaveTimer((prev) => {
@@ -308,7 +321,13 @@ export default function InvoiceForm({
         taxRate: String(invoice.taxRate || '21'),
         taxAmount: String(invoice.taxAmount || '0.00'),
       }));
-      setItems(invoice.items || []);
+      setItems(
+        (invoice.items || []).map((it) => ({
+          ...it,
+          id: it.id || randomUUID(),
+          unit: it.unit || 'ks',
+        })),
+      );
     } else {
       // Switching to new invoice mode — reset everything
       if (!newInvoiceIdRef.current) {
@@ -498,15 +517,25 @@ export default function InvoiceForm({
 
   // ─── Effect 4: Auto-calculate Amount and VAT Summary ────────────
   useEffect(() => {
+    let rawItemsSubtotal = 0;
     const calculatedTotals = items.reduce(
       (acc, item) => {
         const qty = parseFloat(String(item.qty)) || 0;
         const price = parseFloat(String(item.price)) || 0;
         const taxRate = parseFloat(String(item.taxRate)) || 0;
-        const discount = parseFloat(String(item.discount)) || 0;
+        const discountVal = parseFloat(String(item.discount)) || 0;
+        const discountType = item.discountType || 'percent';
 
-        const subtotal = qty * price;
-        const afterDiscount = subtotal - discount;
+        const lineSubtotal = qty * price;
+        let lineDiscountAmt = 0;
+        if (discountType === 'percent') {
+          lineDiscountAmt = lineSubtotal * (discountVal / 100);
+        } else {
+          lineDiscountAmt = discountVal;
+        }
+
+        const afterDiscount = Math.max(0, lineSubtotal - lineDiscountAmt);
+        rawItemsSubtotal += afterDiscount;
         const taxAmount = afterDiscount * (taxRate / 100);
         const total = afterDiscount + taxAmount;
 
@@ -519,13 +548,31 @@ export default function InvoiceForm({
       { taxBase: 0, taxAmount: 0, amount: 0 },
     );
 
+    const invDiscountVal = parseFloat(String(formData.invoiceDiscount)) || 0;
+    const invDiscountType = formData.invoiceDiscountType || 'percent';
+    let invDiscountAmt = 0;
+
+    if (invDiscountVal > 0) {
+      if (invDiscountType === 'percent') {
+        invDiscountAmt = calculatedTotals.taxBase * (invDiscountVal / 100);
+      } else {
+        invDiscountAmt = invDiscountVal;
+      }
+    }
+
+    const finalTaxBase = Math.max(0, calculatedTotals.taxBase - invDiscountAmt);
+    const ratio = calculatedTotals.taxBase > 0 ? finalTaxBase / calculatedTotals.taxBase : 1;
+    const finalTaxAmount = calculatedTotals.taxAmount * ratio;
+    const finalGrandTotal = finalTaxBase + finalTaxAmount;
+
     setFormData((prev) => ({
       ...prev,
-      amount: money(calculatedTotals.amount),
-      taxBase: calculatedTotals.taxBase.toFixed(2),
-      taxAmount: calculatedTotals.taxAmount.toFixed(2),
+      itemsSubtotal: rawItemsSubtotal.toFixed(2),
+      amount: money(finalGrandTotal),
+      taxBase: finalTaxBase.toFixed(2),
+      taxAmount: finalTaxAmount.toFixed(2),
     }));
-  }, [items]);
+  }, [items, formData.invoiceDiscount, formData.invoiceDiscountType]);
 
   // Always keep at least one empty line item ready in the editor so users never
   // face an empty Items card (item 12). Blank rows are filtered out on save.
@@ -540,7 +587,7 @@ export default function InvoiceForm({
           id: randomUUID(),
           name: '',
           qty: 1,
-          unit: 'h',
+          unit: 'ks',
           price: 0,
           discount: 0,
           taxRate: stateRef.current.formData.isVatPayer ? 21 : 0,
@@ -697,6 +744,9 @@ export default function InvoiceForm({
         iban: currentFormData.iban || '',
       },
       isVatPayer: currentFormData.isVatPayer,
+      itemsSubtotal: Number(currentFormData.itemsSubtotal || currentFormData.taxBase) || 0,
+      invoiceDiscount: Number(currentFormData.invoiceDiscount) || 0,
+      invoiceDiscountType: currentFormData.invoiceDiscountType || 'percent',
       taxBase: currentFormData.taxBase,
       taxRate: currentFormData.taxRate,
       taxAmount: currentFormData.taxAmount,
@@ -1031,6 +1081,7 @@ export default function InvoiceForm({
       price: '',
       taxRate: formData.isVatPayer ? '21' : '0',
       discount: 0,
+      discountType: 'percent' as 'percent' | 'amount',
       total: '',
     });
     setItemSuggestions([]);
@@ -1083,7 +1134,7 @@ export default function InvoiceForm({
         id: randomUUID(),
         name: '',
         qty: 1,
-        unit: 'h',
+        unit: 'ks',
         price: 0,
         discount: 0,
         taxRate: formData.isVatPayer ? 21 : 0,
@@ -1106,8 +1157,20 @@ export default function InvoiceForm({
         const taxRate =
           parseFloat(String(key === 'taxRate' ? rawValue : updated.taxRate)) ||
           0;
-        const discount = parseFloat(String(updated.discount)) || 0;
-        const afterDiscount = qty * price - discount;
+        const discountVal =
+          parseFloat(String(key === 'discount' ? rawValue : updated.discount)) || 0;
+        const discountType =
+          (key === 'discountType' ? rawValue : updated.discountType) || 'percent';
+
+        const lineSubtotal = qty * price;
+        let lineDiscountAmt = 0;
+        if (discountType === 'percent') {
+          lineDiscountAmt = lineSubtotal * (discountVal / 100);
+        } else {
+          lineDiscountAmt = discountVal;
+        }
+
+        const afterDiscount = Math.max(0, lineSubtotal - lineDiscountAmt);
         const taxAmount = afterDiscount * (taxRate / 100);
         return {
           ...updated,
@@ -1880,6 +1943,13 @@ export default function InvoiceForm({
               </button>
               <button
                 type='button'
+                onClick={() => window.print()}
+                className='ap-btn ap-btn--secondary'
+              >
+                <Printer size={ICON_MD} strokeWidth={STROKE} /> {t.print || 'Tisk'}
+              </button>
+              <button
+                type='button'
                 onClick={handleEmailPDF}
                 disabled={isGenerating || !isAuthenticated}
                 className='ap-btn ap-btn--secondary'
@@ -2356,6 +2426,9 @@ export default function InvoiceForm({
                         {lang === 'cs' ? 'Jedn. cena' : 'Unit price'}
                       </div>
                       <div style={{ textAlign: 'right' }}>
+                        {t.discount || (lang === 'cs' ? 'Sleva' : 'Discount')}
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
                         {lang === 'cs' ? 'DPH %' : 'VAT %'}
                       </div>
                       <div style={{ textAlign: 'right' }}>
@@ -2391,15 +2464,15 @@ export default function InvoiceForm({
                         />
                         <select
                           className='ap-select'
-                          value={(it as any).unit || 'h'}
+                          value={(it as any).unit || 'ks'}
                           onChange={(e) =>
                             updateItem(i, 'unit', e.target.value)
                           }
                         >
-                          <option value='h'>{lang === 'cs' ? 'h' : 'h'}</option>
                           <option value='ks'>
                             {lang === 'cs' ? 'ks' : 'pcs'}
                           </option>
+                          <option value='h'>{lang === 'cs' ? 'h' : 'h'}</option>
                           <option value='m'>
                             {lang === 'cs' ? 'měsíc' : 'month'}
                           </option>
@@ -2417,6 +2490,33 @@ export default function InvoiceForm({
                           }
                           style={{ textAlign: 'right' }}
                         />
+                        <div className='ap-discount-input'>
+                          <input
+                            className='ap-discount-input__field'
+                            type='number'
+                            step='any'
+                            min='0'
+                            value={it.discount || ''}
+                            placeholder='0'
+                            onChange={(e) =>
+                              updateItem(
+                                i,
+                                'discount',
+                                parseFloat(e.target.value) || 0,
+                              )
+                            }
+                          />
+                          <select
+                            className='ap-discount-input__select'
+                            value={it.discountType || 'percent'}
+                            onChange={(e) =>
+                              updateItem(i, 'discountType', e.target.value)
+                            }
+                          >
+                            <option value='percent'>%</option>
+                            <option value='amount'>{formData.currency}</option>
+                          </select>
+                        </div>
                         <select
                           className='ap-select'
                           value={String(it.taxRate || 0)}
@@ -2454,15 +2554,57 @@ export default function InvoiceForm({
                   <div className='ap-totals'>
                     <div className='ap-totals__row'>
                       <span className='label'>
-                        {lang === 'cs' ? 'Mezisoučet' : 'Subtotal'}
+                        {t.itemsSubtotal || (lang === 'cs' ? 'Mezisoučet položek' : 'Items subtotal')}
                       </span>
-                      <span className='num'>{formData.taxBase}</span>
+                      <span className='num'>{formData.itemsSubtotal || formData.taxBase} {formData.currency}</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '8px 0', padding: '8px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
+                      <span className='label' style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
+                        {t.invoiceDiscount || (lang === 'cs' ? 'Sleva na celou fakturu' : 'Invoice discount')}
+                      </span>
+                      <div className='ap-discount-input' style={{ width: 130 }}>
+                        <input
+                          className='ap-discount-input__field'
+                          type='number'
+                          step='any'
+                          min='0'
+                          value={formData.invoiceDiscount || ''}
+                          placeholder='0'
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              invoiceDiscount: parseFloat(e.target.value) || 0,
+                            }))
+                          }
+                        />
+                        <select
+                          className='ap-discount-input__select'
+                          value={formData.invoiceDiscountType || 'percent'}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              invoiceDiscountType: e.target.value as 'percent' | 'amount',
+                            }))
+                          }
+                        >
+                          <option value='percent'>%</option>
+                          <option value='amount'>{formData.currency}</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className='ap-totals__row'>
+                      <span className='label'>
+                        {lang === 'cs' ? 'Základ daně' : 'Tax base'}
+                      </span>
+                      <span className='num'>{formData.taxBase} {formData.currency}</span>
                     </div>
                     <div className='ap-totals__row'>
                       <span className='label'>
                         {lang === 'cs' ? 'DPH' : 'VAT'}
                       </span>
-                      <span className='num'>{formData.taxAmount}</span>
+                      <span className='num'>{formData.taxAmount} {formData.currency}</span>
                     </div>
                     <div className='ap-totals__row ap-totals__row--grand'>
                       <span>
@@ -2677,6 +2819,14 @@ export default function InvoiceForm({
                   </button>
                   <button
                     type='button'
+                    onClick={() => window.print()}
+                    className='ap-btn ap-btn--secondary'
+                  >
+                    <Printer size={ICON_MD} strokeWidth={STROKE} />{' '}
+                    {t.print || (lang === 'cs' ? 'Tisk' : 'Print')}
+                  </button>
+                  <button
+                    type='button'
                     onClick={handleEmailPDF}
                     disabled={isGenerating || !isAuthenticated}
                     className='ap-btn ap-btn--secondary'
@@ -2696,6 +2846,15 @@ export default function InvoiceForm({
             </div>
           </div>
         )}
+
+        {/* Dedicated target for browser printing — guarantees complete up-to-date document DOM */}
+        <div className='ap-print-target'>
+          <InvoicePreview
+            invoice={getCurrentInvoiceData()}
+            t={t}
+            lang={lang}
+          />
+        </div>
       </div>
     </>
   );

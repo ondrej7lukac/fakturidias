@@ -1,14 +1,26 @@
-/* A4 preview — follows the app theme (flips with light/dark mode) */
+/* Standard A4 Paper Preview — ALWAYS clean crisp paper white regardless of app theme */
 .invoice-preview {
-  background: var(--card);
+  background: #ffffff !important;
+  color: #0f172a !important;
   max-width: 210mm;
   margin: 0 auto;
   font-family: "Outfit", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   min-height: 297mm;
-  box-shadow: var(--shadow-lg);
-  border-radius: 4px;
-  color: var(--text);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  box-sizing: border-box;
 }
+
+.invoice-preview h1 { color: #2563eb !important; }
+.invoice-preview h3,
+.invoice-preview strong,
+.invoice-preview th { color: #0f172a !important; }
+.invoice-preview p,
+.invoice-preview span,
+.invoice-preview td,
+.invoice-preview div { color: #334155 !important; }
+.invoice-preview table th { color: #475569 !important; border-bottom: 2px solid #cbd5e1 !important; }
+.invoice-preview table td { border-bottom: 1px solid #f1f5f9 !important; color: #1e293b !important; }
 
 @media screen and (min-width: 769px) {
   .invoice-preview {
@@ -19,8 +31,8 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 50px;
-    border-bottom: 2px solid var(--accent-2);
+    margin-bottom: 40px;
+    border-bottom: 2px solid #2563eb !important;
     padding-bottom: 20px;
   }
 
@@ -28,13 +40,13 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 60px;
-    margin-bottom: 50px;
+    margin-bottom: 40px;
   }
 
   .preview-payment-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
   }
 
   .preview-footer {
@@ -102,9 +114,63 @@
 }
 
 @media print {
+  /* globals.css handles all print layout via .ap-print-target wrapper.
+     These rules act as a safety net to prevent mobile-CSS overrides from
+     leaking into print when InvoicePreview is rendered directly. */
   .invoice-preview {
     box-shadow: none;
     border-radius: 0;
+    /* 15mm padding — same value as globals.css so output is identical
+       whether coming from the print-target or a direct window.print() */
     padding: 15mm;
+    width: 100%;
+    max-width: 100%;
+    min-height: auto;
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 13px;
+    line-height: 1.5;
+    box-sizing: border-box;
+  }
+
+  /* Restore all desktop layout classes — overrides any mobile breakpoint rules */
+  .preview-header {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    border-bottom: 2px solid #2563eb !important;
+    padding-bottom: 20px !important;
+    margin-bottom: 40px !important;
+  }
+  .preview-header > div { text-align: left !important; width: auto !important; }
+  .preview-header > div:last-child { text-align: right !important; }
+
+  .preview-grid-2 {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 60px !important;
+    margin-bottom: 40px !important;
+  }
+
+  .preview-footer {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: flex-end !important;
+  }
+  .preview-footer > div { width: auto !important; }
+
+  .preview-vat-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 15px !important;
+  }
+
+  .preview-payment-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 15px !important;
   }
 }
+

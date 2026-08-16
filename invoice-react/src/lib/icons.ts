@@ -58,6 +58,7 @@ export {
   Loader2,
   Key,
   Webhook,
+  Printer,
 } from 'lucide-react'
 
 export const ICON_SM = 14

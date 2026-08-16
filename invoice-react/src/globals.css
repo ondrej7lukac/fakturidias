@@ -262,4 +262,151 @@ select option,
 .ap-select option {
   background-color: var(--card);
   color: var(--text);
-}
+}
+
+/* Screen rule to hide print-only target from normal web UI */
+@media screen {
+  .ap-print-target {
+    display: none !important;
+  }
+}
+
+/* ── Print Media Stylesheet ────────────────────────────── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  /* Force all elements to overflow: visible so Chromium printer renderer never clips tables or footers */
+  *,
+  *::before,
+  *::after {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Hide entire web-app shell */
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  header, nav, aside, footer,
+  .ap-page__head, .ap-action-bar,
+  button, form, .ap-card {
+    display: none !important;
+  }
+
+  /* ── Show only the dedicated print target ── */
+  .ap-print-target {
+    display: block !important;
+    visibility: visible !important;
+    /* static = stays in normal flow → full height renders → no clipping */
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  .ap-print-target,
+  .ap-print-target * {
+    visibility: visible !important;
+  }
+
+  /*
+   * Force invoice to render at consistent A4 dimensions on every device.
+   * The @page margin (10 mm per side) is applied by the browser.
+   * We add 15 mm inner padding so content never touches the page edge,
+   * matching the on-screen preview appearance on both mobile and desktop.
+   */
+  .ap-print-target .invoice-preview {
+    display: block !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 15mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ── Tables ── */
+  .ap-print-target table {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-bottom: 30px !important;
+    table-layout: auto !important;
+  }
+  .ap-print-target thead  { display: table-header-group !important; }
+  .ap-print-target tbody  { display: table-row-group !important; }
+  .ap-print-target tr     { display: table-row !important; page-break-inside: avoid; }
+  .ap-print-target td,
+  .ap-print-target th     { display: table-cell !important; padding: 8px 0 !important; }
+
+  /* ── Always use desktop (wide) layout — same on phone or PC ── */
+  .ap-print-target .preview-header {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    margin-bottom: 30px !important;
+    border-bottom: 2px solid #2563eb !important;
+    padding-bottom: 15px !important;
+  }
+  .ap-print-target .preview-header > div:last-child {
+    text-align: right !important;
+  }
+
+  .ap-print-target .preview-grid-2 {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 40px !important;
+    margin-bottom: 30px !important;
+  }
+
+  .ap-print-target .preview-footer {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: flex-end !important;
+    margin-bottom: 30px !important;
+  }
+  .ap-print-target .preview-footer > div {
+    width: auto !important;
+  }
+
+  .ap-print-target .preview-vat-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 15px !important;
+  }
+
+  .ap-print-target .preview-payment-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 15px !important;
+  }
+
+  /* QR code canvas must have explicit size so it doesn't collapse */
+  .ap-print-target canvas {
+    display: block !important;
+    width: 120px !important;
+    height: 120px !important;
+  }
+}

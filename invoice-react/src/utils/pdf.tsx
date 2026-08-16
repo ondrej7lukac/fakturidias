@@ -168,7 +168,7 @@ function InvoicePDF({ invoice, t, qrDataUrl }: { invoice: any; t: any; qrDataUrl
                             <Text style={[S.tblCell, S.colQty]}>{item.qty}</Text>
                             <Text style={[S.tblCell, S.colPrice]}>{invoice.currency} {Number(item.price).toFixed(2)}</Text>
                             <Text style={[S.tblCell, S.colTax]}>{item.taxRate || 0}%</Text>
-                            <Text style={[S.tblCell, S.colDisc]}>{item.discount > 0 ? `${invoice.currency} ${Number(item.discount).toFixed(2)}` : '-'}</Text>
+                            <Text style={[S.tblCell, S.colDisc]}>{item.discount > 0 ? (item.discountType === 'percent' ? `${item.discount}%` : `${invoice.currency} ${Number(item.discount).toFixed(2)}`) : '-'}</Text>
                             <Text style={[S.tblCell, S.colTotal]}>{invoice.currency} {Number(item.total).toFixed(2)}</Text>
                         </View>
                     ))}
@@ -207,9 +207,17 @@ function InvoicePDF({ invoice, t, qrDataUrl }: { invoice: any; t: any; qrDataUrl
                         <View style={S.totRow}>
                             <Text style={S.totLabel}>{t.subtotal}:</Text>
                             <Text style={S.totVal}>
-                                {invoice.currency} {parseFloat(invoice.isVatPayer ? (invoice.taxBase || invoice.amount) : invoice.amount).toFixed(2)}
+                                {invoice.currency} {parseFloat(String(invoice.itemsSubtotal || (invoice.isVatPayer ? (invoice.taxBase || invoice.amount) : invoice.amount) || 0)).toFixed(2)}
                             </Text>
                         </View>
+                        {!!invoice.invoiceDiscount && Number(invoice.invoiceDiscount) > 0 && (
+                            <View style={S.totRow}>
+                                <Text style={[S.totLabel, { color: '#e33d63' }]}>{t.invoiceDiscount || 'Sleva'}:</Text>
+                                <Text style={[S.totVal, { color: '#e33d63' }]}>
+                                    - {invoice.invoiceDiscountType === 'percent' ? `${invoice.invoiceDiscount}%` : `${invoice.currency} ${Number(invoice.invoiceDiscount).toFixed(2)}`}
+                                </Text>
+                            </View>
+                        )}
                         <View style={S.totRow}>
                             <Text style={S.totLabel}>{isCs ? 'DPH' : 'VAT'} ({invoice.isVatPayer ? invoice.taxRate : '0'}%):</Text>
                             <Text style={S.totLabel}>
