@@ -1,110 +1,76 @@
-/* A4 preview — follows the app theme (flips with light/dark mode) */
+/* The invoice preview always looks like a printed A4 page: fixed paper
+   colors (see paperColors.ts / InvoicePreview.tsx), independent of the app's
+   theme (no dark mode), and a fixed layout that is scaled down as one rigid
+   unit on narrow screens instead of reflowing — proportions never change,
+   only the zoom level, exactly like a real page thumbnail. */
+
+.invoice-preview-frame {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
 .invoice-preview {
-  background: var(--card);
-  max-width: 210mm;
-  margin: 0 auto;
-  font-family: "Outfit", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: #ffffff;
+  width: 210mm;
   min-height: 297mm;
-  box-shadow: var(--shadow-lg);
+  flex-shrink: 0;
+  padding: 20mm;
+  box-sizing: border-box;
+  font-family: "Outfit", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
   border-radius: 4px;
-  color: var(--text);
+  color: #111827;
+  transform-origin: top center;
 }
 
-@media screen and (min-width: 769px) {
-  .invoice-preview {
-    padding: 20mm;
-  }
-
-  .preview-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 50px;
-    border-bottom: 2px solid var(--accent-2);
-    padding-bottom: 20px;
-  }
-
-  .preview-grid-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 60px;
-    margin-bottom: 50px;
-  }
-
-  .preview-payment-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-  }
-
-  .preview-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-  }
-
-  .preview-vat-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-    font-size: 14px;
-  }
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 50px;
+  border-bottom: 2px solid #6366f1;
+  padding-bottom: 20px;
 }
 
-@media (max-width: 768px) {
-  .invoice-preview {
-    padding: 1rem !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box;
-    overflow-x: hidden;
-  }
+.preview-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  margin-bottom: 50px;
+}
 
-  .preview-header {
-    flex-direction: column;
-    align-items: flex-start !important;
-    gap: 1rem;
-    border-bottom: 2px solid var(--accent-2);
-    padding-bottom: 20px;
-    margin-bottom: 30px !important;
-  }
+.preview-payment-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
 
-  .preview-header > div {
-    text-align: left !important;
-    width: 100%;
-  }
+.preview-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
 
-  .preview-grid-2 {
-    grid-template-columns: 1fr !important;
-    gap: 30px !important;
-    margin-bottom: 30px !important;
-  }
-
-  .preview-payment-grid {
-    grid-template-columns: 1fr !important;
-    gap: 15px !important;
-  }
-
-  .preview-footer {
-    flex-direction: column;
-    align-items: flex-start !important;
-    gap: 20px;
-  }
-
-  .preview-footer > div {
-    width: 100% !important;
-  }
-
-  .preview-vat-grid {
-    grid-template-columns: 1fr !important;
-    gap: 15px !important;
-  }
+.preview-vat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  font-size: 14px;
 }
 
 @media print {
+  .invoice-preview-frame {
+    height: auto !important;
+    overflow: visible;
+  }
+
   .invoice-preview {
     box-shadow: none;
     border-radius: 0;
     padding: 15mm;
+    transform: none !important;
   }
 }

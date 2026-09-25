@@ -16,6 +16,7 @@ export {
   AlertTriangle,
   Cloud,
   Mail,
+  Share2,
   RefreshCw,
   ArrowLeftRight,
   ArrowUp,
@@ -58,6 +59,8 @@ export {
   Loader2,
   Key,
   Webhook,
+  Paperclip,
+  Link2,
 } from 'lucide-react'
 
 export const ICON_SM = 14

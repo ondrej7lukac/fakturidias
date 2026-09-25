@@ -68,6 +68,10 @@ export interface Invoice {
   taxRate?: number | string;
   taxAmount?: number | string;
   note?: string;
+  // Durable email-send confirmation — set once the PDF is actually delivered,
+  // so the list/dashboard/preview can show it without relying on transient UI state.
+  emailSentAt?: string | null;
+  emailSentTo?: string | null;
   [key: string]: unknown;
 }
 

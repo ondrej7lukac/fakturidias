@@ -1,6 +1,7 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet, Image, pdf as renderPdf, Font } from '@react-pdf/renderer'
 import { documentTypeTitleKey } from './storage'
+import { PAPER } from './paperColors'
 
 // Bundled locally (Vite asset) so PDF rendering never depends on a third-party
 // font CDN at render time. Full latin + latin-ext coverage for Czech/Slovak diacritics.
@@ -16,22 +17,9 @@ Font.register({
 })
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-const C = {
-    indigo:      '#6366f1',
-    slate400:    '#94a3b8',
-    slate500:    '#64748b',
-    gray900:     '#111827',
-    gray700:     '#374151',
-    gray500:     '#6b7280',
-    gray200:     '#e5e7eb',
-    greenBg:     '#f0fdf4',
-    greenBorder: '#86efac',
-    green700:    '#15803d',
-    green800:    '#166534',
-    slate50:     '#f8fafc',
-    slate200:    '#e2e8f0',
-    white:       '#ffffff',
-}
+// Shared with the on-screen preview (InvoicePreview.tsx via paperColors.ts) so
+// the PDF you download always looks exactly like what you saw in the preview.
+const C = PAPER
 
 const S = StyleSheet.create({
     page: { fontFamily: 'Roboto', fontSize: 10, color: C.gray900, backgroundColor: C.white, padding: 40 },

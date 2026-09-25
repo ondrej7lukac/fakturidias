@@ -7,6 +7,7 @@ import type {
   ClipboardEvent,
   KeyboardEvent,
   FormEvent,
+  ReactNode,
 } from 'react';
 import { useLiveActivity } from '@/contexts/activity';
 import {
@@ -18,6 +19,8 @@ import {
   createPaymentLink,
   createShareLink,
   downloadInvoiceIsdoc,
+  peekInvoiceCounter,
+  reserveInvoiceCounter,
   type DocumentType,
 } from '../utils/storage';
 import { searchAres, parseAresItem, lookupAresByIco } from '../utils/ares';
@@ -39,13 +42,33 @@ import {
   Wallet,
   Search,
   X,
-  Send,
   Save,
   CreditCard,
+  MoreHorizontal,
+  Download,
+  Share2,
+  Copy,
+  Loader2,
+  Paperclip,
+  Link2,
   ICON_MD,
   ICON_SM,
   STROKE,
 } from '@/lib/icons';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from '@/components/ui/dialog';
 
 import ItemsTable from './ItemsTable';
 import InvoicePreview from './InvoicePreview';
@@ -79,7 +102,10 @@ function randomUUID(): string {
 interface InvoiceFormProps {
   invoice?: Invoice | null;
   categories: string[];
-  onSave: (invoice: Invoice, options?: { autoSave?: boolean }) => void;
+  onSave: (
+    invoice: Invoice,
+    options?: { autoSave?: boolean },
+  ) => void | Promise<void>;
   onAddCategory: (cat: string) => void;
   invoiceCounter: number;
   invoicesLoaded: boolean;
@@ -179,6 +205,11 @@ export default function InvoiceForm({
     taxBase: '0.00',
     taxRate: '21',
     taxAmount: '0.00',
+    // Durable send confirmation — set once by handleEmailPDF and persisted with
+    // the invoice, so "was this actually sent?" survives reloads and shows up
+    // wherever the invoice is viewed, not just as a toast that fades away.
+    emailSentAt: '',
+    emailSentTo: '',
   });
 
   const [items, setItems] = useState<InvoiceLineItem[]>([]);
@@ -186,6 +217,14 @@ export default function InvoiceForm({
   const itemSuggestionsRef = useRef<HTMLDivElement | null>(null);
   // Stable ID for this new-invoice session — generated once, reused across all auto-saves
   const newInvoiceIdRef = useRef<string | null>(null);
+  // Caches the server-reserved number for the CURRENT new-invoice session so
+  // repeat autosaves reuse it instead of reserving a fresh number each time.
+  // Keyed by newInvoiceIdRef's value so it naturally invalidates for the next draft.
+  const reservedNumberRef = useRef<{
+    forId: string;
+    documentType: string;
+    invoiceNumber: string;
+  } | null>(null);
 
   useEffect(() => {
     stateRef.current = { formData, items };
@@ -223,9 +262,30 @@ export default function InvoiceForm({
   const [categoryInput, setCategoryInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [emailStatus, setEmailStatus] = useState('');
+  // Persistent (non-fading) error banner for the last failed send attempt.
+  const [emailError, setEmailError] = useState('');
   const [payStatus, setPayStatus] = useState('');
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [previewMode, setPreviewMode] = useState(false);
+  // Download/email/share each confirm in a modal before doing anything —
+  // the email one also shows exactly what will be sent.
+  const [activeModal, setActiveModal] = useState<'download' | 'email' | 'share' | null>(
+    null,
+  );
+  const [shareLink, setShareLink] = useState<{
+    status: 'idle' | 'loading' | 'ready' | 'error';
+    url?: string;
+    error?: string;
+  }>({ status: 'idle' });
+  const [shareLinkCopied, setShareLinkCopied] = useState(false);
+  // Editable subject/body for the email modal — pre-filled with the default
+  // template each time the modal opens, then left alone while it's open.
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [includeShareLink, setIncludeShareLink] = useState(false);
+  // Opening an existing invoice starts in its preview, not the raw edit form
+  // (see also Effect 1b below, which keeps this in sync when a different
+  // invoice is opened later without remounting this component).
+  const [previewMode, setPreviewMode] = useState(() => !!invoice);
   const [viesStatus, setViesStatus] = useState<
     'loading' | 'valid' | 'invalid' | null
   >(null);
@@ -258,6 +318,7 @@ export default function InvoiceForm({
       if (prev) clearTimeout(prev);
       return null;
     });
+    setEmailError('');
 
     if (invoice) {
       // Opening an existing invoice for editing
@@ -307,6 +368,8 @@ export default function InvoiceForm({
         taxBase: String(invoice.taxBase || '0.00'),
         taxRate: String(invoice.taxRate || '21'),
         taxAmount: String(invoice.taxAmount || '0.00'),
+        emailSentAt: (invoice.emailSentAt as string) || '',
+        emailSentTo: (invoice.emailSentTo as string) || '',
       }));
       setItems(invoice.items || []);
     } else {
@@ -335,6 +398,8 @@ export default function InvoiceForm({
         clientAddress: '',
         currency: 'CZK',
         amount: '0.00',
+        emailSentAt: '',
+        emailSentTo: '',
         // Keep supplier/bank from previous state (filled in Effect 3)
         iban: prev.iban,
         bic: prev.bic,
@@ -360,9 +425,24 @@ export default function InvoiceForm({
     }
   }, [invoice]); // ← ONLY invoice as dependency
 
+  // ─── Effect 1b: Open an existing invoice straight into its preview ────────
+  // Keyed on the invoice's id (a primitive), not the invoice object itself,
+  // so re-saving the SAME invoice (autosave gives it a new object reference
+  // every ~1s while editing) never yanks the user out of edit mode. It only
+  // fires when a genuinely different invoice is opened, a new one is started,
+  // or a brand-new invoice is saved for the first time.
+  useEffect(() => {
+    setPreviewMode(!!invoice);
+  }, [invoice?.id]);
+
   // ─── Effect 2: Generate invoice number once invoices are loaded ────────────
+  // Guests: client-derived counter (scan of loaded invoices) — fine at their
+  // 1-invoice cap. Authenticated users: a live, non-committal preview from the
+  // server's per-series counter (see Effect 2b) — the real number is only
+  // reserved once, at first save, by ensureReservedNumber().
   useEffect(() => {
     if (invoice) return; // Editing existing — never change its number
+    if (isAuthenticated) return; // handled by Effect 2b below
     if (!invoicesLoaded) {
       setFormData((prev) => ({ ...prev, invoiceNumber: '...' }));
       return;
@@ -386,7 +466,77 @@ export default function InvoiceForm({
         variableSymbol: draftNumber.replace(/\D/g, '').slice(0, 10),
       }));
     }
-  }, [invoice, invoiceCounter, invoicesLoaded, draftNumber, setDraftNumber]);
+  }, [
+    invoice,
+    isAuthenticated,
+    invoiceCounter,
+    invoicesLoaded,
+    draftNumber,
+    setDraftNumber,
+  ]);
+
+  // ─── Effect 2b: Live number preview for authenticated users ────────────────
+  // Each document type has its own server-side sequence (Invoice/Proforma/
+  // Advance/Credit note count independently). This only PEEKS at the next
+  // value — it never consumes it, so opening/abandoning a new-invoice draft
+  // never burns a number or creates a gap in the sequence.
+  useEffect(() => {
+    if (invoice) return; // Editing existing — never change its number
+    if (!isAuthenticated) return;
+    const documentType = (formData.documentType || 'invoice') as DocumentType;
+
+    // Already reserved a real number for this exact draft + series? Keep it.
+    const reserved = reservedNumberRef.current;
+    if (
+      reserved &&
+      reserved.forId === newInvoiceIdRef.current &&
+      reserved.documentType === documentType
+    ) {
+      if (formData.invoiceNumber !== reserved.invoiceNumber) {
+        setFormData((prev) => ({
+          ...prev,
+          invoiceNumber: reserved.invoiceNumber,
+          variableSymbol: reserved.invoiceNumber.replace(/\D/g, '').slice(0, 10),
+        }));
+      }
+      return;
+    }
+
+    let cancelled = false;
+    peekInvoiceCounter(documentType)
+      .then((counter) => {
+        if (cancelled) return;
+        const base = formatInvoiceNumber(
+          counter,
+          defaultSupplier?.invoiceNumberFormat,
+        );
+        const invoiceNumber = applyDocumentTypeToNumber(base, documentType);
+        setFormData((prev) => ({
+          ...prev,
+          invoiceNumber,
+          variableSymbol: invoiceNumber.replace(/\D/g, '').slice(0, 10),
+        }));
+      })
+      .catch((err) => {
+        console.error('[Numbering] Failed to preview next number:', err);
+        if (cancelled) return;
+        // Fall back to the client-derived guess so the field isn't stuck on '...'
+        const base = formatInvoiceNumber(
+          invoiceCounter,
+          defaultSupplier?.invoiceNumberFormat,
+        );
+        const invoiceNumber = applyDocumentTypeToNumber(base, documentType);
+        setFormData((prev) => ({
+          ...prev,
+          invoiceNumber,
+          variableSymbol: invoiceNumber.replace(/\D/g, '').slice(0, 10),
+        }));
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoice, isAuthenticated, formData.documentType, defaultSupplier?.invoiceNumberFormat]);
 
   // ─── Effect 3: Pre-fill supplier/bank for new invoices when profile loads ──
   useEffect(() => {
@@ -593,13 +743,13 @@ export default function InvoiceForm({
     const currentFormData = stateRef.current.formData;
     if (!currentFormData.clientName?.trim()) return;
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       const currentData = stateRef.current;
-      const invoiceData = getCurrentInvoiceData(
+      const invoiceData = await finalizeAndSave(
         currentData.formData,
         currentData.items,
+        { autoSave: true },
       );
-      onSave(invoiceData, { autoSave: true });
 
       if (invoiceData.client && invoiceData.client.name) {
         fetch('/api/customers', {
@@ -700,7 +850,73 @@ export default function InvoiceForm({
       taxBase: currentFormData.taxBase,
       taxRate: currentFormData.taxRate,
       taxAmount: currentFormData.taxAmount,
+      emailSentAt: currentFormData.emailSentAt || null,
+      emailSentTo: currentFormData.emailSentTo || null,
     };
+  };
+
+  // Consumes a real, collision-free number from the server the FIRST time a
+  // brand-new invoice is actually persisted (never on every render/keystroke —
+  // see Effect 2, which only shows a non-committal preview until then).
+  // Repeat autosaves of the same draft+series reuse the cached reservation.
+  const ensureReservedNumber = async () => {
+    if (!isAuthenticated || invoice) return; // guests keep client-derived numbers; existing invoices never change
+    const forId = newInvoiceIdRef.current;
+    const documentType = (stateRef.current.formData.documentType ||
+      'invoice') as DocumentType;
+    const reserved = reservedNumberRef.current;
+    if (
+      reserved &&
+      reserved.forId === forId &&
+      reserved.documentType === documentType
+    ) {
+      return; // already reserved for this exact draft + series
+    }
+    try {
+      const counter = await reserveInvoiceCounter(documentType);
+      const base = formatInvoiceNumber(
+        counter,
+        defaultSupplier?.invoiceNumberFormat,
+      );
+      const invoiceNumber = applyDocumentTypeToNumber(base, documentType);
+      const variableSymbol = invoiceNumber.replace(/\D/g, '').slice(0, 10);
+      reservedNumberRef.current = { forId: forId!, documentType, invoiceNumber };
+      stateRef.current = {
+        ...stateRef.current,
+        formData: {
+          ...stateRef.current.formData,
+          invoiceNumber,
+          variableSymbol,
+        },
+      };
+      setFormData((prev) => ({ ...prev, invoiceNumber, variableSymbol }));
+    } catch (err) {
+      // Numbering service hiccup — don't block the save, just keep whatever
+      // preview number was already displayed (best-effort, user can edit it).
+      console.error('[Numbering] Failed to reserve invoice number:', err);
+    }
+  };
+
+  // Every path that persists a NEW invoice for the first time must funnel
+  // through here so the number is reserved exactly once before saving.
+  const finalizeAndSave = async (
+    currentFormData = stateRef.current.formData,
+    currentItems = stateRef.current.items,
+    options?: { autoSave?: boolean },
+  ) => {
+    await ensureReservedNumber();
+    const latest = stateRef.current.formData;
+    const mergedFormData =
+      reservedNumberRef.current && !invoice
+        ? {
+            ...currentFormData,
+            invoiceNumber: latest.invoiceNumber,
+            variableSymbol: latest.variableSymbol,
+          }
+        : currentFormData;
+    const invoiceData = getCurrentInvoiceData(mergedFormData, currentItems);
+    await onSave(invoiceData, options);
+    return invoiceData;
   };
 
   const handleDocTypeChange = (e: ChangeEvent<HTMLSelectElement>) => {
@@ -708,6 +924,9 @@ export default function InvoiceForm({
     setFormData((prev) => {
       // Existing invoices keep their issued number; only re-prefix drafts.
       if (invoice) return { ...prev, documentType };
+      // Authenticated drafts: Effect 2b re-peeks the new series' own counter
+      // and fills in the correct number — just flip the type here.
+      if (isAuthenticated) return { ...prev, documentType };
       const invoiceNumber = applyDocumentTypeToNumber(
         prev.invoiceNumber,
         documentType,
@@ -1151,17 +1370,22 @@ export default function InvoiceForm({
     }
   };
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
+  // Shared by both the form's native submit (Enter key) and the action bar's
+  // Save button, which renders identically in edit and preview mode.
+  const saveInvoiceNow = async () => {
     // Ensure we use the very latest state from stateRef for saving
     const data = stateRef.current;
-    const invoiceData = getCurrentInvoiceData(data.formData, data.items);
-    onSave(invoiceData);
+    const invoiceData = await finalizeAndSave(data.formData, data.items);
     setDefaultSupplier(invoiceData.supplier);
     announce({
       kind: 'done',
       label: lang === 'cs' ? 'Faktura uložena' : 'Invoice saved',
     });
+  };
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    saveInvoiceNow();
   };
 
   const handleMarkPaid = () => {
@@ -1244,6 +1468,7 @@ export default function InvoiceForm({
     }
     setIsGenerating(true);
     setEmailStatus(lang === 'cs' ? 'Odesílám…' : 'Sending…');
+    setEmailError('');
     announce({
       kind: 'processing',
       label: lang === 'cs' ? 'Odesílám e-mail…' : 'Sending email…',
@@ -1263,10 +1488,28 @@ export default function InvoiceForm({
       } catch (err) {}
       const pdfBlob = await generateInvoicePDF(currentData, t, qrDataUrl);
       const pdfBase64 = await pdfBlobToDataUri(pdfBlob);
+
+      // A share link points at a persisted invoice — a brand-new draft has
+      // no server-side record yet, so save it first. The server (not this
+      // client) resolves the actual token/URL, so it can verify the invoice
+      // belongs to this user instead of trusting a URL string we hand it.
+      if (includeShareLink) {
+        await finalizeAndSave(stateRef.current.formData, stateRef.current.items, {
+          autoSave: true,
+        });
+      }
+
       const response = await fetch('/api/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoice: currentData, pdfBase64, lang }),
+        body: JSON.stringify({
+          invoice: currentData,
+          pdfBase64,
+          lang,
+          subject: emailSubject.trim(),
+          message: emailMessage.trim(),
+          includeShareLink,
+        }),
       });
       const result = await response.json();
       if (response.ok) {
@@ -1276,16 +1519,35 @@ export default function InvoiceForm({
           label: lang === 'cs' ? 'E-mail odeslán' : 'Email sent',
         });
         setTimeout(() => setEmailStatus(''), 3000);
+
+        // Durable confirmation: mark as sent and persist it, so this survives
+        // reload and shows up in the list/dashboard/preview — not just a toast.
+        const sentAt = new Date().toISOString();
+        const sentTo = currentData.client.email;
+        const updatedFormData = {
+          ...stateRef.current.formData,
+          status:
+            stateRef.current.formData.status === 'paid' ? 'paid' : 'sent',
+          emailSentAt: sentAt,
+          emailSentTo: sentTo,
+        };
+        setFormData(updatedFormData);
+        await finalizeAndSave(updatedFormData, stateRef.current.items, {
+          autoSave: true,
+        });
       } else {
         setEmailStatus('');
+        const message = result.message || result.error || t.alertError;
+        setEmailError(message);
         announce({
           kind: 'error',
           label: lang === 'cs' ? 'Chyba odeslání' : 'Email failed',
         });
-        alert(`${t.alertEmailFailed}${result.message || result.error}`);
+        alert(`${t.alertEmailFailed}${message}`);
       }
     } catch (error) {
       setEmailStatus('');
+      setEmailError(t.alertError);
       announce({
         kind: 'error',
         label: lang === 'cs' ? 'Chyba e-mailu' : 'Email error',
@@ -1332,6 +1594,9 @@ export default function InvoiceForm({
     }
   };
 
+  // Opens the share modal and generates the link in the background — the
+  // modal shows the URL with a Copy button instead of silently copying it
+  // and popping a new tab, so you can actually see what you're sharing.
   const handleShareLink = async () => {
     if (!isAuthenticated) {
       return alert(
@@ -1340,31 +1605,43 @@ export default function InvoiceForm({
           : 'You must be logged in to share an invoice.',
       );
     }
-    const { id } = getCurrentInvoiceData();
-    if (!id) return;
-    setPayStatus(lang === 'cs' ? 'Generuji…' : 'Generating…');
+    setActiveModal('share');
+    setShareLinkCopied(false);
+    setShareLink({ status: 'loading' });
     announce({
       kind: 'processing',
       label: lang === 'cs' ? 'Generuji odkaz…' : 'Generating link…',
     });
     try {
-      const { url } = await createShareLink(id);
-      await navigator.clipboard?.writeText(url).catch(() => {});
-      window.open(url, '_blank', 'noopener');
-      setPayStatus(lang === 'cs' ? 'Odkaz zkopírován' : 'Link copied');
+      // The share link is looked up server-side by invoice id, so a brand
+      // new draft has to be saved first — otherwise the backend has never
+      // seen this id and answers "Invoice not found".
+      const savedInvoice = await finalizeAndSave(
+        stateRef.current.formData,
+        stateRef.current.items,
+        { autoSave: true },
+      );
+      const { url } = await createShareLink(savedInvoice.id);
+      setShareLink({ status: 'ready', url });
       announce({
         kind: 'done',
-        label: lang === 'cs' ? 'Odkaz sdílení zkopírován' : 'Share link copied',
+        label: lang === 'cs' ? 'Odkaz sdílení připraven' : 'Share link ready',
       });
-      setTimeout(() => setPayStatus(''), 3000);
-    } catch {
-      setPayStatus(lang === 'cs' ? 'Chyba' : 'Error');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error';
+      setShareLink({ status: 'error', error: message });
       announce({
         kind: 'error',
         label: lang === 'cs' ? 'Chyba sdílení' : 'Share failed',
       });
-      setTimeout(() => setPayStatus(''), 3000);
     }
+  };
+
+  const handleCopyShareLink = async () => {
+    if (!shareLink.url) return;
+    await navigator.clipboard?.writeText(shareLink.url).catch(() => {});
+    setShareLinkCopied(true);
+    setTimeout(() => setShareLinkCopied(false), 2000);
   };
 
   const handleExportIsdoc = async () => {
@@ -1513,7 +1790,7 @@ export default function InvoiceForm({
 
   // "Create invoice": fill the form AND persist immediately, then jump to the
   // saved invoice. Builds the payload synchronously so it isn't stale.
-  const handleAICreate = (data: any) => {
+  const handleAICreate = async (data: any) => {
     const nextFormData = applyAIData(stateRef.current.formData, data);
     const nextItems = mapAIItems(data) ?? stateRef.current.items;
     setFormData(nextFormData);
@@ -1531,7 +1808,7 @@ export default function InvoiceForm({
       taxBase: totals.taxBase.toFixed(2),
       taxAmount: totals.taxAmount.toFixed(2),
     };
-    onSave(getCurrentInvoiceData(formForSave, nextItems));
+    await finalizeAndSave(formForSave, nextItems);
     announce({
       kind: 'done',
       label: lang === 'cs' ? 'Faktura vytvořena' : 'Invoice created',
@@ -1776,6 +2053,447 @@ export default function InvoiceForm({
     </div>
   );
 
+  // Durable confirmation/error line for the last email attempt — shown above
+  // the action bar in BOTH modes, since it comes from persisted invoice data
+  // (formData.emailSentAt/emailSentTo), not a transient toast.
+  const emailStatusLine = emailError ? (
+    <div className='ap-email-status ap-email-status--error'>
+      <AlertTriangle size={ICON_SM} strokeWidth={STROKE} /> {emailError}
+    </div>
+  ) : formData.emailSentAt ? (
+    <div className='ap-email-status'>
+      <Check size={ICON_SM} strokeWidth={STROKE} />{' '}
+      {lang === 'cs'
+        ? `Odesláno e-mailem ${new Date(formData.emailSentAt).toLocaleString('cs-CZ')} na ${formData.emailSentTo}`
+        : `Emailed ${new Date(formData.emailSentAt).toLocaleString()} to ${formData.emailSentTo}`}
+    </div>
+  ) : null;
+
+  // Secondary, less-frequently-used actions live under "More options" so the
+  // bar stays short on phones — the 4 buttons everyone uses on every invoice
+  // (preview/edit, download, email, save) stay directly visible.
+  const moreActions: {
+    key: string;
+    icon: ReactNode;
+    label: ReactNode;
+    onClick: () => void;
+    disabled?: boolean;
+  }[] = [
+    {
+      key: 'draft',
+      icon: null,
+      label: lang === 'cs' ? 'Uložit jako rozepsanou' : 'Save as draft',
+      onClick: () => setFormData((prev) => ({ ...prev, status: 'draft' })),
+    },
+  ];
+  if (isAuthenticated && formData.status !== 'paid') {
+    moreActions.push({
+      key: 'payment-link',
+      icon: <CreditCard size={ICON_SM} strokeWidth={STROKE} />,
+      label: payStatus || (lang === 'cs' ? 'Platební odkaz' : 'Payment link'),
+      onClick: handlePaymentLink,
+    });
+  }
+  moreActions.push({
+    key: 'isdoc',
+    icon: <FileText size={ICON_SM} strokeWidth={STROKE} />,
+    label: 'ISDOC',
+    onClick: handleExportIsdoc,
+  });
+  if (isAuthenticated) {
+    moreActions.push({
+      key: 'drive',
+      icon: <Cloud size={ICON_SM} strokeWidth={STROKE} />,
+      label: 'Drive',
+      onClick: handleBackupToDrive,
+      disabled: isGenerating,
+    });
+  }
+  if (isAuthenticated && invoice && formData.status !== 'paid') {
+    moreActions.push({
+      key: 'mark-paid',
+      icon: null,
+      label: t.markPaid,
+      onClick: handleMarkPaid,
+    });
+  }
+
+  // One action bar, rendered identically whether the invoice is being viewed
+  // (preview) or edited — the only thing that used to differ between the two
+  // modes was which buttons showed up, which was the actual complaint. Wrapped
+  // in its own card so it looks the same regardless of what surrounds it.
+  const actionBar = (
+    <div className='ap-card ap-action-card'>
+      {emailStatusLine}
+
+      {/* Preview/Edit on top, with download/email/share centered right below
+          it as unlabeled circular icons (mirrors a share sheet). */}
+      <div className='ap-action-top'>
+        <button
+          type='button'
+          onClick={(e) => {
+            e.preventDefault();
+            setPreviewMode(!previewMode);
+          }}
+          className='ap-btn ap-btn--secondary ap-btn--full'
+        >
+          {previewMode ? (
+            <Pencil size={ICON_MD} strokeWidth={STROKE} />
+          ) : (
+            <Eye size={ICON_MD} strokeWidth={STROKE} />
+          )}{' '}
+          {previewMode
+            ? lang === 'cs'
+              ? 'Upravit'
+              : 'Edit'
+            : lang === 'cs'
+              ? 'Náhled PDF'
+              : 'PDF preview'}
+        </button>
+
+        <div className='ap-icon-row'>
+          <button
+            type='button'
+            title={t.downloadPdf}
+            aria-label={t.downloadPdf}
+            onClick={() => setActiveModal('download')}
+            disabled={isGenerating}
+            className='ap-btn ap-btn--secondary ap-btn--circle'
+          >
+            <Download size={ICON_MD} strokeWidth={STROKE} />
+          </button>
+          <button
+            type='button'
+            title={lang === 'cs' ? 'Odeslat e-mailem' : 'Send by email'}
+            aria-label={lang === 'cs' ? 'Odeslat e-mailem' : 'Send by email'}
+            onClick={() => setActiveModal('email')}
+            disabled={isGenerating || !isAuthenticated}
+            className='ap-btn ap-btn--secondary ap-btn--circle'
+          >
+            <Mail size={ICON_MD} strokeWidth={STROKE} />
+          </button>
+          {isAuthenticated && (
+            <button
+              type='button'
+              title={lang === 'cs' ? 'Sdílet odkaz' : 'Share link'}
+              aria-label={lang === 'cs' ? 'Sdílet odkaz' : 'Share link'}
+              onClick={handleShareLink}
+              className='ap-btn ap-btn--secondary ap-btn--circle'
+            >
+              <Share2 size={ICON_MD} strokeWidth={STROKE} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className='ap-action-bar ap-action-bar--mobile-stack'>
+        <DropdownMenu>
+          <DropdownMenuTrigger className='ap-btn ap-btn--ghost'>
+            <MoreHorizontal size={ICON_MD} strokeWidth={STROKE} />{' '}
+            {lang === 'cs' ? 'Další možnosti' : 'More options'}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='end'>
+            {moreActions.map((action) => (
+              <DropdownMenuItem
+                key={action.key}
+                disabled={action.disabled}
+                onClick={action.onClick}
+              >
+                {action.icon}
+                {action.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <button
+          type={previewMode ? 'button' : 'submit'}
+          onClick={(e) => {
+            e.preventDefault();
+            saveInvoiceNow();
+          }}
+          className='ap-btn ap-btn--primary ap-btn--lg'
+        >
+          <Save size={ICON_MD} strokeWidth={STROKE} /> {t.saveInvoice}
+        </button>
+      </div>
+    </div>
+  );
+
+  // Snapshot used to render the download/email confirmation modals — cheap
+  // to (re)compute, always reflects the current form state.
+  const modalInvoiceData = getCurrentInvoiceData();
+  const emailSenderName = modalInvoiceData.supplier?.name || 'Fakturidias';
+  const emailRecipient = modalInvoiceData.client?.email || '';
+  const emailSubjectDefault =
+    lang === 'cs'
+      ? `Faktura ${modalInvoiceData.invoiceNumber}`
+      : `Invoice ${modalInvoiceData.invoiceNumber}`;
+  const emailMessageDefault =
+    lang === 'cs'
+      ? `Vážený zákazníku,\n\nV příloze naleznete fakturu č. ${modalInvoiceData.invoiceNumber}.\n\nDěkujeme za váš obchod!\n\n${emailSenderName}`
+      : `Dear customer,\n\nPlease find attached invoice ${modalInvoiceData.invoiceNumber}.\n\nThank you for your business!\n\n${emailSenderName}`;
+
+  // Re-fill the editable subject/message with fresh defaults each time the
+  // email modal is opened, so switching invoices or language doesn't leave
+  // stale text behind — but leave it alone while the modal stays open, so
+  // edits aren't clobbered by unrelated re-renders.
+  const wasEmailModalOpenRef = useRef(false);
+  useEffect(() => {
+    const isOpen = activeModal === 'email';
+    if (isOpen && !wasEmailModalOpenRef.current) {
+      setEmailSubject(emailSubjectDefault);
+      setEmailMessage(emailMessageDefault);
+      setIncludeShareLink(false);
+    }
+    wasEmailModalOpenRef.current = isOpen;
+  }, [activeModal, emailSubjectDefault, emailMessageDefault]);
+
+  const modals = (
+    <>
+      {/* Download — quick confirm, since the exact page is already visible above */}
+      <Dialog
+        open={activeModal === 'download'}
+        onOpenChange={(open) => !open && setActiveModal(null)}
+      >
+        <DialogContent className='ap-modal' overlayClassName='ap-modal-overlay'>
+          <DialogHeader className='ap-modal__header'>
+            <DialogTitle>{t.downloadPdf}</DialogTitle>
+            <DialogClose
+              className='ap-btn ap-btn--icon ap-btn--ghost'
+              aria-label={lang === 'cs' ? 'Zavřít' : 'Close'}
+            >
+              <X size={ICON_SM} strokeWidth={STROKE} />
+            </DialogClose>
+          </DialogHeader>
+          <DialogDescription>
+            {lang === 'cs'
+              ? `Stáhne se soubor ${modalInvoiceData.invoiceNumber}.pdf do vašeho zařízení.`
+              : `This downloads ${modalInvoiceData.invoiceNumber}.pdf to your device.`}
+          </DialogDescription>
+          <div className='ap-modal__footer'>
+            <button
+              type='button'
+              className='ap-btn ap-btn--ghost'
+              onClick={() => setActiveModal(null)}
+            >
+              {lang === 'cs' ? 'Zrušit' : 'Cancel'}
+            </button>
+            <button
+              type='button'
+              className='ap-btn ap-btn--primary'
+              disabled={isGenerating}
+              onClick={async () => {
+                await handleDownloadPDF();
+                setActiveModal(null);
+              }}
+            >
+              {isGenerating ? (
+                <Loader2 size={ICON_SM} strokeWidth={STROKE} className='ap-spin' />
+              ) : (
+                <Download size={ICON_SM} strokeWidth={STROKE} />
+              )}
+              {t.downloadPdf}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email — shows exactly what will be sent (to / subject / message)
+          before it actually goes out, mirroring backend/lib/email.js's template. */}
+      <Dialog
+        open={activeModal === 'email'}
+        onOpenChange={(open) => !open && setActiveModal(null)}
+      >
+        <DialogContent className='ap-modal' overlayClassName='ap-modal-overlay'>
+          <DialogHeader className='ap-modal__header'>
+            <DialogTitle>
+              {lang === 'cs' ? 'Odeslat fakturu e-mailem' : 'Send invoice by email'}
+            </DialogTitle>
+            <DialogClose
+              className='ap-btn ap-btn--icon ap-btn--ghost'
+              aria-label={lang === 'cs' ? 'Zavřít' : 'Close'}
+            >
+              <X size={ICON_SM} strokeWidth={STROKE} />
+            </DialogClose>
+          </DialogHeader>
+
+          {!emailRecipient ? (
+            <div className='ap-modal__warning'>
+              <AlertTriangle size={ICON_SM} strokeWidth={STROKE} />
+              {t.alertEmailMissing}
+            </div>
+          ) : (
+            <>
+              <div className='ap-modal__meta'>
+                <div>
+                  <span>{lang === 'cs' ? 'Komu' : 'To'}</span>
+                  <strong>{emailRecipient}</strong>
+                </div>
+              </div>
+
+              <div className='ap-field'>
+                <label>{lang === 'cs' ? 'Předmět' : 'Subject'}</label>
+                <input
+                  className='ap-input'
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  maxLength={200}
+                />
+              </div>
+
+              <div className='ap-field'>
+                <label>{lang === 'cs' ? 'Zpráva' : 'Message'}</label>
+                <textarea
+                  className='ap-textarea'
+                  rows={6}
+                  value={emailMessage}
+                  onChange={(e) => setEmailMessage(e.target.value)}
+                />
+              </div>
+
+              <div className='ap-modal__pins'>
+                <span
+                  className='ap-modal__pin'
+                  title={
+                    lang === 'cs'
+                      ? 'Tato příloha se vždy odešle s fakturou'
+                      : 'This attachment is always sent with the invoice'
+                  }
+                >
+                  <Paperclip size={ICON_SM} strokeWidth={STROKE} />
+                  {modalInvoiceData.invoiceNumber}.pdf
+                </span>
+                <label className='ap-modal__pin ap-modal__pin--toggle'>
+                  <input
+                    type='checkbox'
+                    checked={includeShareLink}
+                    onChange={(e) => setIncludeShareLink(e.target.checked)}
+                  />
+                  <Link2 size={ICON_SM} strokeWidth={STROKE} />
+                  {lang === 'cs'
+                    ? 'Odkaz na online zobrazení'
+                    : 'Link to view online'}
+                </label>
+              </div>
+            </>
+          )}
+
+          {emailError && (
+            <div className='ap-modal__warning ap-modal__warning--error'>
+              {emailError}
+            </div>
+          )}
+
+          <div className='ap-modal__footer'>
+            <button
+              type='button'
+              className='ap-btn ap-btn--ghost'
+              onClick={() => setActiveModal(null)}
+            >
+              {lang === 'cs' ? 'Zrušit' : 'Cancel'}
+            </button>
+            <button
+              type='button'
+              className='ap-btn ap-btn--primary'
+              disabled={isGenerating || !emailRecipient}
+              onClick={async () => {
+                await handleEmailPDF();
+                setActiveModal(null);
+              }}
+            >
+              {isGenerating ? (
+                <Loader2 size={ICON_SM} strokeWidth={STROKE} className='ap-spin' />
+              ) : (
+                <Mail size={ICON_SM} strokeWidth={STROKE} />
+              )}
+              {lang === 'cs' ? 'Odeslat' : 'Send'}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share link — generates in the background, shown here instead of a
+          silent clipboard-copy + auto-opened tab. */}
+      <Dialog
+        open={activeModal === 'share'}
+        onOpenChange={(open) => !open && setActiveModal(null)}
+      >
+        <DialogContent className='ap-modal' overlayClassName='ap-modal-overlay'>
+          <DialogHeader className='ap-modal__header'>
+            <DialogTitle>{lang === 'cs' ? 'Sdílet odkaz' : 'Share link'}</DialogTitle>
+            <DialogClose
+              className='ap-btn ap-btn--icon ap-btn--ghost'
+              aria-label={lang === 'cs' ? 'Zavřít' : 'Close'}
+            >
+              <X size={ICON_SM} strokeWidth={STROKE} />
+            </DialogClose>
+          </DialogHeader>
+
+          {shareLink.status === 'loading' && (
+            <div className='ap-modal__loading'>
+              <Loader2 size={ICON_MD} strokeWidth={STROKE} className='ap-spin' />
+              {lang === 'cs' ? 'Generuji odkaz…' : 'Generating link…'}
+            </div>
+          )}
+          {shareLink.status === 'error' && (
+            <div className='ap-modal__warning ap-modal__warning--error'>
+              {shareLink.error || (lang === 'cs' ? 'Chyba' : 'Error')}
+            </div>
+          )}
+          {shareLink.status === 'ready' && shareLink.url && (
+            <div className='ap-modal__link-row'>
+              <input
+                className='ap-input'
+                readOnly
+                value={shareLink.url}
+                onFocus={(e) => e.currentTarget.select()}
+              />
+              <button
+                type='button'
+                className='ap-btn ap-btn--secondary'
+                onClick={handleCopyShareLink}
+              >
+                {shareLinkCopied ? (
+                  <Check size={ICON_SM} strokeWidth={STROKE} />
+                ) : (
+                  <Copy size={ICON_SM} strokeWidth={STROKE} />
+                )}
+                {shareLinkCopied
+                  ? lang === 'cs'
+                    ? 'Zkopírováno'
+                    : 'Copied'
+                  : lang === 'cs'
+                    ? 'Kopírovat'
+                    : 'Copy'}
+              </button>
+            </div>
+          )}
+
+          <div className='ap-modal__footer'>
+            {shareLink.status === 'ready' && shareLink.url && (
+              <a
+                href={shareLink.url}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='ap-btn ap-btn--ghost'
+              >
+                {lang === 'cs' ? 'Otevřít' : 'Open'}
+              </a>
+            )}
+            <button
+              type='button'
+              className='ap-btn ap-btn--primary'
+              onClick={() => setActiveModal(null)}
+            >
+              {lang === 'cs' ? 'Hotovo' : 'Done'}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+
   return (
     <>
       <style>{`
@@ -1840,98 +2558,15 @@ export default function InvoiceForm({
         </div>
 
         {previewMode ? (
-          <div className='ap-card'>
-            <InvoicePreview
-              invoice={getCurrentInvoiceData()}
-              t={t}
-              lang={lang}
-            />
-            <div className='ap-action-bar' style={{ marginTop: '24px' }}>
-              <button
-                type='button'
-                onClick={(e) => {
-                  e.preventDefault();
-                  onSave(getCurrentInvoiceData());
-                }}
-                className='ap-btn ap-btn--primary ap-btn--lg'
-              >
-                <Save size={ICON_MD} strokeWidth={STROKE} /> {t.saveInvoice}
-              </button>
-              <button
-                type='button'
-                onClick={(e) => {
-                  e.preventDefault();
-                  setPreviewMode(false);
-                }}
-                className='ap-btn ap-btn--secondary'
-              >
-                <Pencil size={ICON_MD} strokeWidth={STROKE} />{' '}
-                {lang === 'cs' ? 'Upravit' : 'Edit'}
-              </button>
-              <button
-                type='button'
-                onClick={handleDownloadPDF}
-                disabled={isGenerating}
-                className='ap-btn ap-btn--secondary'
-              >
-                {isGenerating && !emailStatus
-                  ? t.alertGenerating
-                  : t.downloadPdf}
-              </button>
-              <button
-                type='button'
-                onClick={handleEmailPDF}
-                disabled={isGenerating || !isAuthenticated}
-                className='ap-btn ap-btn--secondary'
-              >
-                <Send size={ICON_MD} strokeWidth={STROKE} />{' '}
-                {emailStatus || t.emailPdf}
-              </button>
-              {isAuthenticated && formData.status !== 'paid' && (
-                <button
-                  type='button'
-                  onClick={handlePaymentLink}
-                  className='ap-btn ap-btn--secondary'
-                >
-                  <CreditCard size={ICON_MD} strokeWidth={STROKE} />{' '}
-                  {payStatus ||
-                    (lang === 'cs' ? 'Platební odkaz' : 'Payment link')}
-                </button>
-              )}
-              <button
-                type='button'
-                onClick={handleExportIsdoc}
-                className='ap-btn ap-btn--ghost'
-              >
-                <FileText size={ICON_MD} strokeWidth={STROKE} /> ISDOC
-              </button>
-              {isAuthenticated && (
-                <button
-                  type='button'
-                  onClick={handleShareLink}
-                  className='ap-btn ap-btn--ghost'
-                >
-                  <Eye size={ICON_MD} strokeWidth={STROKE} />{' '}
-                  {lang === 'cs' ? 'Sdílet odkaz' : 'Share link'}
-                </button>
-              )}
-              <button
-                type='button'
-                onClick={handleBackupToDrive}
-                disabled={isGenerating}
-                className='ap-btn ap-btn--ghost'
-              >
-                <Cloud size={ICON_MD} strokeWidth={STROKE} /> Drive
-              </button>
-              <button
-                type='button'
-                onClick={handleMarkPaid}
-                className='ap-btn ap-btn--ghost'
-                style={{ marginLeft: 'auto' }}
-              >
-                {t.markPaid}
-              </button>
+          <div style={{ display: 'grid', gap: '18px', minWidth: 0 }}>
+            <div className='ap-card' style={{ minWidth: 0, overflow: 'hidden' }}>
+              <InvoicePreview
+                invoice={getCurrentInvoiceData()}
+                t={t}
+                lang={lang}
+              />
             </div>
+            {actionBar}
           </div>
         ) : (
           /* ── create layout (single column, beside list) ── */
@@ -2653,50 +3288,14 @@ export default function InvoiceForm({
                 {/* Summary */}
                 {summaryCard}
 
-                {/* Action bar */}
-                <div className='ap-action-bar ap-action-bar--mobile-stack'>
-                  <button
-                    type='button'
-                    onClick={() =>
-                      setFormData((prev) => ({ ...prev, status: 'draft' }))
-                    }
-                    className='ap-btn ap-btn--ghost'
-                  >
-                    {lang === 'cs' ? 'Uložit jako rozepsanou' : 'Save as draft'}
-                  </button>
-                  <button
-                    type='button'
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPreviewMode(true);
-                    }}
-                    className='ap-btn ap-btn--secondary'
-                  >
-                    <Eye size={ICON_MD} strokeWidth={STROKE} />{' '}
-                    {lang === 'cs' ? 'Náhled PDF' : 'PDF preview'}
-                  </button>
-                  <button
-                    type='button'
-                    onClick={handleEmailPDF}
-                    disabled={isGenerating || !isAuthenticated}
-                    className='ap-btn ap-btn--secondary'
-                  >
-                    <Send size={ICON_MD} strokeWidth={STROKE} />{' '}
-                    {emailStatus ||
-                      (lang === 'cs' ? 'Odeslat e-mailem' : 'Send by email')}
-                  </button>
-                  <button
-                    type='submit'
-                    className='ap-btn ap-btn--primary ap-btn--lg'
-                  >
-                    <Save size={ICON_MD} strokeWidth={STROKE} /> {t.saveInvoice}
-                  </button>
-                </div>
+                {/* Action bar — identical to the one shown in preview mode */}
+                {actionBar}
               </form>
             </div>
           </div>
         )}
       </div>
+      {modals}
     </>
   );
 }

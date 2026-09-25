@@ -51,7 +51,15 @@ function callResend(apiKey, payload) {
     });
 }
 
-async function sendEmail(invoice, pdfBase64, lang) {
+function escapeHtml(str) {
+    return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+async function sendEmail(invoice, pdfBase64, lang, options = {}) {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
         const err = new Error('Email service not configured');
@@ -77,13 +85,27 @@ async function sendEmail(invoice, pdfBase64, lang) {
         to.push(invoice.client.emailCopy);
     }
 
-    const subject = lang === 'cs'
+    // Custom subject/message are user-supplied — strip header-injection
+    // newlines from the subject and escape both before they reach the HTML.
+    const customSubject = String(options.subject || '').replace(/[\r\n]/g, ' ').trim().slice(0, 200);
+    const subject = customSubject || (lang === 'cs'
         ? `Faktura ${invoice.invoiceNumber}`
-        : `Invoice ${invoice.invoiceNumber}`;
+        : `Invoice ${invoice.invoiceNumber}`);
 
-    const html = lang === 'cs'
-        ? `<p>Vážený zákazníku,</p><p>V příloze naleznete fakturu č. <strong>${invoice.invoiceNumber}</strong>.</p><p>Děkujeme za váš obchod!</p><p>${senderName}</p>`
-        : `<p>Dear customer,</p><p>Please find attached invoice <strong>${invoice.invoiceNumber}</strong>.</p><p>Thank you for your business!</p><p>${senderName}</p>`;
+    const customMessage = String(options.message || '').trim();
+    let html;
+    if (customMessage) {
+        html = `<div style="white-space:pre-line">${escapeHtml(customMessage)}</div>`;
+    } else {
+        html = lang === 'cs'
+            ? `<p>Vážený zákazníku,</p><p>V příloze naleznete fakturu č. <strong>${escapeHtml(invoice.invoiceNumber)}</strong>.</p><p>Děkujeme za váš obchod!</p><p>${escapeHtml(senderName)}</p>`
+            : `<p>Dear customer,</p><p>Please find attached invoice <strong>${escapeHtml(invoice.invoiceNumber)}</strong>.</p><p>Thank you for your business!</p><p>${escapeHtml(senderName)}</p>`;
+    }
+
+    if (options.shareUrl) {
+        const label = lang === 'cs' ? 'Zobrazit fakturu online' : 'View invoice online';
+        html += `<p><a href="${escapeHtml(options.shareUrl)}">${label}</a></p>`;
+    }
 
     const base64Data = (pdfBase64 || '').replace(/^data:application\/pdf;base64,/, '');
 

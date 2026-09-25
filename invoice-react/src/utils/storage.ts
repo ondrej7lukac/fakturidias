@@ -56,6 +56,31 @@ export async function deleteApiInvoice(invoiceId: string) {
   return true;
 }
 
+// Server-side sequence counters, one per user + document type + year. Peeking
+// never consumes a number (safe to call while a draft is still being edited);
+// reserving atomically increments it and must only be called once, at the
+// moment a brand-new invoice is first persisted, so concurrent tabs/devices
+// can never end up with the same number.
+export async function peekInvoiceCounter(documentType: string): Promise<number> {
+  const response = await fetch(
+    `/api/invoices/counter?documentType=${encodeURIComponent(documentType)}`,
+  );
+  if (!response.ok) throw new Error('Failed to fetch invoice counter');
+  const data = await response.json();
+  return data.counter;
+}
+
+export async function reserveInvoiceCounter(documentType: string): Promise<number> {
+  const response = await fetch('/api/invoices/counter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ documentType }),
+  });
+  if (!response.ok) throw new Error('Failed to reserve invoice number');
+  const data = await response.json();
+  return data.counter;
+}
+
 // --- Local Storage (Guest Mode) ---
 
 const LOCAL_STORAGE_KEY = 'invoices_guest';
@@ -580,6 +605,21 @@ export interface InvoiceNumberFormat {
   padding?: number;
 }
 
+// Sequence numbers are always small positive integers in practice. Anything
+// else (corrupted historical data parsed by getNextInvoiceCounter, a stray
+// NaN/Infinity) is rejected here so it can never reach String()/padStart() —
+// a sufficiently large number renders in scientific notation ("2.6e+22"),
+// which is how a bad counter used to end up baked into an invoice number.
+const MAX_SANE_INVOICE_COUNTER = 999_999;
+
+function sanitizeInvoiceCounter(counter: number): number {
+  return Number.isFinite(counter) &&
+    counter > 0 &&
+    counter <= MAX_SANE_INVOICE_COUNTER
+    ? Math.floor(counter)
+    : 1;
+}
+
 export function formatInvoiceNumber(
   counter: number,
   format?: InvoiceNumberFormat | null,
@@ -590,7 +630,7 @@ export function formatInvoiceNumber(
   const includeYear = format?.includeYear ?? true;
   const padding = format?.padding ?? 3;
 
-  const seq = String(counter).padStart(padding, '0');
+  const seq = String(sanitizeInvoiceCounter(counter)).padStart(padding, '0');
   const parts: string[] = [];
   if (prefix) parts.push(prefix);
   if (includeYear) parts.push(String(year));
@@ -615,10 +655,14 @@ export function getNextInvoiceCounter(invoices: StoredInvoice[]) {
 
   if (thisYearInvoices.length === 0) return 1;
 
-  // Extract trailing numeric run from each invoice number (the sequence counter)
+  // Extract trailing numeric run from each invoice number (the sequence
+  // counter). Capped at 6 digits — a real sequence number is never longer
+  // than that — so a corrupted/garbled invoiceNumber (e.g. one that already
+  // slipped through as "2026202620262026...") can't be parsed as one giant
+  // integer and poison every invoice number generated after it.
   const counters = thisYearInvoices
     .map((inv) => {
-      const match = String(inv.invoiceNumber || '').match(/(\d+)$/);
+      const match = String(inv.invoiceNumber || '').match(/(\d{1,6})$/);
       if (!match) return NaN;
       return parseInt(match[1], 10);
     })

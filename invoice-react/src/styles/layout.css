@@ -112,7 +112,10 @@ main:not(.dashboard-mode) .invoice-list-container {
 
 @media (max-width: 1024px) {
   main {
-    grid-template-columns: 1fr;
+    /* minmax(0, 1fr), not bare 1fr: a bare 1fr track's automatic minimum size
+       is content-based, so a wide child (e.g. the fixed-width A4 preview)
+       can force the whole page to stretch instead of the track shrinking it. */
+    grid-template-columns: minmax(0, 1fr);
     padding: var(--headerH) 1rem 1rem 1rem;
     gap: 1.5rem;
   }
@@ -169,7 +172,7 @@ main:not(.dashboard-mode) .invoice-list-container {
   }
 
   main {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     padding: 1rem;
     gap: 1rem;
     width: 100%;

@@ -44,24 +44,46 @@ function publicView(inv) {
     };
 }
 
+// Generate (or reuse) a share token for one of the user's invoices. Shared
+// by the share-link endpoint and the email route (for the optional "include
+// link" attachment), so both trust the same ownership check instead of the
+// client handing over a raw URL. `error` is 'not_found' or 'save_failed'
+// when `token` comes back empty, so callers can tell the two apart.
+async function ensureShareToken(userEmail, invoiceId) {
+    const invoices = await getUserInvoices(userEmail);
+    const invoice = invoices.find((inv) => inv.id === invoiceId);
+    if (!invoice) return { error: 'not_found' };
+
+    let token = invoice.publicToken;
+    if (!token) {
+        token = crypto.randomBytes(18).toString('base64url');
+        const ok = await saveInvoice(userEmail, { ...invoice, publicToken: token });
+        if (!ok) return { error: 'save_failed' };
+    }
+    return { token, invoice };
+}
+
+async function getOrCreateShareUrl(req, userEmail, invoiceId) {
+    const result = await ensureShareToken(userEmail, invoiceId);
+    return result.token ? `${getAppUrl(req)}/i/${result.token}` : null;
+}
+
 function attachProtected(router) {
     // Generate (or reuse) a share token for one of the user's invoices.
     router.add('POST', '/api/share-link/:id', async ({ req, res, userEmail, params }) => {
-        const invoices = await getUserInvoices(userEmail);
-        const invoice = invoices.find((inv) => inv.id === params.id);
-        if (!invoice) return sendJson(res, 404, { error: 'Invoice not found' });
-
-        let token = invoice.publicToken;
-        if (!token) {
-            token = crypto.randomBytes(18).toString('base64url');
-            const ok = await saveInvoice(userEmail, { ...invoice, publicToken: token });
-            if (!ok) return sendJson(res, 500, { error: 'Failed to create share link' });
+        const result = await ensureShareToken(userEmail, params.id);
+        if (result.error === 'not_found') {
+            return sendJson(res, 404, { error: 'Invoice not found' });
         }
+        if (result.error) {
+            return sendJson(res, 500, { error: 'Failed to create share link' });
+        }
+
         return sendJson(res, 200, {
-            token,
-            url: `${getAppUrl(req)}/i/${token}`,
-            viewCount: invoice.viewCount || 0,
-            viewedAt: invoice.viewedAt || null,
+            token: result.token,
+            url: `${getAppUrl(req)}/i/${result.token}`,
+            viewCount: result.invoice.viewCount || 0,
+            viewedAt: result.invoice.viewedAt || null,
         });
     });
 }
@@ -76,4 +98,4 @@ function attachPublic(router) {
     });
 }
 
-module.exports = { attachProtected, attachPublic };
+module.exports = { attachProtected, attachPublic, getOrCreateShareUrl };

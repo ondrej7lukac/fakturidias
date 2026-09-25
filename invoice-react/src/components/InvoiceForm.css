@@ -2,6 +2,163 @@
   width: 100%;
 }
 
+/* Action bar card — wraps the Save/Preview/Download/email/More-options row so
+   it always has the same (card) background, whether it sits below the raw
+   preview page or below the last form section. Without this, the ghost/
+   secondary buttons (which are transparent) picked up whatever background
+   happened to be behind them in each mode and looked inconsistent. */
+.ap-action-card {
+  transform: none !important;
+}
+.ap-action-card:hover {
+  transform: none !important;
+  box-shadow: none;
+  border-color: var(--border);
+}
+
+/* Preview/Edit toggle on top, download/email/share centered right underneath it */
+.ap-action-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+/* Download / email / share row — unlabeled circular icon buttons, centered */
+.ap-icon-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.ap-btn--circle {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 50%;
+  justify-content: center;
+}
+.ap-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ap-spin {
+  animation: ap-spin 0.9s linear infinite;
+}
+
+/* Download / email / share confirmation modals */
+.ap-modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.ap-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(100%, 480px);
+  max-height: min(85vh, 640px);
+  overflow: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ap-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ap-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+.ap-modal__meta {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--card2);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.ap-modal__meta > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ap-modal__meta span {
+  color: var(--muted);
+}
+/* Pinned attachment / share-link chips shown under the email message */
+.ap-modal__pins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ap-modal__pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card2);
+  font-size: 13px;
+  color: var(--text);
+}
+.ap-modal__pin--toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.ap-modal__pin--toggle input[type='checkbox'] {
+  margin: 0;
+}
+.ap-modal__warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--warn);
+}
+.ap-modal__warning--error {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.ap-modal__loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 10px 0;
+}
+.ap-modal__link-row {
+  display: flex;
+  gap: 8px;
+}
+.ap-modal__link-row .ap-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
 .invoice-form-mobile-tabs {
   display: none;
 }
@@ -33,6 +190,27 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Durable confirmation for the last email send attempt — persisted with the
+   invoice, so it stays put (unlike a fading toast) until a fresh attempt. */
+.ap-email-status {
+  padding: 10px 12px;
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+  color: var(--accent-ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ap-email-status--error {
+  background: var(--accent-soft);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .vat-valid {

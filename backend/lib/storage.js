@@ -41,12 +41,25 @@ const InvoiceSchema = new mongoose.Schema({
   taxAmount: String,
   remindersSent: { type: Number, default: 0 },
   lastReminderAt: { type: Date, default: null },
+  emailSentAt: { type: Date, default: null },
+  emailSentTo: { type: String, default: null },
   publicToken: { type: String, default: null, index: true },
   viewCount: { type: Number, default: 0 },
   viewedAt: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
+
+// Per-user, per-document-type, per-year sequence counter for invoice numbering.
+// Incremented atomically via $inc so concurrent tabs/devices never get the
+// same number, and numbers are never reused after a deletion.
+const CounterSchema = new mongoose.Schema({
+  userEmail: { type: String, required: true, index: true },
+  series: { type: String, required: true }, // 'invoice' | 'proforma' | 'advance' | 'creditNote'
+  year: { type: Number, required: true },
+  value: { type: Number, default: 0 },
+});
+CounterSchema.index({ userEmail: 1, series: 1, year: 1 }, { unique: true });
 
 const ItemSchema = new mongoose.Schema({
   userEmail: { type: String, required: true, index: true },
@@ -256,6 +269,8 @@ const WebhookEndpointSchema = new mongoose.Schema({
 
 const InvoiceModel =
   mongoose.models.Invoice || mongoose.model('Invoice', InvoiceSchema);
+const CounterModel =
+  mongoose.models.Counter || mongoose.model('Counter', CounterSchema);
 const ItemModel = mongoose.models.Item || mongoose.model('Item', ItemSchema);
 const CustomerModel =
   mongoose.models.Customer || mongoose.model('Customer', CustomerSchema);
@@ -395,7 +410,12 @@ async function saveInvoice(userEmail, invoice) {
   if (_isConnected) return saveSingleInvoice(userEmail, invoice);
   const invoices = await getUserInvoices(userEmail);
   const idx = invoices.findIndex((inv) => inv.id === invoice.id);
-  if (idx >= 0) invoices[idx] = invoice;
+  // Merge rather than replace: the editor only ever sends the fields it owns
+  // (client/items/dates/...), so a full replace here would silently wipe
+  // server-managed fields it doesn't know about (reminders, public share
+  // tokens, view counts, email-sent confirmation). Mirrors the Mongo path
+  // above, where findOneAndUpdate() with a plain object is an implicit $set.
+  if (idx >= 0) invoices[idx] = { ...invoices[idx], ...invoice };
   else invoices.push(invoice);
   return saveUserInvoices_FS(userEmail, invoices);
 }
@@ -414,6 +434,83 @@ async function deleteInvoice(userEmail, id) {
     userEmail,
     invoices.filter((inv) => inv.id !== id),
   );
+}
+
+const COUNTER_SERIES = ['invoice', 'proforma', 'advance', 'creditNote'];
+
+function normalizeSeries(series) {
+  return COUNTER_SERIES.includes(series) ? series : 'invoice';
+}
+
+// Serializes FS-fallback reservations per user so two near-simultaneous
+// requests in the same process can't read the same pre-increment value.
+const _counterFsQueues = new Map();
+function _withCounterQueue(userEmail, task) {
+  const prev = _counterFsQueues.get(userEmail) || Promise.resolve();
+  const next = prev.then(task, task);
+  _counterFsQueues.set(userEmail, next.catch(() => {}));
+  return next;
+}
+
+function _readCountersFile(userEmail) {
+  const filePath = getUserPath(userEmail, 'counters.json');
+  if (!filePath || !fs.existsSync(filePath)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function _writeCountersFile(userEmail, counters) {
+  const filePath = getUserPath(userEmail, 'counters.json');
+  if (!filePath) return;
+  fs.writeFileSync(filePath, JSON.stringify(counters, null, 2), 'utf8');
+}
+
+// Returns the number the NEXT reservation would hand out, without consuming
+// it — used to show a live preview while a new invoice is still a draft.
+async function peekInvoiceCounter(userEmail, series) {
+  const seriesKey = normalizeSeries(series);
+  const year = new Date().getFullYear();
+  if (_isConnected) {
+    try {
+      const doc = await CounterModel.findOne({
+        userEmail,
+        series: seriesKey,
+        year,
+      }).lean();
+      return (doc?.value || 0) + 1;
+    } catch {
+      return 1;
+    }
+  }
+  const counters = _readCountersFile(userEmail);
+  const key = `${seriesKey}:${year}`;
+  return (counters[key] || 0) + 1;
+}
+
+// Atomically increments and returns the next number for this user+series+year.
+// This is the only function that actually consumes a number — call it once,
+// right when an invoice is first persisted, never on every render.
+async function reserveInvoiceCounter(userEmail, series) {
+  const seriesKey = normalizeSeries(series);
+  const year = new Date().getFullYear();
+  if (_isConnected) {
+    const doc = await CounterModel.findOneAndUpdate(
+      { userEmail, series: seriesKey, year },
+      { $inc: { value: 1 } },
+      { upsert: true, new: true },
+    );
+    return doc.value;
+  }
+  return _withCounterQueue(userEmail, () => {
+    const counters = _readCountersFile(userEmail);
+    const key = `${seriesKey}:${year}`;
+    counters[key] = (counters[key] || 0) + 1;
+    _writeCountersFile(userEmail, counters);
+    return counters[key];
+  });
 }
 
 async function getUserCustomers(userEmail) {
@@ -2079,6 +2176,9 @@ module.exports = {
   saveUserInvoices_FS,
   saveInvoice,
   deleteInvoice,
+  CounterModel,
+  peekInvoiceCounter,
+  reserveInvoiceCounter,
   getUserCustomers,
   saveUserCustomer,
   getUserItems,
