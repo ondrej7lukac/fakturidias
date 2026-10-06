@@ -61,6 +61,7 @@ export {
   Webhook,
   Paperclip,
   Link2,
+  Printer,
 } from 'lucide-react'
 
 export const ICON_SM = 14

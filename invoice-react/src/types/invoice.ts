@@ -39,6 +39,7 @@ export interface InvoiceLineItem {
   unit?: string;
   price: number;
   discount?: number;
+  discountType?: 'percent' | 'amount';
   taxRate?: number;
   subtotal?: number;
   taxAmount?: number;
@@ -64,6 +65,10 @@ export interface Invoice {
   taxStatus?: string;
   exchangeRate?: number | string;
   reverseChargeText?: string;
+  itemsSubtotal?: number;
+  invoiceDiscount?: number;
+  invoiceDiscountType?: 'percent' | 'amount';
+  invoiceDiscountAmount?: number;
   taxBase?: number | string;
   taxRate?: number | string;
   taxAmount?: number | string;

@@ -271,7 +271,7 @@ export default function InvoicePreview({ invoice, t, lang }: InvoicePreviewProps
                                         borderBottom: `1px solid ${PAPER.gray200}`,
                                         textAlign: 'right',
                                         color: PAPER.gray900
-                                    }}>{item.discount && item.discount > 0 ? `${invoice.currency} ${item.discount.toFixed(2)}` : '-'}</td>
+                                    }}>{item.discount && Number(item.discount) > 0 ? ((item.discountType || 'percent') === 'percent' ? `${item.discount}%` : `${invoice.currency} ${Number(item.discount).toFixed(2)}`) : '-'}</td>
                                     <td style={{
                                         padding: '12px 0',
                                         borderBottom: `1px solid ${PAPER.gray200}`,
@@ -377,8 +377,22 @@ export default function InvoicePreview({ invoice, t, lang }: InvoicePreviewProps
                             marginBottom: '10px'
                         }}>
                             <span style={{ color: PAPER.slate500 }}>{t.subtotal}:</span>
-                            <span style={{ fontWeight: 600, color: PAPER.gray900 }}>{invoice.currency} {parseFloat(String((invoice.isVatPayer ? (invoice.taxBase || invoice.amount) : invoice.amount) || 0)).toFixed(2)}</span>
+                            <span style={{ fontWeight: 600, color: PAPER.gray900 }}>{invoice.currency} {parseFloat(String(invoice.itemsSubtotal || (invoice.isVatPayer ? (invoice.taxBase || invoice.amount) : invoice.amount) || 0)).toFixed(2)}</span>
                         </div>
+
+                        {!!invoice.invoiceDiscount && Number(invoice.invoiceDiscount) > 0 && (
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                marginBottom: '10px',
+                                color: PAPER.danger
+                            }}>
+                                <span>{t.invoiceDiscount || 'Sleva'}:</span>
+                                <span style={{ fontWeight: 600 }}>
+                                    - {(invoice.invoiceDiscountType || 'percent') === 'percent' ? `${invoice.invoiceDiscount}%` : `${invoice.currency} ${Number(invoice.invoiceDiscount).toFixed(2)}`}
+                                </span>
+                            </div>
+                        )}
 
                         <div style={{
                             display: 'flex',
@@ -402,7 +416,7 @@ export default function InvoicePreview({ invoice, t, lang }: InvoicePreviewProps
                                 fontWeight: 700,
                                 fontSize: '18px',
                                 color: PAPER.indigo
-                            }}>{invoice.currency} {(invoice.amount || 0).toFixed(2)}</span>
+                            }}>{invoice.currency} {Number(invoice.amount || 0).toFixed(2)}</span>
                         </div>
                     </div>
                 </div>

@@ -7,6 +7,7 @@ interface LineItem {
     price: number
     taxRate?: number
     discount?: number
+    discountType?: 'percent' | 'amount'
     total: number
     taxAmount?: number
 }
@@ -62,7 +63,7 @@ export default function ItemsTable({ items, lang, t, onDelete }: ItemsTableProps
                             <td>{item.qty}</td>
                             <td>{money(item.price)}</td>
                             <td>{item.taxRate || 0}%</td>
-                            <td>{item.discount ? `${item.discount}%` : '0%'}</td>
+                            <td>{item.discount ? (item.discountType === 'amount' ? money(item.discount) : `${item.discount}%`) : '0%'}</td>
                             <td>{money(item.total)}</td>
                             <td style={{ width: '40px', textAlign: 'center' }}>
                                 <button
