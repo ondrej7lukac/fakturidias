@@ -66,11 +66,15 @@ const ARES_HEADERS = {
 };
 
 async function searchAres(body) {
+    const name = String(body.obchodniJmeno || '').trim();
+    const ico = String(body.ico || '').trim();
+    const pocet = body.pocet || 8;
+    // ARES rejects `ico` as a string — the search endpoint expects a list.
     const payload = JSON.stringify({
-        obchodniJmeno: String(body.obchodniJmeno || '').trim(),
-        ico: body.ico ? String(body.ico).trim() : undefined,
-        pocet: body.pocet || 8,
-        strana: body.strana || 1
+        obchodniJmeno: name || undefined,
+        ico: ico ? [ico] : undefined,
+        pocet,
+        start: ((body.strana || 1) - 1) * pocet
     });
     return proxyJsonWithFallback([
         {
