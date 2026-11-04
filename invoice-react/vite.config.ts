@@ -5,12 +5,17 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import https from 'https';
 import zlib from 'zlib';
+import { createRequire } from 'node:module';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { RequestOptions } from 'node:https';
 
+// The backend (CommonJS) is the single source of the production headers.
+const backendUtils: { SECURITY_HEADERS: Record<string, string> } =
+  createRequire(import.meta.url)('../backend/lib/utils.js');
+
 interface AresFilter {
   obchodniJmeno?: string;
-  ico?: string;
+  ico?: string[];
   start?: number;
   pocet?: number;
 }
@@ -55,7 +60,7 @@ function aresProxyPlugin() {
                 filter.obchodniJmeno = String(data.obchodniJmeno).trim();
               }
               if (data.ico && String(data.ico).trim()) {
-                filter.ico = String(data.ico).trim();
+                filter.ico = [String(data.ico).trim()];
               }
 
               // ARES API expects start (0-indexed) and pocet
@@ -261,5 +266,11 @@ export default defineConfig({
       '/auth': 'http://localhost:5500',
       '/api': 'http://localhost:5500',
     },
+  },
+  // Production headers (incl. the CSP) so `vite preview` — and the e2e suite
+  // that runs against it — fails the same way Railway would. Not set on the
+  // dev server: script-src would block Vite's inline React Refresh preamble.
+  preview: {
+    headers: backendUtils.SECURITY_HEADERS,
   },
 });

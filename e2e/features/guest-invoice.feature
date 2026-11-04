@@ -12,6 +12,11 @@ Feature: Guest Mode Invoice Management
     And I save the invoice
     Then the invoice should appear in the list
 
+  Scenario: Guest can download the invoice as a PDF
+    When I fill in the supplier name with "Jan Novák"
+    And I fill in the client name with "Acme Studio"
+    Then I should be able to download the invoice PDF
+
   Scenario: Guest is blocked from saving a second new invoice
     When I fill in the supplier name with "Jan Novák"
     And I fill in the client name with "Acme Studio"

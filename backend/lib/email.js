@@ -1,5 +1,6 @@
 'use strict';
 const https = require('https');
+const { EMAIL_RE } = require('./utils');
 
 function slugifyCompanyName(name = '') {
     return name
@@ -29,19 +30,24 @@ function callResend(apiKey, payload) {
                 try {
                     const parsed = JSON.parse(raw);
                     if (res.statusCode >= 400) {
+                        // Resend's reason (e.g. unverified sending domain) goes to
+                        // the server log only; the client gets the generic message.
+                        console.error('[email] Resend rejected the email:', res.statusCode, parsed.name || '', parsed.message || '');
                         const err = new Error('Email delivery failed');
                         err.statusCode = 502;
                         return reject(err);
                     }
                     resolve(parsed);
                 } catch {
+                    console.error('[email] Unparseable Resend response, status', res.statusCode);
                     const err = new Error('Failed to parse email service response');
                     err.statusCode = 500;
                     reject(err);
                 }
             });
         });
-        req.on('error', () => {
+        req.on('error', (requestError) => {
+            console.error('[email] Resend request failed:', requestError.message);
             const err = new Error('Email delivery unavailable');
             err.statusCode = 500;
             reject(err);
@@ -109,8 +115,15 @@ async function sendEmail(invoice, pdfBase64, lang, options = {}) {
 
     const base64Data = (pdfBase64 || '').replace(/^data:application\/pdf;base64,/, '');
 
+    // Replies go to the supplier (or the account owner), not the unmonitored
+    // @fakturidias.app sender address.
+    const replyTo = [invoice?.supplier?.email, options.fallbackReplyTo]
+        .map(e => String(e || '').trim())
+        .find(e => EMAIL_RE.test(e));
+
     const result = await callResend(apiKey, {
         from, to, subject, html,
+        ...(replyTo ? { reply_to: replyTo } : {}),
         attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: base64Data }]
     });
 
