@@ -1,18 +1,59 @@
 import React from 'react'
-import { Document, Page, Text, View, StyleSheet, Image, pdf as renderPdf, Font } from '@react-pdf/renderer'
-import { documentTypeTitleKey } from './storage'
+import { Document, Page, Text, View, StyleSheet, Svg, Path, pdf as renderPdf, Font } from '@react-pdf/renderer'
+import QRCode from 'qrcode'
+import { buildInvoiceLayout } from './invoiceLayout'
+import type { LabeledValue } from './invoiceLayout'
 import { PAPER } from './paperColors'
+import type { Invoice } from '../types/invoice'
 
-// Bundled locally (Vite asset) so PDF rendering never depends on a third-party
-// font CDN at render time. Full latin + latin-ext coverage for Czech/Slovak diacritics.
-import RobotoRegular from '@/assets/fonts/Roboto-Regular.ttf?url'
-import RobotoBold from '@/assets/fonts/Roboto-Bold.ttf?url'
+// Bundled locally (Vite assets) so PDF rendering never depends on a third-party
+// font CDN at render time. Each face ships as a latin + latin-ext pair
+// (react-pdf cannot merge subsets), registered as two families that are
+// chained in fontFamily so Czech/Slovak diacritics fall through per glyph.
+// Plain TTF on purpose: react-pdf fails to embed the WOFF builds.
+import SansLatin400 from '@/assets/fonts/InstrumentSans-Latin-Regular.ttf?url'
+import SansLatin600 from '@/assets/fonts/InstrumentSans-Latin-SemiBold.ttf?url'
+import SansLatin700 from '@/assets/fonts/InstrumentSans-Latin-Bold.ttf?url'
+import SansLatin700Italic from '@/assets/fonts/InstrumentSans-Latin-BoldItalic.ttf?url'
+import SansExt400 from '@/assets/fonts/InstrumentSans-LatinExt-Regular.ttf?url'
+import SansExt600 from '@/assets/fonts/InstrumentSans-LatinExt-SemiBold.ttf?url'
+import SansExt700 from '@/assets/fonts/InstrumentSans-LatinExt-Bold.ttf?url'
+import SansExt700Italic from '@/assets/fonts/InstrumentSans-LatinExt-BoldItalic.ttf?url'
+import MonoLatin400 from '@/assets/fonts/GeistMono-Latin-Regular.ttf?url'
+import MonoLatin600 from '@/assets/fonts/GeistMono-Latin-SemiBold.ttf?url'
+import MonoExt400 from '@/assets/fonts/GeistMono-LatinExt-Regular.ttf?url'
+import MonoExt600 from '@/assets/fonts/GeistMono-LatinExt-SemiBold.ttf?url'
 
 Font.register({
-    family: 'Roboto',
+    family: 'InstrumentSans',
     fonts: [
-        { src: RobotoRegular },
-        { src: RobotoBold, fontWeight: 'bold' }
+        { src: SansLatin400 },
+        { src: SansLatin600, fontWeight: 600 },
+        { src: SansLatin700, fontWeight: 700 },
+        { src: SansLatin700Italic, fontWeight: 700, fontStyle: 'italic' },
+    ]
+})
+Font.register({
+    family: 'InstrumentSansExt',
+    fonts: [
+        { src: SansExt400 },
+        { src: SansExt600, fontWeight: 600 },
+        { src: SansExt700, fontWeight: 700 },
+        { src: SansExt700Italic, fontWeight: 700, fontStyle: 'italic' },
+    ]
+})
+Font.register({
+    family: 'GeistMono',
+    fonts: [
+        { src: MonoLatin400 },
+        { src: MonoLatin600, fontWeight: 600 },
+    ]
+})
+Font.register({
+    family: 'GeistMonoExt',
+    fonts: [
+        { src: MonoExt400 },
+        { src: MonoExt600, fontWeight: 600 },
     ]
 })
 
@@ -20,75 +61,136 @@ Font.register({
 // Shared with the on-screen preview (InvoicePreview.tsx via paperColors.ts) so
 // the PDF you download always looks exactly like what you saw in the preview.
 const C = PAPER
+const SANS = ['InstrumentSans', 'InstrumentSansExt']
+const MONO = ['GeistMono', 'GeistMonoExt']
 
 const S = StyleSheet.create({
-    page: { fontFamily: 'Roboto', fontSize: 10, color: C.gray900, backgroundColor: C.white, padding: 40 },
+    page: { fontFamily: SANS, fontSize: 10, color: C.ink, backgroundColor: C.white, paddingTop: 33, paddingHorizontal: 36, paddingBottom: 26 },
 
     // Header
-    header:      { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 2, borderBottomColor: C.indigo, paddingBottom: 14, marginBottom: 22 },
-    headerTitle: { fontSize: 26, fontFamily: 'Roboto', fontWeight: 'bold', color: C.indigo },
-    headerNum:   { fontSize: 12, color: C.slate500, marginTop: 4 },
-    dateRow:     { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 3 },
-    dateLabel:   { fontFamily: 'Roboto', fontWeight: 'bold', fontSize: 10 },
-    dateValue:   { fontSize: 10, marginLeft: 4 },
+    header:       { flexDirection: 'row', alignItems: 'flex-end' },
+    title:        { fontFamily: SANS, fontWeight: 700, fontStyle: 'italic', fontSize: 30, lineHeight: 1 },
+    headerRule:   { flexGrow: 1, marginLeft: 14, marginRight: 14, marginBottom: 6 },
+    ruleThick:    { height: 2.25, backgroundColor: C.accent },
+    ruleThin:     { height: 0.75, backgroundColor: C.accent, marginTop: 1.5 },
+    numberBox:    { borderWidth: 1.1, borderColor: C.accent, borderRadius: 12, paddingTop: 9, paddingBottom: 4, paddingHorizontal: 14 },
+    number:       { fontFamily: SANS, fontWeight: 700, fontStyle: 'italic', fontSize: 22, lineHeight: 1 },
 
-    // Parties
-    parties:     { flexDirection: 'row', marginBottom: 22 },
-    partyBlock:  { flex: 1, paddingRight: 20 },
-    partyLabel:  { fontSize: 9, fontFamily: 'Roboto', fontWeight: 'bold', color: C.slate500, marginBottom: 6 },
-    partyName:   { fontSize: 14, fontFamily: 'Roboto', fontWeight: 'bold', marginBottom: 4 },
-    partyAddr:   { fontSize: 10, color: C.gray700, lineHeight: 1.5, marginBottom: 2 },
-    partyDetail: { fontSize: 9, color: C.gray500, marginTop: 1 },
-    nonVat:      { fontSize: 9, color: C.slate500, marginTop: 6 },
+    // Legend sitting on a box border
+    legend:       { position: 'absolute', top: -8, left: 8, backgroundColor: C.white, paddingHorizontal: 6, fontFamily: SANS, fontWeight: 700, fontSize: 11 },
+    legendSmall:  { position: 'absolute', top: -8, left: 8, backgroundColor: C.white, paddingHorizontal: 6, fontFamily: SANS, fontWeight: 700, fontSize: 10 },
 
-    // Items table
-    tblSection:    { marginBottom: 22 },
-    tblHeaderRow:  { flexDirection: 'row', borderBottomWidth: 2, borderBottomColor: C.gray200, paddingBottom: 6, marginBottom: 2 },
-    tblRow:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.gray200, paddingTop: 8, paddingBottom: 8 },
-    tblHead:       { fontSize: 8, fontFamily: 'Roboto', fontWeight: 'bold', color: C.slate500 },
-    tblCell:       { fontSize: 10, color: C.gray900 },
-    colDesc:       { flex: 3 },
-    colQty:        { flex: 0.8, textAlign: 'center' },
-    colPrice:      { flex: 1.4, textAlign: 'right' },
-    colTax:        { flex: 0.8, textAlign: 'center' },
-    colDisc:       { flex: 1.4, textAlign: 'right' },
-    colTotal:      { flex: 1.4, textAlign: 'right' },
+    // Dates
+    datesRow:     { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+    dateGroup:    { flexDirection: 'row', alignItems: 'flex-end' },
+    dateLabel:    { fontSize: 9.5, color: C.muted, marginRight: 6 },
+    dateValue:    { fontFamily: MONO, fontSize: 10.5 },
+    dateDivider:  { width: 1.1, height: 10, backgroundColor: C.accent, marginHorizontal: 10 },
 
-    // VAT box
-    vatBox:   { backgroundColor: C.greenBg, borderWidth: 1, borderColor: C.greenBorder, borderRadius: 6, padding: 12, marginBottom: 18 },
-    vatTitle: { fontSize: 9, fontFamily: 'Roboto', fontWeight: 'bold', color: C.green800, marginBottom: 8 },
-    vatRow:   { flexDirection: 'row' },
-    vatCol:   { flex: 1 },
-    vatLabel: { fontSize: 9, color: C.green800 },
-    vatVal:   { fontSize: 11, fontFamily: 'Roboto', fontWeight: 'bold', color: C.green700, marginTop: 2 },
+    // Boxes
+    box:          { borderWidth: 1.1, borderColor: C.accent, borderRadius: 12 },
+    partiesRow:   { flexDirection: 'row', marginTop: 22 },
+    partyBox:     { flex: 1, paddingTop: 15, paddingBottom: 10, paddingHorizontal: 13 },
+    row:          { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 4 },
+    rowLabel:     { fontSize: 9.5, color: C.muted },
+    rowValue:     { flex: 1, paddingBottom: 2, borderBottomWidth: 0.75, borderBottomColor: C.dotted, borderBottomStyle: 'dotted', fontSize: 11 },
 
-    // QR + totals
-    footerRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 18 },
-    qrLabel:     { fontSize: 8, color: C.slate500, marginBottom: 4 },
-    totalsBlock: { width: 190 },
-    totRow:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-    totLabel:    { color: C.slate500, fontSize: 10 },
-    totVal:      { fontSize: 10, fontFamily: 'Roboto', fontWeight: 'bold' },
-    grandRow:    { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 2, borderTopColor: C.indigo, paddingTop: 8, marginTop: 4 },
-    grandLabel:  { fontSize: 14, fontFamily: 'Roboto', fontWeight: 'bold' },
-    grandVal:    { fontSize: 14, fontFamily: 'Roboto', fontWeight: 'bold', color: C.indigo },
+    // Items box
+    itemsBox:     { marginTop: 22, flexGrow: 1, paddingTop: 10, paddingBottom: 10, paddingHorizontal: 13 },
+    itemsLegendRow: { position: 'absolute', top: -8, left: 13, right: 13, flexDirection: 'row', alignItems: 'center' },
+    itemsLegend:  { backgroundColor: C.white, paddingHorizontal: 6, marginLeft: -6, fontFamily: SANS, fontWeight: 700, fontSize: 11 },
+    colHead:      { fontSize: 9.5, color: C.muted, backgroundColor: C.white, paddingHorizontal: 4, textAlign: 'right' },
+    itemRow:      { flexDirection: 'row', alignItems: 'flex-end', paddingTop: 7, paddingBottom: 4, borderBottomWidth: 0.75, borderBottomColor: C.dotted, borderBottomStyle: 'dotted' },
+    itemName:     { flex: 1, fontSize: 11, paddingRight: 8 },
+    cellQty:      { width: 36, textAlign: 'right', fontFamily: MONO, fontSize: 10 },
+    cellPrice:    { width: 84, textAlign: 'right', fontFamily: MONO, fontSize: 10 },
+    cellDisc:     { width: 62, textAlign: 'right', fontFamily: MONO, fontSize: 10 },
+    cellTax:      { width: 40, textAlign: 'right', fontFamily: MONO, fontSize: 10 },
+    cellTotal:    { width: 93, textAlign: 'right', fontFamily: MONO, fontSize: 10, fontWeight: 600 },
+
+    // Payment + totals
+    bottomRow:    { flexDirection: 'row', marginTop: 22 },
+    paymentBox:   { flex: 1, paddingTop: 15, paddingBottom: 12, paddingHorizontal: 13, marginRight: 15 },
+    paymentInner: { flexDirection: 'row' },
+    paymentRows:  { flex: 1, paddingRight: 12 },
+    qrWrap:       { width: 66, alignItems: 'center' },
+    qrFrame:      { width: 66, height: 66, borderWidth: 0.75, borderColor: C.qrBorder, borderRadius: 4, padding: 5 },
+    qrLabel:      { fontSize: 9, color: C.muted, marginTop: 4 },
+    totalsBlock:  { width: 174 },
+    totalsHead:   { flexDirection: 'row', alignItems: 'center', marginTop: -7 },
+    totalsLabel:  { fontFamily: SANS, fontWeight: 700, fontStyle: 'italic', fontSize: 11.5 },
+    totalsLine:   { flexGrow: 1, height: 0.75, backgroundColor: C.ink, marginLeft: 8 },
+    totalsSub:    { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, fontSize: 9.5 },
+    totalsSubLabel: { fontSize: 9.5, color: C.muted },
+    totalsSubValue: { fontFamily: MONO, fontSize: 9.5 },
+    amountRow:    { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'flex-end', marginTop: 8, paddingBottom: 4, borderBottomWidth: 1.5, borderBottomColor: C.accent },
+    amount:       { fontFamily: SANS, fontWeight: 700, fontStyle: 'italic', fontSize: 27, lineHeight: 1 },
+    currency:     { fontFamily: SANS, fontWeight: 700, fontStyle: 'italic', fontSize: 12, marginLeft: 6, marginBottom: 2 },
 
     // Tax note
-    noteBox: { borderWidth: 1, borderColor: C.slate200, borderRadius: 6, backgroundColor: C.slate50, padding: 10, marginBottom: 14, fontSize: 10 },
+    noteBox:      { borderWidth: 0.75, borderColor: C.noteBorder, borderRadius: 6, backgroundColor: C.noteBg, padding: 8, marginTop: 14, fontSize: 9.5 },
 
-    // Payment bar
-    payBar:   { backgroundColor: C.slate50, borderTopWidth: 1, borderTopColor: C.slate200, padding: 10, flexDirection: 'row', flexWrap: 'wrap' },
-    payItem:  { flexDirection: 'row', marginRight: 16, marginBottom: 4 },
-    payLabel: { color: C.slate500, fontSize: 10 },
-    payVal:   { fontSize: 10, fontFamily: 'Roboto', fontWeight: 'bold', marginLeft: 3 },
-
-    thanks: { marginTop: 14, textAlign: 'center', fontSize: 9, color: C.slate400 },
+    // Footer
+    footer:       { marginTop: 14 },
+    footerLine:   { flexDirection: 'row', justifyContent: 'space-between', fontSize: 9, color: C.inkSoft, marginBottom: 2 },
+    footerRule:   { marginTop: 8 },
 })
 
+function Rows({ rows, labelWidth }: { rows: LabeledValue[]; labelWidth: number }) {
+    return (
+        <>
+            {rows.map((r, i) => (
+                <View key={i} style={S.row}>
+                    <Text style={[S.rowLabel, { width: labelWidth }]}>{r.label}</Text>
+                    <Text style={[S.rowValue, r.isMono ? { fontFamily: MONO, fontSize: 10 } : {}, r.isStrong ? { fontWeight: 600 } : {}]}>{r.value}</Text>
+                </View>
+            ))}
+        </>
+    )
+}
+
+function DoubleRule({ style }: { style?: React.ComponentProps<typeof View>['style'] }) {
+    return (
+        <View style={style}>
+            <View style={S.ruleThick} />
+            <View style={S.ruleThin} />
+        </View>
+    )
+}
+
 // ─── PDF component ─────────────────────────────────────────────────────────────
-function InvoicePDF({ invoice, t, qrDataUrl }: { invoice: any; t: any; qrDataUrl: string | null }) {
+// Drawn as vector paths (not a PNG) so react-pdf never has to decode an image,
+// which would need a blob: Worker and weaken our CSP.
+function qrPathData(payload: string): { path: string; size: number } | null {
+    try {
+        const { size, data } = QRCode.create(payload, { errorCorrectionLevel: 'M' }).modules
+        let path = ''
+        for (let row = 0; row < size; row++) {
+            for (let col = 0; col < size; col++) {
+                if (data[row * size + col]) path += `M${col} ${row}h1v1h-1z`
+            }
+        }
+        return { path, size }
+    } catch {
+        return null
+    }
+}
+
+function QrCode({ payload, dimension }: { payload: string; dimension: number }) {
+    const qr = qrPathData(payload)
+    if (!qr) return <View style={{ width: dimension }} />
+    return (
+        <Svg width={dimension} height={dimension} viewBox={`0 0 ${qr.size} ${qr.size}`}>
+            <Path d={qr.path} fill="#000000" />
+        </Svg>
+    )
+}
+
+function InvoicePDF({ invoice, t, qrPayload }: { invoice: Invoice; t: Record<string, string>; qrPayload: string | null }) {
     const isCs = !t.lang || t.lang === 'cs'
-    const hasTaxNote = invoice.reverseChargeText || (invoice.exchangeRate && invoice.exchangeRate !== '1.0000')
+    const layout = buildInvoiceLayout(invoice, t, isCs)
+    const { columns } = layout
+    const hasTotals = layout.vatRows.length > 0 || !!layout.discountRow
 
     return (
         <Document>
@@ -96,167 +198,123 @@ function InvoicePDF({ invoice, t, qrDataUrl }: { invoice: any; t: any; qrDataUrl
 
                 {/* Header */}
                 <View style={S.header}>
-                    <View>
-                        <Text style={S.headerTitle}>{t[documentTypeTitleKey(invoice.documentType)]}</Text>
-                        <Text style={S.headerNum}># {invoice.invoiceNumber}</Text>
-                    </View>
-                    <View>
-                        <View style={S.dateRow}>
-                            <Text style={S.dateLabel}>{t.issueDate}:</Text>
-                            <Text style={S.dateValue}>{invoice.issueDate}</Text>
-                        </View>
-                        <View style={S.dateRow}>
-                            <Text style={S.dateLabel}>{t.dueDate}:</Text>
-                            <Text style={S.dateValue}>{invoice.dueDate || 'N/A'}</Text>
-                        </View>
-                        {invoice.taxableSupplyDate && invoice.taxableSupplyDate !== invoice.issueDate && (
-                            <View style={S.dateRow}>
-                                <Text style={[S.dateLabel, { fontSize: 9 }]}>DUZP:</Text>
-                                <Text style={[S.dateValue, { fontSize: 9 }]}>{invoice.taxableSupplyDate}</Text>
-                            </View>
-                        )}
+                    <Text style={[S.title, layout.title.length > 12 ? { fontSize: 20 } : {}]}>{layout.title}</Text>
+                    <DoubleRule style={S.headerRule} />
+                    <View style={S.numberBox}>
+                        <Text style={S.legendSmall}>{layout.numberLabel}</Text>
+                        <Text style={S.number}>{layout.number}</Text>
                     </View>
                 </View>
 
-                {/* Parties */}
-                <View style={S.parties}>
-                    <View style={S.partyBlock}>
-                        <Text style={S.partyLabel}>{t.issuer}</Text>
-                        <Text style={S.partyName}>{invoice.supplier?.name || '---'}</Text>
-                        {!!invoice.supplier?.address  && <Text style={S.partyAddr}>{invoice.supplier.address}</Text>}
-                        {!!invoice.supplier?.ico      && <Text style={S.partyDetail}>{t.ico}: {invoice.supplier.ico}</Text>}
-                        {!!invoice.supplier?.vat      && <Text style={S.partyDetail}>{t.vat}: {invoice.supplier.vat}</Text>}
-                        {!!invoice.supplier?.registry && <Text style={[S.partyDetail, { fontSize: 8 }]}>{invoice.supplier.registry}</Text>}
-                        {!!invoice.supplier?.phone    && <Text style={S.partyDetail}>Tel: {invoice.supplier.phone}</Text>}
-                        {!!invoice.supplier?.email    && <Text style={S.partyDetail}>Email: {invoice.supplier.email}</Text>}
-                        {!invoice.isVatPayer && <Text style={S.nonVat}>Nejsem plátce DPH</Text>}
-                    </View>
-                    <View style={S.partyBlock}>
-                        <Text style={S.partyLabel}>{t.billTo}</Text>
-                        <Text style={S.partyName}>{invoice.client.name}</Text>
-                        {!!invoice.client.address && <Text style={S.partyAddr}>{invoice.client.address}</Text>}
-                        {!!invoice.client.ico     && <Text style={S.partyDetail}>{t.ico}: {invoice.client.ico}</Text>}
-                        {!!invoice.client.vat     && <Text style={S.partyDetail}>{t.vat}: {invoice.client.vat}</Text>}
-                    </View>
-                </View>
-
-                {/* Items table */}
-                <View style={S.tblSection}>
-                    <View style={S.tblHeaderRow}>
-                        <Text style={[S.tblHead, S.colDesc]}>{t.itemDescription}</Text>
-                        <Text style={[S.tblHead, S.colQty]}>{t.qty}</Text>
-                        <Text style={[S.tblHead, S.colPrice]}>{isCs ? 'CENA/JEDN.' : 'PRICE/UNIT'}</Text>
-                        <Text style={[S.tblHead, S.colTax]}>{isCs ? 'DPH %' : 'TAX %'}</Text>
-                        <Text style={[S.tblHead, S.colDisc]}>{isCs ? 'SLEVA' : 'DISC.'}</Text>
-                        <Text style={[S.tblHead, S.colTotal]}>{t.total}</Text>
-                    </View>
-                    {invoice.items.map((item: any, i: number) => (
-                        <View key={i} style={S.tblRow}>
-                            <Text style={[S.tblCell, S.colDesc]}>{item.name}</Text>
-                            <Text style={[S.tblCell, S.colQty]}>{item.qty}</Text>
-                            <Text style={[S.tblCell, S.colPrice]}>{invoice.currency} {Number(item.price).toFixed(2)}</Text>
-                            <Text style={[S.tblCell, S.colTax]}>{item.taxRate || 0}%</Text>
-                            <Text style={[S.tblCell, S.colDisc]}>{item.discount > 0 ? (item.discountType === 'percent' ? `${item.discount}%` : `${invoice.currency} ${Number(item.discount).toFixed(2)}`) : '-'}</Text>
-                            <Text style={[S.tblCell, S.colTotal]}>{invoice.currency} {Number(item.total).toFixed(2)}</Text>
+                <View style={S.datesRow}>
+                    {layout.dates.map((d, i) => (
+                        <View key={i} style={S.dateGroup}>
+                            {i > 0 && <View style={S.dateDivider} />}
+                            <Text style={S.dateLabel}>{d.label}</Text>
+                            <Text style={[S.dateValue, d.isStrong ? { fontWeight: 600 } : {}]}>{d.value}</Text>
                         </View>
                     ))}
                 </View>
 
-                {/* VAT summary */}
-                {invoice.isVatPayer && (
-                    <View style={S.vatBox}>
-                        <Text style={S.vatTitle}>Daňový doklad – Rozpis DPH</Text>
-                        <View style={S.vatRow}>
-                            <View style={S.vatCol}>
-                                <Text style={S.vatLabel}>Základ daně</Text>
-                                <Text style={S.vatVal}>{invoice.currency} {parseFloat(invoice.taxBase || 0).toFixed(2)}</Text>
+                {/* Parties */}
+                <View style={S.partiesRow}>
+                    <View style={[S.box, S.partyBox, { marginRight: 15 }]}>
+                        <Text style={S.legend}>{layout.supplier.title}</Text>
+                        <Rows rows={layout.supplier.rows} labelWidth={74} />
+                    </View>
+                    <View style={[S.box, S.partyBox]}>
+                        <Text style={S.legend}>{layout.client.title}</Text>
+                        <Rows rows={layout.client.rows} labelWidth={74} />
+                    </View>
+                </View>
+
+                {/* Items */}
+                <View style={[S.box, S.itemsBox]}>
+                    <View style={S.itemsLegendRow}>
+                        <Text style={[S.itemsLegend, { flex: 1 }]}>{layout.itemsTitle}</Text>
+                        <Text style={[S.colHead, { width: 36 }]}>{columns.labels.qty}</Text>
+                        <Text style={[S.colHead, { width: 84 }]}>{columns.labels.unitPrice}</Text>
+                        {columns.hasDiscount && <Text style={[S.colHead, { width: 62 }]}>{columns.labels.discount}</Text>}
+                        {columns.hasTax && <Text style={[S.colHead, { width: 40 }]}>{columns.labels.tax}</Text>}
+                        <Text style={[S.colHead, { width: 93, marginRight: -4 }]}>{columns.labels.total}</Text>
+                    </View>
+                    {layout.items.map((item, i) => (
+                        <View key={i} style={S.itemRow} wrap={false}>
+                            <Text style={S.itemName}>{item.name}</Text>
+                            <Text style={S.cellQty}>{item.qty}</Text>
+                            <Text style={S.cellPrice}>{item.unitPrice}</Text>
+                            {columns.hasDiscount && <Text style={S.cellDisc}>{item.discount}</Text>}
+                            {columns.hasTax && <Text style={S.cellTax}>{item.taxRate}</Text>}
+                            <Text style={S.cellTotal}>{item.total}</Text>
+                        </View>
+                    ))}
+                </View>
+
+                {/* Payment + total */}
+                <View style={S.bottomRow} wrap={false}>
+                    <View style={[S.box, S.paymentBox]}>
+                        <Text style={S.legend}>{layout.paymentTitle}</Text>
+                        <View style={S.paymentInner}>
+                            <View style={S.paymentRows}>
+                                <Rows rows={layout.paymentRows} labelWidth={76} />
                             </View>
-                            <View style={S.vatCol}>
-                                <Text style={S.vatLabel}>Sazba DPH</Text>
-                                <Text style={S.vatVal}>{invoice.taxRate || '21'}%</Text>
-                            </View>
-                            <View style={S.vatCol}>
-                                <Text style={S.vatLabel}>Výše daně</Text>
-                                <Text style={S.vatVal}>{invoice.currency} {parseFloat(invoice.taxAmount || 0).toFixed(2)}</Text>
+                            <View style={S.qrWrap}>
+                                <View style={S.qrFrame}>
+                                    {qrPayload ? <QrCode payload={qrPayload} dimension={54} /> : null}
+                                </View>
+                                <Text style={S.qrLabel}>{t.qrPreview}</Text>
                             </View>
                         </View>
-                    </View>
-                )}
-
-                {/* QR code + totals */}
-                <View style={S.footerRow}>
-                    <View>
-                        {qrDataUrl
-                            ? <><Text style={S.qrLabel}>{t.qrPreview}</Text><Image src={qrDataUrl} style={{ width: 88, height: 88 }} /></>
-                            : <View style={{ width: 88 }} />
-                        }
                     </View>
                     <View style={S.totalsBlock}>
-                        <View style={S.totRow}>
-                            <Text style={S.totLabel}>{t.subtotal}:</Text>
-                            <Text style={S.totVal}>
-                                {invoice.currency} {parseFloat(String(invoice.itemsSubtotal || (invoice.isVatPayer ? (invoice.taxBase || invoice.amount) : invoice.amount) || 0)).toFixed(2)}
-                            </Text>
+                        <View style={S.totalsHead}>
+                            <Text style={S.totalsLabel}>{layout.totalLabel}</Text>
+                            <View style={S.totalsLine} />
                         </View>
-                        {!!invoice.invoiceDiscount && Number(invoice.invoiceDiscount) > 0 && (
-                            <View style={S.totRow}>
-                                <Text style={[S.totLabel, { color: '#e33d63' }]}>{t.invoiceDiscount || 'Sleva'}:</Text>
-                                <Text style={[S.totVal, { color: '#e33d63' }]}>
-                                    - {invoice.invoiceDiscountType === 'percent' ? `${invoice.invoiceDiscount}%` : `${invoice.currency} ${Number(invoice.invoiceDiscount).toFixed(2)}`}
-                                </Text>
+                        {hasTotals && (
+                            <View style={{ marginTop: 6 }}>
+                                {layout.vatRows.map((r, i) => (
+                                    <View key={i} style={S.totalsSub}>
+                                        <Text style={S.totalsSubLabel}>{r.label}</Text>
+                                        <Text style={S.totalsSubValue}>{r.value}</Text>
+                                    </View>
+                                ))}
+                                {layout.discountRow && (
+                                    <View style={S.totalsSub}>
+                                        <Text style={[S.totalsSubLabel, { color: C.danger }]}>{layout.discountRow.label}</Text>
+                                        <Text style={[S.totalsSubValue, { color: C.danger }]}>{layout.discountRow.value}</Text>
+                                    </View>
+                                )}
                             </View>
                         )}
-                        <View style={S.totRow}>
-                            <Text style={S.totLabel}>{isCs ? 'DPH' : 'VAT'} ({invoice.isVatPayer ? invoice.taxRate : '0'}%):</Text>
-                            <Text style={S.totLabel}>
-                                {invoice.currency} {parseFloat(invoice.isVatPayer ? (invoice.taxAmount || 0) : 0).toFixed(2)}
-                            </Text>
-                        </View>
-                        <View style={S.grandRow}>
-                            <Text style={S.grandLabel}>{t.total}:</Text>
-                            <Text style={S.grandVal}>{invoice.currency} {Number(invoice.amount).toFixed(2)}</Text>
+                        <View style={S.amountRow}>
+                            <Text style={S.amount}>{layout.totalAmount}</Text>
+                            <Text style={S.currency}>{layout.currency}</Text>
                         </View>
                     </View>
                 </View>
 
                 {/* Tax notes / reverse charge */}
-                {hasTaxNote && (
-                    <View style={S.noteBox}>
-                        {!!invoice.reverseChargeText && (
-                            <Text style={{ marginBottom: (invoice.exchangeRate && invoice.exchangeRate !== '1.0000') ? 5 : 0 }}>
-                                <Text style={{ fontFamily: 'Roboto', fontWeight: 'bold' }}>{t.reverseCharge}: </Text>
-                                {invoice.reverseChargeText}
+                {layout.taxNotes.length > 0 && (
+                    <View style={S.noteBox} wrap={false}>
+                        {layout.taxNotes.map((n, i) => (
+                            <Text key={i} style={i > 0 ? { marginTop: 4, color: C.muted } : {}}>
+                                <Text style={{ fontWeight: 700 }}>{n.label}: </Text>
+                                {n.value}
                             </Text>
-                        )}
-                        {invoice.exchangeRate && invoice.exchangeRate !== '1.0000' && (
-                            <Text style={{ color: C.slate500 }}>
-                                {t.exchangeRate}: 1 {invoice.currency} = {invoice.exchangeRate} {invoice.supplier?.region === 'SK' ? 'EUR' : 'CZK'}
-                            </Text>
-                        )}
+                        ))}
                     </View>
                 )}
 
-                {/* Payment bar */}
-                <View style={S.payBar}>
-                    <View style={S.payItem}>
-                        <Text style={S.payLabel}>{t.bankAccount}:</Text>
-                        <Text style={S.payVal}>{invoice.payment.accountNumber || ''}/{invoice.payment.bankCode || ''}</Text>
+                {/* Footer */}
+                <View style={S.footer} wrap={false}>
+                    <View style={S.footerLine}>
+                        <Text>{layout.issuedBy}</Text>
+                        <Text>{layout.thankYou}</Text>
                     </View>
-                    <View style={S.payItem}>
-                        <Text style={S.payLabel}>{t.iban}:</Text>
-                        <Text style={S.payVal}>{invoice.payment.iban}</Text>
-                    </View>
-                    <View style={S.payItem}>
-                        <Text style={S.payLabel}>{t.bic}:</Text>
-                        <Text style={S.payVal}>{invoice.payment.bic}</Text>
-                    </View>
-                    <View style={S.payItem}>
-                        <Text style={S.payLabel}>{t.variableSymbol}:</Text>
-                        <Text style={S.payVal}>{invoice.payment.variableSymbol || ''}</Text>
-                    </View>
+                    {!!layout.registry && <Text style={[S.footerLine, { justifyContent: 'flex-start' }]}>{layout.registry}</Text>}
+                    <DoubleRule style={S.footerRule} />
                 </View>
-
-                <Text style={S.thanks}>{t.thankYou}</Text>
             </Page>
         </Document>
     )
@@ -264,8 +322,8 @@ function InvoicePDF({ invoice, t, qrDataUrl }: { invoice: any; t: any; qrDataUrl
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-export async function generateInvoicePDF(invoice: any, t: any, qrDataUrl: string | null = null): Promise<Blob> {
-    return renderPdf(<InvoicePDF invoice={invoice} t={t} qrDataUrl={qrDataUrl} />).toBlob()
+export async function generateInvoicePDF(invoice: Invoice, t: Record<string, string>, qrPayload: string | null = null): Promise<Blob> {
+    return renderPdf(<InvoicePDF invoice={invoice} t={t} qrPayload={qrPayload} />).toBlob()
 }
 
 export function downloadPDF(blob: Blob, filename: string): void {

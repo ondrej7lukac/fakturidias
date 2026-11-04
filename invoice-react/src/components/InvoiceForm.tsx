@@ -81,7 +81,6 @@ import {
   getCzechQrPayload,
 } from '../utils/bank';
 import { QRCodeCanvas } from 'qrcode.react';
-import QRCode from 'qrcode';
 
 async function loadPdfUtils() {
   return import('../utils/pdf');
@@ -1488,19 +1487,9 @@ export default function InvoiceForm({
     });
     try {
       const { generateInvoicePDF, downloadPDF } = await loadPdfUtils();
-      let qrDataUrl = null;
-      try {
-        const qrPayload = getCzechQrPayload(currentData);
-        if (qrPayload) {
-          qrDataUrl = await QRCode.toDataURL(qrPayload, {
-            errorCorrectionLevel: 'M',
-            margin: 0,
-            width: 256,
-          });
-        }
-      } catch (err) {}
+      const qrPayload = getCzechQrPayload(currentData);
 
-      const pdf = await generateInvoicePDF(currentData, t, qrDataUrl);
+      const pdf = await generateInvoicePDF(currentData, t, qrPayload);
       downloadPDF(pdf, `${currentData.invoiceNumber}.pdf`);
       announce({
         kind: 'done',
@@ -1538,18 +1527,8 @@ export default function InvoiceForm({
     });
     try {
       const { generateInvoicePDF, pdfBlobToDataUri } = await loadPdfUtils();
-      let qrDataUrl = null;
-      try {
-        const qrPayload = getCzechQrPayload(currentData);
-        if (qrPayload) {
-          qrDataUrl = await QRCode.toDataURL(qrPayload, {
-            errorCorrectionLevel: 'M',
-            margin: 0,
-            width: 256,
-          });
-        }
-      } catch (err) {}
-      const pdfBlob = await generateInvoicePDF(currentData, t, qrDataUrl);
+      const qrPayload = getCzechQrPayload(currentData);
+      const pdfBlob = await generateInvoicePDF(currentData, t, qrPayload);
       const pdfBase64 = await pdfBlobToDataUri(pdfBlob);
 
       // A share link points at a persisted invoice — a brand-new draft has
@@ -1743,19 +1722,9 @@ export default function InvoiceForm({
     });
     try {
       const { generateInvoicePDF, pdfBlobToDataUri } = await loadPdfUtils();
-      let qrDataUrl = null;
-      try {
-        const qrPayload = getCzechQrPayload(currentData);
-        if (qrPayload) {
-          qrDataUrl = await QRCode.toDataURL(qrPayload, {
-            errorCorrectionLevel: 'M',
-            margin: 0,
-            width: 256,
-          });
-        }
-      } catch (err) {}
+      const qrPayload = getCzechQrPayload(currentData);
 
-      const pdfBlob = await generateInvoicePDF(currentData, t, qrDataUrl);
+      const pdfBlob = await generateInvoicePDF(currentData, t, qrPayload);
       const pdfBase64 = await pdfBlobToDataUri(pdfBlob);
 
       const response = await fetch('/api/drive/backup', {
