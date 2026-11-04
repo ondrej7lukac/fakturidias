@@ -1,4 +1,7 @@
+import { readFileSync } from 'fs';
+
 import { expect } from '@playwright/test';
+
 import { Given, When, Then } from './fixtures';
 
 Given('I am in guest mode', async ({ guestMode }) => {
@@ -41,6 +44,13 @@ Then('the invoice should appear in the list', async ({ invoicePage }) => {
 
 Then('I should see the invoice form', async ({ invoicePage }) => {
   await invoicePage.expectFormVisible();
+});
+
+Then('I should be able to download the invoice PDF', async ({ invoicePage }) => {
+  const download = await invoicePage.downloadPdf();
+  expect(download.suggestedFilename()).toMatch(/\.pdf$/);
+  const filePath = await download.path();
+  expect(readFileSync(filePath).subarray(0, 5).toString()).toBe('%PDF-');
 });
 
 Then('I should see a guest limit warning', async ({ page }) => {

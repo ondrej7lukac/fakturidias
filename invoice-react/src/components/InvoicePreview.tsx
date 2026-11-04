@@ -1,10 +1,21 @@
-import './InvoicePreview.css'
 import { useLayoutEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
+
 import { QRCodeCanvas } from 'qrcode.react'
+
 import { getCzechQrPayload } from '../utils/bank'
-import { documentTypeTitleKey } from '../utils/storage'
+import { buildInvoiceLayout } from '../utils/invoiceLayout'
+import type { LabeledValue } from '../utils/invoiceLayout'
 import { PAPER } from '../utils/paperColors'
 import type { Invoice } from '../types/invoice'
+
+import '@fontsource/instrument-sans/400.css'
+import '@fontsource/instrument-sans/600.css'
+import '@fontsource/instrument-sans/700.css'
+import '@fontsource/instrument-sans/700-italic.css'
+import '@fontsource/geist-mono/400.css'
+import '@fontsource/geist-mono/600.css'
+import './InvoicePreview.css'
 
 interface InvoicePreviewProps {
     invoice: Invoice
@@ -12,10 +23,42 @@ interface InvoicePreviewProps {
     lang: string
 }
 
-// The page is ALWAYS laid out at its true fixed A4 width (210mm, set in
-// InvoicePreview.css) — never reflowed for mobile — and scaled down as one
-// rigid unit to fit narrow viewports (see the frame wrapper below), so
-// proportions always match the printed/downloaded PDF exactly.
+const SANS = "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif"
+const MONO = "'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace"
+
+const boxStyle: CSSProperties = { position: 'relative', border: `1.5px solid ${PAPER.accent}`, borderRadius: 16 }
+const legendStyle: CSSProperties = { position: 'absolute', top: -10, left: 10, padding: '0 8px', background: PAPER.white, fontSize: 15, fontWeight: 700, lineHeight: '18px' }
+const italicBold: CSSProperties = { fontWeight: 700, fontStyle: 'italic' }
+
+function DoubleRule({ style }: { style?: CSSProperties }) {
+    return (
+        <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 2, ...style }}>
+            <div style={{ height: 3, background: PAPER.accent }} />
+            <div style={{ height: 1, background: PAPER.accent }} />
+        </div>
+    )
+}
+
+function Rows({ rows, labelWidth, monoSize = 14 }: { rows: LabeledValue[]; labelWidth: number; monoSize?: number }) {
+    return (
+        <>
+            {rows.map((r, i) => (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)`, columnGap: 6, alignItems: 'baseline' }}>
+                    <span style={{ fontSize: 12.5, color: PAPER.muted }}>{r.label}</span>
+                    <span style={{
+                        paddingBottom: 4,
+                        borderBottom: `1px dotted ${PAPER.dotted}`,
+                        fontSize: r.isMono ? monoSize : 15,
+                        fontFamily: r.isMono ? MONO : undefined,
+                        fontWeight: r.isStrong ? 600 : 400,
+                        overflowWrap: 'anywhere',
+                    }}>{r.value}</span>
+                </div>
+            ))}
+        </>
+    )
+}
+
 export default function InvoicePreview({ invoice, t, lang }: InvoicePreviewProps) {
     const frameRef = useRef<HTMLDivElement>(null)
     const pageRef = useRef<HTMLDivElement>(null)
@@ -49,6 +92,14 @@ export default function InvoicePreview({ invoice, t, lang }: InvoicePreviewProps
         return () => ro.disconnect()
     }, [invoice])
 
+    const layout = buildInvoiceLayout(invoice, t, lang === 'cs')
+    const { columns } = layout
+    const gridColumns = ['minmax(0, 1fr)', '48px', '112px', columns.hasDiscount && '84px', columns.hasTax && '56px', '124px']
+        .filter(Boolean)
+        .join(' ')
+    const headCell: CSSProperties = { justifySelf: 'end', marginRight: -6, padding: '0 6px', background: PAPER.white, fontSize: 13, color: PAPER.muted }
+    const cell: CSSProperties = { textAlign: 'right', fontFamily: MONO, fontSize: 14, whiteSpace: 'nowrap' }
+
     return (
         <div
             className="invoice-preview-frame"
@@ -58,431 +109,127 @@ export default function InvoicePreview({ invoice, t, lang }: InvoicePreviewProps
             <div
                 className="invoice-preview"
                 ref={pageRef}
-                style={{ transform: `scale(${scale})` }}
+                style={{ transform: `scale(${scale})`, fontFamily: SANS, color: PAPER.ink }}
             >
                 {/* Header */}
-                <div className="preview-header">
-                    <div>
-                        <h1 style={{
-                            margin: 0,
-                            color: PAPER.indigo,
-                            fontSize: '32px',
-                            fontWeight: 800,
-                            textTransform: 'uppercase',
-                            letterSpacing: '-0.025em'
-                        }}>{t[documentTypeTitleKey(invoice.documentType)]}</h1>
-                        <p style={{
-                            margin: '5px 0',
-                            color: PAPER.slate500,
-                            fontSize: '16px',
-                            fontWeight: 500
-                        }}># {invoice.invoiceNumber}</p>
+                <header style={{ display: 'flex', alignItems: 'flex-end', gap: 18 }}>
+                    <h1 style={{ margin: 0, fontSize: layout.title.length > 12 ? 26 : 40, ...italicBold, lineHeight: 1, letterSpacing: '0.01em', whiteSpace: 'nowrap' }}>{layout.title}</h1>
+                    <DoubleRule style={{ flex: 1, marginBottom: 8 }} />
+                    <div style={{ ...boxStyle, padding: '12px 18px 6px' }}>
+                        <span style={{ ...legendStyle, fontSize: 13 }}>{layout.numberLabel}</span>
+                        <span style={{ fontSize: 30, ...italicBold, lineHeight: 1 }}>{layout.number}</span>
                     </div>
-                    <div style={{ textAlign: 'right', color: PAPER.gray900 }}>
-                        <p style={{ margin: 0, fontWeight: 600 }}>
-                            {t.issueDate}: <span style={{ fontWeight: 400 }}>{invoice.issueDate}</span>
-                        </p>
-                        <p style={{ margin: '5px 0', fontWeight: 600 }}>
-                            {t.dueDate}: <span style={{
-                                fontWeight: 400,
-                                color: new Date(invoice.dueDate || '') < new Date() ? PAPER.danger : 'inherit'
-                            }}>{invoice.dueDate || 'N/A'}</span>
-                        </p>
-                        {invoice.taxableSupplyDate && invoice.taxableSupplyDate !== invoice.issueDate && (
-                            <p style={{ margin: '5px 0', fontWeight: 600, fontSize: '12px' }}>
-                                DUZP: <span style={{ fontWeight: 400 }}>{invoice.taxableSupplyDate}</span>
-                            </p>
+                </header>
+
+                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 14, fontSize: 13, whiteSpace: 'nowrap' }}>
+                    {layout.dates.map((d, i) => (
+                        <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                            {i > 0 && <span aria-hidden="true" style={{ width: 1.5, height: 13, background: PAPER.accent }} />}
+                            <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                                <span style={{ color: PAPER.muted }}>{d.label}</span>
+                                <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: d.isStrong ? 600 : 400 }}>{d.value}</span>
+                            </span>
+                        </span>
+                    ))}
+                </div>
+
+                {/* Supplier and client */}
+                <div style={{ marginTop: 30, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 20 }}>
+                    {[layout.supplier, layout.client].map((party, i) => (
+                        <section key={i} style={{ ...boxStyle, minWidth: 0, padding: '20px 18px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <span style={legendStyle}>{party.title}</span>
+                            <Rows rows={party.rows} labelWidth={99} />
+                        </section>
+                    ))}
+                </div>
+
+                {/* Items */}
+                <section className="invoice-preview-items" style={{ ...boxStyle, marginTop: 30, padding: '14px 18px', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ position: 'absolute', top: -10, left: 18, right: 18, display: 'grid', gridTemplateColumns: gridColumns, columnGap: 12, alignItems: 'center', lineHeight: '18px' }}>
+                        <span style={{ ...legendStyle, position: 'static', justifySelf: 'start', marginLeft: -8 }}>{layout.itemsTitle}</span>
+                        <span style={headCell}>{columns.labels.qty}</span>
+                        <span style={headCell}>{columns.labels.unitPrice}</span>
+                        {columns.hasDiscount && <span style={headCell}>{columns.labels.discount}</span>}
+                        {columns.hasTax && <span style={headCell}>{columns.labels.tax}</span>}
+                        <span style={headCell}>{columns.labels.total}</span>
+                    </div>
+                    {layout.items.map((item, i) => (
+                        <div key={i} style={{ display: 'grid', gridTemplateColumns: gridColumns, columnGap: 12, alignItems: 'baseline', padding: '10px 0 6px', borderBottom: `1px dotted ${PAPER.dotted}`, fontSize: 15 }}>
+                            <span style={{ overflowWrap: 'anywhere' }}>{item.name}</span>
+                            <span style={cell}>{item.qty}</span>
+                            <span style={cell}>{item.unitPrice}</span>
+                            {columns.hasDiscount && <span style={cell}>{item.discount}</span>}
+                            {columns.hasTax && <span style={cell}>{item.taxRate}</span>}
+                            <span style={{ ...cell, fontWeight: 600 }}>{item.total}</span>
+                        </div>
+                    ))}
+                </section>
+
+                {/* Payment + total */}
+                <div style={{ marginTop: 30, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 232px', gap: 20, alignItems: 'start' }}>
+                    <section style={{ ...boxStyle, minWidth: 0, padding: '20px 18px 16px', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                        <span style={legendStyle}>{layout.paymentTitle}</span>
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <Rows rows={layout.paymentRows} labelWidth={99} monoSize={12.5} />
+                        </div>
+                        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 88, height: 88, boxSizing: 'border-box', padding: 7, border: `1px solid ${PAPER.qrBorder}`, borderRadius: 6, display: 'flex' }}>
+                                <QRCodeCanvas value={getCzechQrPayload(invoice)} size={72} level="M" includeMargin={false} />
+                            </div>
+                            <span style={{ fontSize: 12, color: PAPER.muted }}>{t.qrPreview}</span>
+                        </div>
+                    </section>
+
+                    <section style={{ marginTop: -9, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, ...italicBold, lineHeight: '18px' }}>
+                            <span>{layout.totalLabel}</span>
+                            <div aria-hidden="true" style={{ flex: 1, height: 1, background: PAPER.ink }} />
+                        </div>
+                        {(layout.vatRows.length > 0 || layout.discountRow) && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
+                                {layout.vatRows.map((r, i) => (
+                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                                        <span style={{ color: PAPER.muted }}>{r.label}</span>
+                                        <span style={{ fontFamily: MONO, whiteSpace: 'nowrap' }}>{r.value}</span>
+                                    </div>
+                                ))}
+                                {layout.discountRow && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: PAPER.danger }}>
+                                        <span>{layout.discountRow.label}</span>
+                                        <span style={{ fontFamily: MONO, whiteSpace: 'nowrap' }}>{layout.discountRow.value}</span>
+                                    </div>
+                                )}
+                            </div>
                         )}
-                    </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: 8, paddingBottom: 6, borderBottom: `2px solid ${PAPER.accent}`, whiteSpace: 'nowrap' }}>
+                            <span style={{ fontSize: 36, ...italicBold, letterSpacing: '0.01em', lineHeight: 1 }}>{layout.totalAmount}</span>
+                            <span style={{ fontSize: 16, ...italicBold }}>{layout.currency}</span>
+                        </div>
+                    </section>
                 </div>
 
-                {/* Supplier and Client Info */}
-                <div className="preview-grid-2">
-                    {/* Supplier */}
-                    <div>
-                        <h3 style={{
-                            margin: '0 0 12px',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            color: PAPER.slate500,
-                            letterSpacing: '0.05em'
-                        }}>{t.issuer}</h3>
-                        <p style={{
-                            margin: 0,
-                            fontWeight: 700,
-                            fontSize: '18px',
-                            color: PAPER.gray900
-                        }}>{invoice.supplier?.name || '---'}</p>
-                        <p style={{
-                            margin: '6px 0',
-                            lineHeight: 1.5,
-                            color: PAPER.gray700
-                        }}>{invoice.supplier?.address || ''}</p>
-                        <div style={{ fontSize: '14px', color: PAPER.gray500 }}>
-                            {invoice.supplier?.ico && (
-                                <p style={{ margin: '2px 0' }}>
-                                    <strong>{t.ico}:</strong> {invoice.supplier.ico}
-                                </p>
-                            )}
-                            {invoice.supplier?.vat && (
-                                <p style={{ margin: '2px 0' }}>
-                                    <strong>{t.vat}:</strong> {invoice.supplier.vat}
-                                </p>
-                            )}
-                            {invoice.supplier?.registry && (
-                                <p style={{ margin: '2px 0', fontSize: '12px' }}>
-                                    {invoice.supplier.registry}
-                                </p>
-                            )}
-                            {invoice.supplier?.phone && (
-                                <p style={{ margin: '2px 0' }}>Tel: {invoice.supplier.phone}</p>
-                            )}
-                            {invoice.supplier?.email && (
-                                <p style={{ margin: '2px 0' }}>Email: {invoice.supplier.email}</p>
-                            )}
-                        </div>
-                        {!invoice.isVatPayer && (
-                            <p style={{
-                                marginTop: '10px',
-                                color: PAPER.slate500,
-                                fontSize: '11px'
-                            }}>Nejsem plátce DPH</p>
-                        )}
-                    </div>
-
-                    {/* Client */}
-                    <div>
-                        <h3 style={{
-                            margin: '0 0 12px',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            color: PAPER.slate500,
-                            letterSpacing: '0.05em'
-                        }}>{t.billTo}</h3>
-                        <p style={{
-                            margin: 0,
-                            fontWeight: 700,
-                            fontSize: '18px',
-                            color: PAPER.gray900
-                        }}>{invoice.client?.name}</p>
-                        <p style={{
-                            margin: '6px 0',
-                            lineHeight: 1.5,
-                            color: PAPER.gray700
-                        }}>{invoice.client?.address || ''}</p>
-                        <div style={{ fontSize: '14px', color: PAPER.gray500 }}>
-                            {invoice.client?.ico && (
-                                <p style={{ margin: '2px 0' }}>
-                                    <strong>{t.ico}:</strong> {invoice.client.ico}
-                                </p>
-                            )}
-                            {invoice.client?.vat && (
-                                <p style={{ margin: '2px 0' }}>
-                                    <strong>{t.vat}:</strong> {invoice.client.vat}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Items Table */}
-                <div className="table-container">
-                    <table style={{
-                        width: '100%',
-                        borderCollapse: 'collapse',
-                        marginBottom: '40px'
-                    }}>
-                        <thead>
-                            <tr style={{ borderBottom: `2px solid ${PAPER.gray200}` }}>
-                                <th style={{
-                                    textAlign: 'left',
-                                    padding: '10px 0',
-                                    color: PAPER.slate500,
-                                    fontSize: '12px',
-                                    textTransform: 'uppercase'
-                                }}>{t.itemDescription}</th>
-                                <th style={{
-                                    textAlign: 'center',
-                                    padding: '10px 0',
-                                    color: PAPER.slate500,
-                                    fontSize: '12px',
-                                    textTransform: 'uppercase'
-                                }}>{t.qty}</th>
-                                <th style={{
-                                    textAlign: 'right',
-                                    padding: '10px 0',
-                                    color: PAPER.slate500,
-                                    fontSize: '12px',
-                                    textTransform: 'uppercase'
-                                }}>{lang === 'cs' ? 'CENA/JEDN.' : 'PRICE/UNIT'}</th>
-                                <th style={{
-                                    textAlign: 'center',
-                                    padding: '10px 0',
-                                    color: PAPER.slate500,
-                                    fontSize: '12px',
-                                    textTransform: 'uppercase'
-                                }}>{lang === 'cs' ? 'DPH %' : 'TAX %'}</th>
-                                <th style={{
-                                    textAlign: 'right',
-                                    padding: '10px 0',
-                                    color: PAPER.slate500,
-                                    fontSize: '12px',
-                                    textTransform: 'uppercase'
-                                }}>{lang === 'cs' ? 'SLEVA' : 'DISC.'}</th>
-                                <th style={{
-                                    textAlign: 'right',
-                                    padding: '10px 0',
-                                    color: PAPER.slate500,
-                                    fontSize: '12px',
-                                    textTransform: 'uppercase'
-                                }}>{t.total}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {(invoice.items || []).map((item, idx) => (
-                                <tr key={idx}>
-                                    <td style={{
-                                        padding: '12px 0',
-                                        borderBottom: `1px solid ${PAPER.gray200}`,
-                                        color: PAPER.gray900
-                                    }}>{item.name}</td>
-                                    <td style={{
-                                        padding: '12px 0',
-                                        borderBottom: `1px solid ${PAPER.gray200}`,
-                                        textAlign: 'center',
-                                        color: PAPER.gray900
-                                    }}>{item.qty}</td>
-                                    <td style={{
-                                        padding: '12px 0',
-                                        borderBottom: `1px solid ${PAPER.gray200}`,
-                                        textAlign: 'right',
-                                        color: PAPER.gray900
-                                    }}>{invoice.currency} {item.price.toFixed(2)}</td>
-                                    <td style={{
-                                        padding: '12px 0',
-                                        borderBottom: `1px solid ${PAPER.gray200}`,
-                                        textAlign: 'center',
-                                        color: PAPER.gray900
-                                    }}>{item.taxRate || 0}%</td>
-                                    <td style={{
-                                        padding: '12px 0',
-                                        borderBottom: `1px solid ${PAPER.gray200}`,
-                                        textAlign: 'right',
-                                        color: PAPER.gray900
-                                    }}>{item.discount && Number(item.discount) > 0 ? ((item.discountType || 'percent') === 'percent' ? `${item.discount}%` : `${invoice.currency} ${Number(item.discount).toFixed(2)}`) : '-'}</td>
-                                    <td style={{
-                                        padding: '12px 0',
-                                        borderBottom: `1px solid ${PAPER.gray200}`,
-                                        textAlign: 'right',
-                                        color: PAPER.gray900
-                                    }}>{invoice.currency} {item.total.toFixed(2)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* VAT Section */}
-                {invoice.isVatPayer && (
-                    <div style={{
-                        marginBottom: '30px',
-                        padding: '15px',
-                        background: PAPER.greenBg,
-                        border: `1px solid ${PAPER.greenBorder}`,
-                        borderRadius: '8px'
-                    }}>
-                        <h3 style={{
-                            margin: '0 0 10px',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            color: PAPER.green800,
-                            letterSpacing: '0.05em'
-                        }}>Daňový doklad - Rozpis DPH</h3>
-                        <div className="preview-vat-grid">
-                            <div>
-                                <p style={{
-                                    margin: 0,
-                                    fontSize: '11px',
-                                    color: PAPER.green800,
-                                    textTransform: 'uppercase'
-                                }}>Základ daně</p>
-                                <p style={{
-                                    margin: '4px 0',
-                                    fontWeight: 600,
-                                    color: PAPER.green700
-                                }}>{invoice.currency} {parseFloat(String(invoice.taxBase || 0)).toFixed(2)}</p>
+                {/* Tax notes / reverse charge */}
+                {layout.taxNotes.length > 0 && (
+                    <div style={{ marginTop: 20, padding: '12px 16px', border: `1px solid ${PAPER.noteBorder}`, borderRadius: 8, background: PAPER.noteBg, fontSize: 13 }}>
+                        {layout.taxNotes.map((n, i) => (
+                            <div key={i} style={i > 0 ? { marginTop: 6, color: PAPER.muted } : undefined}>
+                                <strong>{n.label}:</strong> {n.value}
                             </div>
-                            <div>
-                                <p style={{
-                                    margin: 0,
-                                    fontSize: '11px',
-                                    color: PAPER.green800,
-                                    textTransform: 'uppercase'
-                                }}>Sazba DPH</p>
-                                <p style={{
-                                    margin: '4px 0',
-                                    fontWeight: 600,
-                                    color: PAPER.green700
-                                }}>{invoice.taxRate || '21'}%</p>
-                            </div>
-                            <div>
-                                <p style={{
-                                    margin: 0,
-                                    fontSize: '11px',
-                                    color: PAPER.green800,
-                                    textTransform: 'uppercase'
-                                }}>Výše daně</p>
-                                <p style={{
-                                    margin: '4px 0',
-                                    fontWeight: 600,
-                                    color: PAPER.green700
-                                }}>{invoice.currency} {parseFloat(String(invoice.taxAmount || 0)).toFixed(2)}</p>
-                            </div>
-                        </div>
+                        ))}
                     </div>
                 )}
 
-                {/* Total & QR */}
-                <div className="preview-footer" style={{ marginBottom: '40px' }}>
-                    <div style={{ width: '180px' }}>
-                        <h3 style={{
-                            margin: '0 0 8px',
-                            fontSize: '12px',
-                            textTransform: 'uppercase',
-                            color: PAPER.slate500
-                        }}>{t.qrPreview}</h3>
-                        <div style={{
-                            width: '120px',
-                            height: '120px',
-                            border: `1px solid ${PAPER.gray200}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                        }}>
-                            <QRCodeCanvas
-                                value={getCzechQrPayload(invoice)}
-                                size={120}
-                                level="M"
-                                includeMargin={false}
-                            />
+                {/* Footer */}
+                <footer style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: PAPER.inkSoft }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24 }}>
+                            <span>{layout.issuedBy}</span>
+                            <span>{layout.thankYou}</span>
                         </div>
+                        {layout.registry && <span>{layout.registry}</span>}
                     </div>
-                    <div style={{ width: '250px' }}>
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            marginBottom: '10px'
-                        }}>
-                            <span style={{ color: PAPER.slate500 }}>{t.subtotal}:</span>
-                            <span style={{ fontWeight: 600, color: PAPER.gray900 }}>{invoice.currency} {parseFloat(String(invoice.itemsSubtotal || (invoice.isVatPayer ? (invoice.taxBase || invoice.amount) : invoice.amount) || 0)).toFixed(2)}</span>
-                        </div>
-
-                        {!!invoice.invoiceDiscount && Number(invoice.invoiceDiscount) > 0 && (
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                marginBottom: '10px',
-                                color: PAPER.danger
-                            }}>
-                                <span>{t.invoiceDiscount || 'Sleva'}:</span>
-                                <span style={{ fontWeight: 600 }}>
-                                    - {(invoice.invoiceDiscountType || 'percent') === 'percent' ? `${invoice.invoiceDiscount}%` : `${invoice.currency} ${Number(invoice.invoiceDiscount).toFixed(2)}`}
-                                </span>
-                            </div>
-                        )}
-
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            marginBottom: '10px',
-                            color: PAPER.slate500,
-                            fontSize: '13px'
-                        }}>
-                            <span>{lang === 'cs' ? 'DPH' : 'VAT'} ({invoice.isVatPayer ? invoice.taxRate : '0'}%)</span>
-                            <span>{invoice.currency} {parseFloat(String(invoice.isVatPayer ? (invoice.taxAmount || 0) : 0)).toFixed(2)}</span>
-                        </div>
-
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            paddingTop: '10px',
-                            borderTop: `2px solid ${PAPER.indigo}`
-                        }}>
-                            <span style={{ fontWeight: 700, fontSize: '18px', color: PAPER.gray900 }}>{t.total}:</span>
-                            <span style={{
-                                fontWeight: 700,
-                                fontSize: '18px',
-                                color: PAPER.indigo
-                            }}>{invoice.currency} {Number(invoice.amount || 0).toFixed(2)}</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Tax Notes / Reverse Charge */}
-                {(invoice.reverseChargeText || (invoice.exchangeRate && invoice.exchangeRate !== '1.0000')) && (
-                    <div style={{
-                        margin: '20px 0',
-                        padding: '15px 20px',
-                        border: `1px solid ${PAPER.slate200}`,
-                        borderRadius: '8px',
-                        background: PAPER.slate50,
-                        fontSize: '13px',
-                        color: PAPER.gray900
-                    }}>
-                        {invoice.reverseChargeText && (
-                            <div style={{ marginBottom: invoice.exchangeRate ? '8px' : '0' }}>
-                                <strong>{t.reverseCharge}:</strong> {invoice.reverseChargeText}
-                            </div>
-                        )}
-                        {invoice.exchangeRate && invoice.exchangeRate !== '1.0000' && (
-                            <div style={{ color: PAPER.slate500 }}>
-                                {t.exchangeRate}: 1 {invoice.currency} = {invoice.exchangeRate} {(invoice.supplier?.region === 'SK' ? 'EUR' : 'CZK')}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Minimalistic Payment Details (Bottom) */}
-                <div style={{
-                    padding: '15px 20px',
-                    background: PAPER.slate50,
-                    borderTop: `1px solid ${PAPER.slate200}`,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '20px',
-                    fontSize: '13px'
-                }}>
-                    <div>
-                        <span style={{ color: PAPER.slate500, marginRight: '6px' }}>{t.bankAccount}:</span>
-                        <span style={{ fontWeight: 600, color: PAPER.gray900 }}>{invoice.payment?.accountNumber}/{invoice.payment?.bankCode}</span>
-                    </div>
-                    <div>
-                        <span style={{ color: PAPER.slate500, marginRight: '6px' }}>{t.iban}:</span>
-                        <span style={{ fontWeight: 600, color: PAPER.gray900, fontFamily: 'monospace' }}>{invoice.payment?.iban}</span>
-                    </div>
-                    <div>
-                        <span style={{ color: PAPER.slate500, marginRight: '6px' }}>{t.bic}:</span>
-                        <span style={{ fontWeight: 600, color: PAPER.gray900 }}>{invoice.payment?.bic}</span>
-                    </div>
-                    <div>
-                        <span style={{ color: PAPER.slate500, marginRight: '6px' }}>{t.variableSymbol}:</span>
-                        <span style={{ fontWeight: 600, color: PAPER.gray900 }}>{invoice.payment?.variableSymbol}</span>
-                    </div>
-                </div>
-
-                {/* Thank you note */}
-                <div style={{
-                    marginTop: '20px',
-                    color: PAPER.slate400,
-                    fontSize: '11px',
-                    textAlign: 'center'
-                }}>
-                    <p>{t.thankYou}</p>
-                </div>
+                    <DoubleRule />
+                </footer>
             </div>
         </div>
     )

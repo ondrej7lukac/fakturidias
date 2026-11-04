@@ -19,7 +19,7 @@ export default defineConfig({
     ['list'],
   ],
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:4173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
@@ -30,11 +30,13 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
+  // Production build + production headers (see `preview` in vite.config.ts).
+  // The dev server sends no CSP, so CSP breakage used to surface only on Railway.
   webServer: {
-    command: 'npm run dev',
+    command: 'npm run build && npm run preview -- --port 4173 --strictPort',
     cwd: path.resolve(__dirname, '../invoice-react'),
-    url: 'http://localhost:3000',
+    url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
+    timeout: 240_000,
   },
 });

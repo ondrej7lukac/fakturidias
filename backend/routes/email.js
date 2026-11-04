@@ -21,6 +21,7 @@ function attach(router) {
                 subject: body.subject,
                 message: body.message,
                 shareUrl,
+                fallbackReplyTo: userEmail,
             });
             return sendJson(res, 200, { success: true, id: result.id });
         } catch (err) {

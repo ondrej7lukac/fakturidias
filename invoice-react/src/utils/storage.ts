@@ -685,8 +685,10 @@ export function formatDate(date: Date | string | number | null | undefined) {
   return d.toISOString().split('T')[0];
 }
 
-export function money(value: number | string | null | undefined) {
-  return Number(value || 0).toFixed(2);
+export function money(value: number | string | null | undefined, locale?: string) {
+  const amount = Number(value || 0);
+  if (!locale) return amount.toFixed(2);
+  return amount.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function debounce<Args extends unknown[]>(

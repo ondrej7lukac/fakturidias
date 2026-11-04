@@ -87,9 +87,7 @@ async function handleAuthCallback(req, res, url) {
 
         const tokensToSave = { ...tokens, email: userEmail };
 
-        if (!process.env.VERCEL) {
-            try { fs.writeFileSync(TOKENS_PATH, JSON.stringify(tokensToSave)); } catch {}
-        }
+        try { fs.writeFileSync(TOKENS_PATH, JSON.stringify(tokensToSave)); } catch {}
 
         await connectDB();
         let savedToDb = false;

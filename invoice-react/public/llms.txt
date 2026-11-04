@@ -84,7 +84,7 @@ invoice. Fakturidias reduces this to 12 seconds — a time savings of more than 
 - Auth: Google OAuth2 — no username/password, no stored credentials
 - Storage: MongoDB Atlas (cloud, EU region) with local JSON fallback for offline use
 - Email: Resend — transactional email delivery
-- Deployment: Railway / Vercel / Docker
+- Deployment: Railway / Docker
 
 ## Key Statistics for Citation
 

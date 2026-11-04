@@ -12,7 +12,14 @@ declare module 'qrcode' {
   function toDataURL(text: string, options?: QRCodeToDataURLOptions): Promise<string>
   function toString(text: string, options?: { type?: string } & QRCodeToDataURLOptions): Promise<string>
 
-  const QRCode: { toDataURL: typeof toDataURL; toString: typeof toString }
+  interface QRCodeModules {
+    size: number
+    data: Uint8Array
+  }
+
+  function create(text: string, options?: { errorCorrectionLevel?: 'L' | 'M' | 'Q' | 'H' }): { modules: QRCodeModules }
+
+  const QRCode: { toDataURL: typeof toDataURL; toString: typeof toString; create: typeof create }
   export default QRCode
-  export { toDataURL, toString }
+  export { toDataURL, toString, create }
 }

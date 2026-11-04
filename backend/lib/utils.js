@@ -2,6 +2,7 @@
 const isProd = process.env.NODE_ENV === "production";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 const MAX_BODY_BYTES = 1 * 1024 * 1024; // 1 MB
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function logDebug(location, message, data) {
   if (!isProd) {
@@ -19,12 +20,16 @@ const SECURITY_HEADERS = {
     "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
   "Content-Security-Policy": [
     "default-src 'self'",
-    "script-src 'self' https://www.googletagmanager.com https://www.clarity.ms https://c.clarity.ms https://scripts.clarity.ms",
+    // 'wasm-unsafe-eval': @react-pdf/renderer's layout engine (yoga-layout) is WebAssembly.
+    "script-src 'self' 'wasm-unsafe-eval' https://www.googletagmanager.com https://www.clarity.ms https://c.clarity.ms https://scripts.clarity.ms",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: https:",
     "font-src 'self' data: https://fonts.gstatic.com",
-    "connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://region1.analytics.google.com https://www.googletagmanager.com https://www.clarity.ms https://c.clarity.ms https://scripts.clarity.ms https://e.clarity.ms",
-    "frame-src 'none'",
+    // Wildcards: GA4 (regionN.*) and Clarity ([a-z].clarity.ms) collect on
+    // subdomains assigned at runtime, so single hosts silently drop data.
+    "connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://*.clarity.ms",
+    // 'self': the Mailbox previews PDF attachments in a same-origin iframe.
+    "frame-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -130,4 +135,5 @@ module.exports = {
   parseBody,
   readRawBody,
   SECURITY_HEADERS,
+  EMAIL_RE,
 };

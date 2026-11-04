@@ -1,6 +1,6 @@
 'use strict';
 
-const { sendJson, parseBody } = require('../lib/utils');
+const { sendJson, parseBody, EMAIL_RE } = require('../lib/utils');
 const {
     grantAccess,
     revokeAccess,
@@ -8,8 +8,6 @@ const {
     getGrantsByGrantee,
     hasAccessGrant,
 } = require('../lib/storage');
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Always act as the real logged-in user, never the view-as identity.
 function realUser(ctx) {

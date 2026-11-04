@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { Download, Page, expect } from '@playwright/test';
 
 export class InvoicePage {
   constructor(readonly page: Page) {}
@@ -44,6 +44,14 @@ export class InvoicePage {
 
   async save() {
     await this.saveButton().click();
+  }
+
+  async downloadPdf(): Promise<Download> {
+    // Action-bar icon button opens the confirm dialog; its primary button downloads.
+    await this.page.getByRole('button', { name: 'Stáhnout PDF' }).first().click();
+    const download = this.page.waitForEvent('download', { timeout: 20_000 });
+    await this.page.locator('.ap-modal__footer .ap-btn--primary').click();
+    return download;
   }
 
   async switchLanguage(code: string) {

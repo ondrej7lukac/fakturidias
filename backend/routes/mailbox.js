@@ -10,6 +10,32 @@ const {
   deleteReceivedInvoice,
 } = require('../lib/storage');
 
+// The sender picks each inbound attachment's Content-Type. Only types that
+// can't run script on our origin render inline; anything else (html, svg,
+// js…) is served as an opaque download.
+const INLINE_ATTACHMENT_TYPES = new Set([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+]);
+
+// Header values must be Latin-1, so a name like "Faktura č. 1.pdf" would make
+// writeHead throw. Send an ASCII fallback plus the RFC 6266 UTF-8 form.
+function contentDisposition(type, filename) {
+  const asciiName = filename
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x20-\x7e]/g, '_')
+    .replace(/["\\]/g, '');
+  const utf8Name = encodeURIComponent(filename).replace(
+    /['()*]/g,
+    (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase(),
+  );
+  return `${type}; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`;
+}
+
 const INBOUND_DOMAIN = process.env.INBOUND_DOMAIN || 'fakturidias.app';
 
 function inboundSetupStatus() {
@@ -122,13 +148,17 @@ function attach(router) {
         return sendJson(res, 404, { error: 'Attachment not found' });
 
       const buf = Buffer.from(att.data, 'base64');
-      const safeName = String(att.filename || 'attachment').replace(
-        /["\r\n]/g,
-        '',
-      );
+      const declaredType = String(att.contentType || '')
+        .split(';')[0]
+        .trim()
+        .toLowerCase();
+      const isInline = INLINE_ATTACHMENT_TYPES.has(declaredType);
       res.writeHead(200, {
-        'Content-Type': att.contentType || 'application/octet-stream',
-        'Content-Disposition': `inline; filename="${safeName}"`,
+        'Content-Type': isInline ? declaredType : 'application/octet-stream',
+        'Content-Disposition': contentDisposition(
+          isInline ? 'inline' : 'attachment',
+          String(att.filename || 'attachment'),
+        ),
         'Content-Length': buf.length,
         ...SECURITY_HEADERS,
       });
