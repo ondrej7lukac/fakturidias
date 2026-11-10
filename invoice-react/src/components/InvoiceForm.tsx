@@ -80,6 +80,11 @@ import {
   parseIban,
   getCzechQrPayload,
 } from '../utils/bank';
+import {
+  supplierToFormFields,
+  applySupplierFields,
+  type SupplierFormFields,
+} from '../utils/supplierFormFields';
 import { QRCodeCanvas } from 'qrcode.react';
 
 async function loadPdfUtils() {
@@ -116,8 +121,6 @@ interface InvoiceFormProps {
   defaultSupplier?: Supplier | null;
   setDefaultSupplier: Dispatch<SetStateAction<Supplier | null>>;
   isAuthenticated: boolean;
-  onShowInvoiceForm?: () => void;
-  onOpenDashboard?: () => void;
 }
 
 // Autocomplete suggestion rows merge saved customers and ARES/RPO lookups, so
@@ -159,11 +162,11 @@ export default function InvoiceForm({
   defaultSupplier,
   setDefaultSupplier,
   isAuthenticated,
-  onShowInvoiceForm,
-  onOpenDashboard,
 }: InvoiceFormProps) {
   const { announce } = useLiveActivity();
   const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Supplier values last applied from the company profile (see Effect 3).
+  const appliedSupplierRef = useRef<SupplierFormFields | null>(null);
   const [formData, setFormData] = useState({
     invoiceNumber: '',
     documentType: 'invoice',
@@ -396,6 +399,12 @@ export default function InvoiceForm({
         newInvoiceIdRef.current = randomUUID();
       }
       const today = new Date();
+      // A fresh draft bills as the active company, even if the invoice open
+      // before it belonged to a different one.
+      const activeSupplier = defaultSupplier
+        ? supplierToFormFields(defaultSupplier)
+        : null;
+      if (activeSupplier) appliedSupplierRef.current = activeSupplier;
       setFormData((prev) => ({
         ...prev,
         // Keep only layout/supplier defaults, reset client/invoice-specific fields
@@ -438,6 +447,7 @@ export default function InvoiceForm({
         taxBase: '0.00',
         taxRate: prev.taxRate,
         taxAmount: '0.00',
+        ...activeSupplier,
       }));
       setItems([]); // ← ONLY cleared here, when truly starting a new invoice
     }
@@ -556,39 +566,17 @@ export default function InvoiceForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoice, isAuthenticated, formData.documentType, defaultSupplier?.invoiceNumberFormat]);
 
-  // ─── Effect 3: Pre-fill supplier/bank for new invoices when profile loads ──
+  // ─── Effect 3: Apply the active company profile to new invoices ───────────
+  // Runs on first load and whenever the user switches company (header quick
+  // menu / Settings). Fields still holding the previous company's values are
+  // replaced, so a switch re-bills the draft; hand-typed values are kept.
   useEffect(() => {
     if (invoice) return; // Don't override data of an existing invoice being edited
     if (!defaultSupplier) return;
-    let bankFields = { accountNumber: '', bankCode: '', prefix: '' };
-    if (defaultSupplier.iban) {
-      const parsed = parseIban(defaultSupplier.iban);
-      if (parsed) bankFields = parsed;
-    }
-    // Only fill fields that are currently empty (supplier fields, not client fields)
-    setFormData((prev) => ({
-      ...prev,
-      iban: prev.iban || defaultSupplier.iban || '',
-      accountNumber:
-        prev.accountNumber ||
-        defaultSupplier.accountNumber ||
-        bankFields.accountNumber,
-      bankCode:
-        prev.bankCode || defaultSupplier.bankCode || bankFields.bankCode,
-      prefix: prev.prefix || defaultSupplier.prefix || bankFields.prefix,
-      supplierName: prev.supplierName || defaultSupplier.name || '',
-      supplierIco: prev.supplierIco || defaultSupplier.ico || '',
-      supplierVat: prev.supplierVat || defaultSupplier.vat || '',
-      supplierAddress: prev.supplierAddress || defaultSupplier.address || '',
-      supplierRegistry: prev.supplierRegistry || defaultSupplier.registry || '',
-      supplierPhone: prev.supplierPhone || defaultSupplier.phone || '',
-      supplierEmail: prev.supplierEmail || defaultSupplier.email || '',
-      supplierWebsite: prev.supplierWebsite || defaultSupplier.website || '',
-      isVatPayer: prev.isVatPayer || defaultSupplier.isVatPayer || false,
-      taxStatus: prev.taxStatus || defaultSupplier.taxStatus || 'non-payer',
-      taxRate: prev.taxRate || defaultSupplier.taxRate || '21',
-      // Never touch: invoiceNumber, client fields, items, dates, status
-    }));
+    const next = supplierToFormFields(defaultSupplier);
+    const previous = appliedSupplierRef.current;
+    appliedSupplierRef.current = next;
+    setFormData((prev) => applySupplierFields(prev, next, previous));
   }, [defaultSupplier]); // ← only runs when supplier profile changes
 
   // ─── Effect 3.1: Cross-Border EU B2B Reverse Charge Logic ────────────
@@ -2544,30 +2532,6 @@ export default function InvoiceForm({
         {/* Page header */}
         <div className='ap-page__head'>
           <div>
-            {onShowInvoiceForm && onOpenDashboard && (
-              <div className='invoice-form-mobile-tabs' role='tablist'>
-                <button
-                  className='invoice-form-mobile-tabs__tab invoice-form-mobile-tabs__tab--active'
-                  type='button'
-                  role='tab'
-                  aria-selected='true'
-                  onClick={onShowInvoiceForm}
-                >
-                  <FileText size={ICON_SM} strokeWidth={STROKE} />
-                  <span>{lang === 'cs' ? 'Faktura' : 'Invoice form'}</span>
-                </button>
-                <button
-                  className='invoice-form-mobile-tabs__tab'
-                  type='button'
-                  role='tab'
-                  aria-selected='false'
-                  onClick={onOpenDashboard}
-                >
-                  <BarChart2 size={ICON_SM} strokeWidth={STROKE} />
-                  <span>{lang === 'cs' ? 'Přehled' : 'Invoice dashboard'}</span>
-                </button>
-              </div>
-            )}
             <h1 className='ap-page__title'>
               {invoice
                 ? lang === 'cs'

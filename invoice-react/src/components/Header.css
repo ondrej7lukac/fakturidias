@@ -5,7 +5,8 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  height: var(--headerH);
+  height: calc(var(--headerH) + var(--safe-top));
+  padding-top: var(--safe-top);
 }
 
 /* Wider container and vertically-centred inner for the app */
@@ -17,7 +18,7 @@
 }
 @media (max-width: 700px) {
   .lp-header__inner--app {
-    padding: 0 16px !important;
+    padding: 0 max(16px, var(--safe-right)) 0 max(16px, var(--safe-left)) !important;
     gap: 10px !important;
   }
 }
@@ -215,17 +216,7 @@
   }
 }
 
-/* Mobile hamburger — hide on desktop */
-.header-mobile-menu {
-  display: none !important;
-}
-@media (max-width: 700px) {
-  .header-mobile-menu {
-    display: grid !important;
-  }
-}
-
-/* User dropdown (avatar) — desktop only; hidden on mobile in favour of the hamburger */
+/* User dropdown (avatar) — desktop only; on mobile the tab bar's "More" opens the sheet */
 .header-user-desktop {
   display: inline-flex;
 }
@@ -473,10 +464,13 @@
 }
 
 .header__sheet-body {
-  overflow-y: hidden;
+  /* Scrollable: on short phones the menu is taller than the screen */
+  overflow-y: auto;
   overflow-x: hidden;
-  padding-top: 90px;
-  padding-bottom: 16px;
+  overscroll-behavior: contain;
+  /* Clear the sticky app header, which stays above the sheet */
+  padding-top: calc(var(--headerH) + var(--safe-top) + 14px);
+  padding-bottom: calc(16px + var(--safe-bottom));
   display: flex;
   flex-direction: column;
   flex: 1;

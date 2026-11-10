@@ -56,3 +56,8 @@ create-env.bat
 push.bat
 start.bat
 .env*.local
+*.tsbuildinfo
+*.tsbuildinfo
+*.tsbuildinfo
+*.tsbuildinfo
+*.tsbuildinfo

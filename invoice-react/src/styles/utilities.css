@@ -27,6 +27,19 @@
   --radius: 10px;
   --radius2: 16px;
   --headerH: 76px;
+  /* Device safe areas (notch / home indicator); non-zero only with
+     viewport-fit=cover in index.html. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  /* Full visible viewport height: dvh tracks the mobile browser bars, so
+     content sized to it never hides under the URL bar. 100vh fallback. */
+  --viewport-h: 100vh;
+  /* Mobile bottom tab bar (MobileTabBar.tsx); --bottom-nav-offset is the
+     space it currently occupies (0 when hidden). */
+  --mobile-nav-h: 64px;
+  --bottom-nav-offset: 0px;
   --success-bg: color-mix(in oklab, var(--accent) 12%, transparent);
   --success-border: var(--accent);
   --success-text: var(--text);
@@ -123,6 +136,10 @@ body {
   background-attachment: fixed;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+
+@supports (height: 100dvh) {
+  :root { --viewport-h: 100dvh; }
 }
 
 /* Reset */

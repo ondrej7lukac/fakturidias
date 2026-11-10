@@ -13,7 +13,7 @@
   --admin-gap: 1.5rem;
 
   position: relative;
-  min-height: calc(100vh - var(--headerH));
+  min-height: calc(var(--viewport-h) - var(--headerH));
   padding: 2.5rem 2rem 5rem;
   max-width: 1440px;
   margin: 0 auto;

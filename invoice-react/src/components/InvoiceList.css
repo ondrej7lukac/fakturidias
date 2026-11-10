@@ -6,7 +6,7 @@
 .invoice-list-card {
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - var(--headerH) - 3.5rem);
+  max-height: calc(var(--viewport-h) - var(--headerH) - 3.5rem);
 }
 
 .invoice-list-card:hover {

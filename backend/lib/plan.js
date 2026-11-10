@@ -14,6 +14,33 @@ const PRICING = {
     max_annual:       { amount: 120000, currency: 'czk', interval: 'year'  },
 };
 
+// Accounts that always get full Max access without a Stripe subscription —
+// the product owner, plus anyone listed in COMPLIMENTARY_EMAILS (comma-separated).
+const OWNER_EMAIL = 'ondrej7lukac@gmail.com';
+const COMPLIMENTARY_EMAILS = new Set(
+    [OWNER_EMAIL, ...(process.env.COMPLIMENTARY_EMAILS || '').split(',')]
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean),
+);
+
+function isComplimentary(email) {
+    return COMPLIMENTARY_EMAILS.has(String(email || '').trim().toLowerCase());
+}
+
+// The subscription that plan checks should use for this user. Complimentary
+// accounts get a synthetic, never-expiring Max subscription; everyone else gets
+// their stored one unchanged. Never persist the returned object.
+function effectiveSubscription(email, subscription) {
+    if (!isComplimentary(email)) return subscription;
+    return {
+        ...(subscription || {}),
+        plan: 'max',
+        status: 'active',
+        currentPeriodEnd: null,
+        complimentary: true,
+    };
+}
+
 function _isActive(subscription) {
     if (!subscription) return false;
     if (subscription.status !== 'active' && subscription.status !== 'trialing') return false;
@@ -41,4 +68,5 @@ module.exports = {
     GUEST_INVOICE_LIMIT, FREE_INVOICE_LIMIT,
     STANDARD_INVOICE_LIMIT, STANDARD_AI_LIMIT,
     PRICING, isPro, isStandard, isMax,
+    isComplimentary, effectiveSubscription,
 };

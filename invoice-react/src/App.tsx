@@ -9,6 +9,7 @@ import Mailbox from './components/Mailbox';
 import Recurring from './components/Recurring';
 import Expenses from './components/Expenses';
 import WelcomeScreen from './components/WelcomeScreen';
+import MobileTabBar from './components/MobileTabBar';
 import Onboarding from './components/Onboarding';
 import type { OnboardingSupplier } from './components/Onboarding';
 import CookieBanner from './components/CookieBanner';
@@ -776,8 +777,6 @@ function App() {
                 defaultSupplier={defaultSupplier}
                 setDefaultSupplier={setDefaultSupplier}
                 isAuthenticated={!!user}
-                onShowInvoiceForm={handleNewInvoice}
-                onOpenDashboard={handleOpenDashboard}
               />
             </div>
             <div
@@ -846,6 +845,18 @@ function App() {
           </>
         )}
       </main>
+      <MobileTabBar
+        lang={lang}
+        currentView={currentView}
+        dashboardOpen={dashboardOpen}
+        mobileView={mobileView}
+        mobileMenuOpen={mobileMenuOpen}
+        onOpenDashboard={handleOpenDashboard}
+        onOpenInvoicesList={handleOpenInvoicesList}
+        onNewInvoice={handleNewInvoice}
+        onOpenSettings={() => setCurrentView('settings')}
+        onOpenMenu={() => setMobileMenuOpen(true)}
+      />
       {impersonating && (
         <div
           style={{

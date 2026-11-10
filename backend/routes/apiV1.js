@@ -12,7 +12,7 @@ const {
     getSubscription,
     getGlobalSettings,
 } = require('../lib/storage');
-const { isPro } = require('../lib/plan');
+const { isPro, effectiveSubscription } = require('../lib/plan');
 const { fireWebhooks } = require('../lib/webhooks');
 
 async function authenticate(req) {
@@ -74,7 +74,7 @@ function attach(router) {
         }
 
         const existing = await getUserInvoices(userEmail);
-        const subscription = await getSubscription(userEmail);
+        const subscription = effectiveSubscription(userEmail, await getSubscription(userEmail));
         const { freeInvoiceLimit } = await getGlobalSettings();
         if (!isPro(subscription) && existing.length >= freeInvoiceLimit) {
             return sendJson(res, 403, {

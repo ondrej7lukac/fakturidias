@@ -18,7 +18,6 @@ import {
   Plus,
   Settings2,
   X,
-  Menu,
   Check,
   Shield,
   Mail,
@@ -600,25 +599,6 @@ export default function Header({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-
-          {/* Mobile hamburger — toggles the sheet open/closed */}
-          <button
-            className='lp-icon-toggle header-mobile-menu'
-            onClick={() => {
-              const next = !mobileMenuOpen;
-              setMobileMenuOpen(next);
-              if (next)
-                announce({ kind: 'info', label: isCz ? 'Nabídka' : 'Menu' });
-            }}
-            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={mobileMenuOpen}
-          >
-            {mobileMenuOpen ? (
-              <X size={18} strokeWidth={2} />
-            ) : (
-              <Menu size={18} strokeWidth={2} />
-            )}
-          </button>
         </div>
       </div>
 

@@ -351,6 +351,10 @@
   box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 16%, transparent);
 }
 .ap-input::placeholder, .ap-textarea::placeholder { color: var(--muted2); }
+@media (max-width: 768px) {
+  /* Prevents iOS focus zoom — see forms.css */
+  .ap-input, .ap-select, .ap-textarea { font-size: 16px; }
+}
 .ap-textarea { resize: vertical; min-height: 90px; line-height: 1.5; }
 .ap-select {
   padding-right: 36px;
@@ -1085,7 +1089,7 @@
 @media (max-width: 700px) {
   .ap-save-bar {
     position: sticky;
-    bottom: 12px;
+    bottom: calc(12px + var(--bottom-nav-offset));
     background: color-mix(in oklab, var(--bg) 85%, transparent);
     backdrop-filter: blur(10px);
     padding: 10px;

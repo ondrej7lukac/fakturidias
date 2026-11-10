@@ -23,7 +23,7 @@
 .ob-panel {
   width: 100%;
   max-width: 760px;
-  max-height: calc(100vh - 48px);
+  max-height: calc(var(--viewport-h) - 48px);
   display: flex;
   flex-direction: column;
   background: var(--card);
@@ -282,8 +282,9 @@
   }
   .ob-panel {
     max-width: 100%;
-    max-height: 100vh;
-    height: 100vh;
+    max-height: var(--viewport-h);
+    height: var(--viewport-h);
+    padding-top: var(--safe-top);
     border-radius: 0;
     border: none;
   }
@@ -294,7 +295,7 @@
     padding: 14px 18px;
   }
   .ob-footer {
-    padding: 14px 18px;
+    padding: 14px 18px calc(14px + var(--safe-bottom));
   }
   .ob-highlights {
     grid-template-columns: 1fr;
