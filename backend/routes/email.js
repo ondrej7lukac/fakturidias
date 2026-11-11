@@ -1,13 +1,13 @@
 'use strict';
 
-const { sendJson, parseBody } = require('../lib/utils');
+const { sendJson, parseBody, PDF_BODY_MAX_BYTES } = require('../lib/utils');
 const { sendEmail } = require('../lib/email');
 const { getOrCreateShareUrl } = require('./share');
 
 function attach(router) {
     router.add('POST', '/api/email/send', async ({ req, res, userEmail }) => {
         let body;
-        try { body = await parseBody(req); }
+        try { body = await parseBody(req, { maxBytes: PDF_BODY_MAX_BYTES }); }
         catch { return sendJson(res, 400, { error: 'Invalid request body' }); }
 
         try {

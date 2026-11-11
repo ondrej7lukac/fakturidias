@@ -1,0 +1,110 @@
+/* ── Mobile bottom tab bar (phones only) ───────────────────────── */
+.mobile-tabbar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  :root.has-mobile-tabbar {
+    --bottom-nav-offset: calc(var(--mobile-nav-h) + var(--safe-bottom));
+  }
+
+  /* Keep the end of every page scrollable above the bar */
+  :root.has-mobile-tabbar main {
+    padding-bottom: calc(var(--bottom-nav-offset) + 16px) !important;
+  }
+
+  .mobile-tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40; /* below sheets/dialogs (50) so their overlay catches taps */
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: stretch;
+    height: calc(var(--mobile-nav-h) + var(--safe-bottom));
+    padding: 0 max(6px, var(--safe-right)) var(--safe-bottom) max(6px, var(--safe-left));
+    background: color-mix(in oklab, var(--bg) 88%, transparent);
+    backdrop-filter: saturate(160%) blur(16px);
+    -webkit-backdrop-filter: saturate(160%) blur(16px);
+    border-top: 1px solid var(--border);
+    transition: transform 0.2s var(--ease-spring), opacity 0.2s ease;
+  }
+
+  .mobile-tabbar--hidden {
+    transform: translateY(100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .mobile-tabbar__tab {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    padding: 6px 2px;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.15s ease;
+  }
+
+  .mobile-tabbar__icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 28px;
+    border-radius: 999px;
+    transition: background 0.15s ease;
+  }
+
+  .mobile-tabbar__label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-tabbar__tab--active {
+    color: var(--text);
+  }
+
+  .mobile-tabbar__tab--active .mobile-tabbar__icon {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+
+  /* "New invoice" — the primary action, always filled */
+  .mobile-tabbar__tab--primary .mobile-tabbar__icon {
+    width: 48px;
+    height: 32px;
+    background: var(--text);
+    color: var(--bg);
+  }
+
+  .mobile-tabbar__tab--primary.mobile-tabbar__tab--active .mobile-tabbar__icon {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .mobile-tabbar__tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -4px;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+  .mobile-tabbar {
+    transition: none;
+  }
+}

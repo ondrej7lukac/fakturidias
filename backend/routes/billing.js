@@ -5,7 +5,7 @@ const {
     getSubscription,
     logWebhookEvent, markWebhookEvent,
 } = require('../lib/storage');
-const { isPro, isMax } = require('../lib/plan');
+const { isPro, isMax, effectiveSubscription } = require('../lib/plan');
 const { stripe, processStripeEvent } = require('../lib/stripe');
 const { processInvoicePaymentEvent } = require('../lib/payments');
 
@@ -69,7 +69,7 @@ function attachPublic(router) {
 
 function attachProtected(router) {
     router.add('GET', '/api/billing/subscription', async ({ res, userEmail }) => {
-        const sub = await getSubscription(userEmail);
+        const sub = effectiveSubscription(userEmail, await getSubscription(userEmail));
         let plan = 'free';
         if (isPro(sub)) {
             // Return the actual saved plan ('standard', 'max', or legacy 'pro')

@@ -8,7 +8,7 @@ const {
     deleteRecurringTemplate,
     getSubscription,
 } = require('../lib/storage');
-const { isPro } = require('../lib/plan');
+const { isPro, effectiveSubscription } = require('../lib/plan');
 
 const CADENCES = ['weekly', 'monthly', 'quarterly', 'yearly'];
 
@@ -19,7 +19,7 @@ function attach(router) {
     });
 
     router.add('POST', '/api/recurring', async ({ req, res, userEmail }) => {
-        const subscription = await getSubscription(userEmail);
+        const subscription = effectiveSubscription(userEmail, await getSubscription(userEmail));
         if (!isPro(subscription)) {
             return sendJson(res, 403, {
                 error: 'Recurring invoices require a Pro plan',

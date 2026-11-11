@@ -2,6 +2,8 @@
 const isProd = process.env.NODE_ENV === "production";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 const MAX_BODY_BYTES = 1 * 1024 * 1024; // 1 MB
+// Bodies that carry a base64 PDF (email, Drive backup).
+const PDF_BODY_MAX_BYTES = 15 * 1024 * 1024;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function logDebug(location, message, data) {
@@ -133,6 +135,7 @@ module.exports = {
   sendNotFound,
   readJsonBody,
   parseBody,
+  PDF_BODY_MAX_BYTES,
   readRawBody,
   SECURITY_HEADERS,
   EMAIL_RE,

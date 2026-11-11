@@ -10,7 +10,7 @@ const {
     peekInvoiceCounter,
     reserveInvoiceCounter
 } = require('../lib/storage');
-const { isPro } = require('../lib/plan');
+const { isPro, effectiveSubscription } = require('../lib/plan');
 const { fireWebhooks } = require('../lib/webhooks');
 
 function attach(router) {
@@ -31,7 +31,7 @@ function attach(router) {
         const existingInvoices = await getUserInvoices(userEmail);
         const isNew = !existingInvoices.find(inv => inv.id === invoice.id);
         if (isNew) {
-            const subscription = await getSubscription(userEmail);
+            const subscription = effectiveSubscription(userEmail, await getSubscription(userEmail));
             const { freeInvoiceLimit } = await getGlobalSettings();
             if (!isPro(subscription) && existingInvoices.length >= freeInvoiceLimit) {
                 return sendJson(res, 403, {
